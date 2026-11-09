@@ -3,6 +3,8 @@ from typing import Tuple, Callable, Any, Optional
 from .handler import AbletonOSCHandler
 import Live
 
+NOTES_PER_CHUNK = 200
+
 def note_name_to_midi(name):
     """ Maps a MIDI note name (D3, C#6) to a value.
     Assumes that middle C is C4. """
@@ -58,10 +60,29 @@ class ClipHandler(AbletonOSCHandler):
                 else:
                     rv = func(clip, *args, tuple(params[2:]))
 
+                if isinstance(rv, list):
+                    return [(track_index, clip_index, *chunk) for chunk in rv]
                 if rv is not None:
                     return (track_index, clip_index, *rv)
 
             return clip_callback
+
+        def create_arrangement_clip_callback(func, *args):
+            """
+            As create_clip_callback, for a clip in a track's Arrangement:
+              (track_index, arrangement_clip_index, *args)
+            where arrangement_clip_index indexes Track.arrangement_clips.
+            """
+            def arrangement_clip_callback(params: Tuple[Any]) -> Tuple:
+                track_index, clip_index = int(params[0]), int(params[1])
+                clip = self.song.tracks[track_index].arrangement_clips[clip_index]
+                rv = func(clip, *args, tuple(params[2:]))
+                if isinstance(rv, list):
+                    return [(track_index, clip_index, *chunk) for chunk in rv]
+                if rv is not None:
+                    return (track_index, clip_index, *rv)
+
+            return arrangement_clip_callback
 
         methods = [
             "fire",
@@ -136,11 +157,22 @@ class ClipHandler(AbletonOSCHandler):
                 pitch_start, pitch_span, time_start, time_span = 0, 127, -8192, 16384
             else:
                 raise ValueError("Invalid number of arguments for /clip/get/notes. Either 0 or 4 arguments must be passed.")
-            notes = clip.get_notes_extended(pitch_start, pitch_span, time_start, time_span)
-            all_note_attributes = []
-            for note in notes:
-                all_note_attributes += [note.pitch, note.start_time, note.duration, note.velocity, note.mute]
-            return tuple(all_note_attributes)
+            notes = list(clip.get_notes_extended(pitch_start, pitch_span, time_start, time_span))
+            #--------------------------------------------------------------------------------
+            # Reply in chunks of NOTES_PER_CHUNK notes, each prefixed with
+            # (chunk_index, chunk_count), so a long clip stays under macOS's 9216-byte
+            # UDP datagram limit. A chunk of 200 notes is about 4.2 KB. An empty clip
+            # replies with one empty chunk.
+            #--------------------------------------------------------------------------------
+            chunk_count = max(1, -(-len(notes) // NOTES_PER_CHUNK))
+            chunks = []
+            for chunk_index in range(chunk_count):
+                chunk_notes = notes[chunk_index * NOTES_PER_CHUNK:(chunk_index + 1) * NOTES_PER_CHUNK]
+                all_note_attributes = []
+                for note in chunk_notes:
+                    all_note_attributes += [note.pitch, note.start_time, note.duration, note.velocity, note.mute]
+                chunks.append((chunk_index, chunk_count, *all_note_attributes))
+            return chunks
 
         def clip_add_notes(clip, params: Tuple[Any] = ()):
             notes = []
@@ -166,6 +198,23 @@ class ClipHandler(AbletonOSCHandler):
         self.osc_server.add_handler("/live/clip/get/notes", create_clip_callback(clip_get_notes))
         self.osc_server.add_handler("/live/clip/add/notes", create_clip_callback(clip_add_notes))
         self.osc_server.add_handler("/live/clip/remove/notes", create_clip_callback(clip_remove_notes))
+
+        #--------------------------------------------------------------------------------
+        # Arrangement clips, addressed by (track_index, index into Track.arrangement_clips).
+        # Note times are in the clip's own time, as for Session clips; the song beat of a
+        # note is start_time + note start_time - start_marker.
+        #--------------------------------------------------------------------------------
+        self.osc_server.add_handler("/live/arrangement_clip/get/notes", create_arrangement_clip_callback(clip_get_notes))
+        for prop in properties_r + properties_rw:
+            self.osc_server.add_handler("/live/arrangement_clip/get/%s" % prop,
+                                        create_arrangement_clip_callback(self._get_property, prop))
+
+        def arrangement_clip_delete(params: Tuple[Any]):
+            track_index, clip_index = int(params[0]), int(params[1])
+            track = self.song.tracks[track_index]
+            track.delete_clip(track.arrangement_clips[clip_index])
+
+        self.osc_server.add_handler("/live/arrangement_clip/delete", arrangement_clip_delete)
 
         def clips_filter_handler(params: Tuple):
             # TODO: Pre-cache clip notes

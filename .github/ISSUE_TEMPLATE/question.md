@@ -2,7 +2,6 @@
 name: Question
 about: Question about implementation or some technical aspect
 title: ''
-labels: 'Type: Question :grey_question:'
 assignees: ''
 
 ---

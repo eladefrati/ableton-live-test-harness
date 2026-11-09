@@ -1,4 +1,4 @@
-from . import client, wait_one_tick, TICK_DURATION
+from . import client, wait_one_tick, query_notes, TICK_DURATION
 import pytest
 import random
 
@@ -52,14 +52,14 @@ def test_clip_property_pitch_fine(client):
     _test_clip_property(client, 2, 0, "pitch_fine", (0.5, 0.0))
 
 def test_clip_add_remove_notes(client):
-    assert client.query("/live/clip/get/notes", (0, 0)) == (0, 0)
+    assert query_notes(client, (0, 0)) == (0, 0)
 
     client.send_message("/live/clip/add/notes", (0, 0,
                                                  60, 0.0, 0.25, 64, False,
                                                  67, -0.25, 0.5, 32, False))
 
     # Should return all notes, including those before time = 0
-    assert client.query("/live/clip/get/notes", (0, 0)) == (0, 0,
+    assert query_notes(client, (0, 0)) == (0, 0,
                                                             60, 0.0, 0.25, 64, False,
                                                             67, -0.25, 0.5, 32, False)
 
@@ -69,16 +69,16 @@ def test_clip_add_remove_notes(client):
 
     # Query between t in [0..2] and pitch in [60, 71]
     # Should only return a single note
-    assert client.query("/live/clip/get/notes", (0, 0, 60, 11, 0, 2)) == (0, 0,
+    assert query_notes(client, (0, 0, 60, 11, 0, 2)) == (0, 0,
                                                                           60, 0.0, 0.25, 64, False)
 
     client.send_message("/live/clip/remove/notes", (0, 0, 60, 11, 0, 2))
-    assert client.query("/live/clip/get/notes", (0, 0)) == (0, 0,
+    assert query_notes(client, (0, 0)) == (0, 0,
                                                             60, 3.0, 0.5, 32, False,
                                                             67, -0.25, 0.5, 32, False,
                                                             72, 0.0, 0.25, 64, False)
     client.send_message("/live/clip/remove/notes", (0, 0))
-    assert client.query("/live/clip/get/notes", (0, 0)) == (0, 0)
+    assert query_notes(client, (0, 0)) == (0, 0)
 
 def test_clip_add_many_notes(client):
     """
@@ -105,11 +105,11 @@ def test_clip_add_many_notes(client):
     all_note_data = tuple(all_note_data)
 
     # Check clip is initially empty
-    assert client.query("/live/clip/get/notes", (0, 0)) == (0, 0)
+    assert query_notes(client, (0, 0)) == (0, 0)
 
     # Populate clip and check return value
     client.send_message("/live/clip/add/notes", (0, 0) + all_note_data)
-    assert client.query("/live/clip/get/notes", (0, 0)) == (0, 0) + all_note_data
+    assert query_notes(client, (0, 0)) == (0, 0) + all_note_data
 
     # Clear clip
     client.send_message("/live/clip/remove/notes", (0, 0))

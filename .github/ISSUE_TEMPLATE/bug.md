@@ -2,7 +2,6 @@
 name: Bug
 about: Some functionality not working as intended
 title: ''
-labels: 'Type: Bug :bug:'
 assignees: ''
 
 ---

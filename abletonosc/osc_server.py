@@ -12,7 +12,7 @@ import traceback
 
 class OSCServer:
     def __init__(self,
-                 local_addr: Tuple[str, int] = ('0.0.0.0', OSC_LISTEN_PORT),
+                 local_addr: Tuple[str, int] = ('127.0.0.1', OSC_LISTEN_PORT),
                  remote_addr: Tuple[str, int] = ('127.0.0.1', OSC_RESPONSE_PORT)):
         """
         Class that handles OSC server responsibilities, including support for sending
@@ -24,8 +24,8 @@ class OSCServer:
 
         Args:
             local_addr: Local address and port to listen on.
-                        By default, binds to the wildcard address 0.0.0.0, which means listening on
-                        every available local IPv4 interface (including 127.0.0.1).
+                        By default, binds to the IPv4 loopback address 127.0.0.1, so only
+                        processes on this machine can control Live.
             remote_addr: Remote address to send replies to, by default. Can be overridden in send().
         """
 
@@ -84,18 +84,33 @@ class OSCServer:
         except BuildError:
             self.logger.error("AbletonOSC: OSC build error: %s" % (traceback.format_exc()))
 
+    def reply(self, address: str, rv, remote_addr: Tuple[str, int]) -> None:
+        """
+        Send a handler's return value back to the client that sent the request.
+
+        Args:
+            address: The OSC address to reply on
+            rv: A tuple of params for one reply message, or a list of such tuples to send
+                as several messages (used to keep large replies under the UDP datagram
+                size limit, 9216 bytes by default on macOS)
+            remote_addr: The address the request came from
+        """
+        remote_hostname, _ = remote_addr
+        response_addr = (remote_hostname, self._response_port)
+        messages = rv if isinstance(rv, list) else [rv]
+        for params in messages:
+            assert isinstance(params, tuple)
+            self.send(address=address,
+                      params=params,
+                      remote_addr=response_addr)
+
     def process_message(self, message, remote_addr):
         if message.address in self._callbacks:
             callback = self._callbacks[message.address]
             rv = callback(message.params)
 
             if rv is not None:
-                assert isinstance(rv, tuple)
-                remote_hostname, _ = remote_addr
-                response_addr = (remote_hostname, self._response_port)
-                self.send(address=message.address,
-                          params=rv,
-                          remote_addr=response_addr)
+                self.reply(message.address, rv, remote_addr)
         elif "*" in message.address:
             regex = message.address.replace("*", "[^/]+")
             for callback_address, callback in self._callbacks.items():
@@ -115,12 +130,7 @@ class OSCServer:
                         #--------------------------------------------------------------------------------
                         continue
                     if rv is not None:
-                        assert isinstance(rv, tuple)
-                        remote_hostname, _ = remote_addr
-                        response_addr = (remote_hostname, self._response_port)
-                        self.send(address=callback_address,
-                                  params=rv,
-                                  remote_addr=response_addr)
+                        self.reply(callback_address, rv, remote_addr)
         else:
             self.logger.error("AbletonOSC: Unknown OSC address: %s" % message.address)
 

@@ -7,6 +7,7 @@ from . import abletonosc
 import importlib
 import traceback
 import logging
+import sys
 import os
 
 logger = logging.getLogger("abletonosc")
@@ -72,7 +73,7 @@ class Manager(ControlSurface):
             self.show_message("Received OSC OK")
             self.osc_server.send("/live/test", ("ok",))
         def reload_callback(params):
-            self.reload_imports()
+            return self.reload_imports()
         def get_log_level_callback(params):
             return (self.log_level,)
         def set_log_level_callback(params):
@@ -90,17 +91,7 @@ class Manager(ControlSurface):
         self.osc_server.add_handler("/live/api/show_message", show_message_callback)
 
         with self.component_guard():
-            self.handlers = [
-                abletonosc.SongHandler(self),
-                abletonosc.ApplicationHandler(self),
-                abletonosc.ClipHandler(self),
-                abletonosc.ClipSlotHandler(self),
-                abletonosc.TrackHandler(self),
-                abletonosc.DeviceHandler(self),
-                abletonosc.ViewHandler(self),
-                abletonosc.SceneHandler(self),
-                abletonosc.MidiMapHandler(self),
-            ]
+            self.handlers = [handler_class(self) for handler_class in abletonosc.HANDLERS]
 
     def clear_api(self):
         self.osc_server.clear_handlers()
@@ -119,25 +110,36 @@ class Manager(ControlSurface):
         self.schedule_message(1, self.tick)
 
     def reload_imports(self):
+        """
+        Reload every loaded abletonosc module, then the package itself, which imports any
+        module added to it since and lists the handler classes in HANDLERS. Replies
+        ("ok",) on success. On ("error", message), modules reloaded before the failure are
+        already new, but the handlers stay as registered: fix the error and reload again, or
+        restart Live.
+        """
         try:
-            importlib.reload(abletonosc.application)
-            importlib.reload(abletonosc.clip)
-            importlib.reload(abletonosc.clip_slot)
-            importlib.reload(abletonosc.device)
-            importlib.reload(abletonosc.handler)
-            importlib.reload(abletonosc.osc_server)
-            importlib.reload(abletonosc.scene)
-            importlib.reload(abletonosc.song)
-            importlib.reload(abletonosc.track)
-            importlib.reload(abletonosc.view)
+            prefix = abletonosc.__name__ + "."
+            modules = [module for name, module in sorted(sys.modules.items()) if name.startswith(prefix)]
+            #--------------------------------------------------------------------------------
+            # Reload the modules other modules build on first, so that handler modules
+            # reloaded after them subclass and import the new code.
+            #--------------------------------------------------------------------------------
+            base_modules = ("constants", "osc_server", "handler")
+            def reload_order(module):
+                name = module.__name__.rsplit(".", 1)[-1]
+                return base_modules.index(name) if name in base_modules else len(base_modules)
+            modules.sort(key=reload_order)
+            for module in modules:
+                importlib.reload(module)
             importlib.reload(abletonosc)
         except Exception as e:
-            exc = traceback.format_exc()
-            logging.warning(exc)
+            logger.error("Reload failed, keeping the old code: %s" % traceback.format_exc())
+            return ("error", str(e))
 
         self.clear_api()
         self.init_api()
         logger.info("Reloaded code")
+        return ("ok",)
 
     def disconnect(self):
         self.show_message("Disconnecting...")

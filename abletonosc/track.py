@@ -136,6 +136,15 @@ class TrackHandler(AbletonOSCHandler):
         self.osc_server.add_handler("/live/track/get/arrangement_clips/length", create_track_callback(track_get_arrangement_clip_lengths))
         self.osc_server.add_handler("/live/track/get/arrangement_clips/start_time", create_track_callback(track_get_arrangement_clip_start_times))
 
+        def track_duplicate_clip_to_arrangement(track, params):
+            clip_index, destination_time = int(params[0]), float(params[1])
+            new_clip = track.duplicate_clip_to_arrangement(track.clip_slots[clip_index].clip, destination_time)
+            for arrangement_clip_index, clip in enumerate(track.arrangement_clips):
+                if clip._live_ptr == new_clip._live_ptr:
+                    return arrangement_clip_index,
+
+        self.osc_server.add_handler("/live/track/duplicate_clip_to_arrangement", create_track_callback(track_duplicate_clip_to_arrangement))
+
         def track_get_num_devices(track, _):
             return len(track.devices),
 

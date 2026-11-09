@@ -3,7 +3,6 @@ name: Improvement
 about: Performance improvement, excluding introducing a new feature or requiring a major
   refactor
 title: ''
-labels: 'Type: Improvement :chart_with_upwards_trend:'
 assignees: ''
 
 ---

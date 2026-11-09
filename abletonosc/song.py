@@ -69,9 +69,11 @@ class SongHandler(AbletonOSCHandler):
             "record_mode",
             "root_note",
             "scale_name",
+            "session_automation_record",
             "session_record",
             "signature_denominator",
             "signature_numerator",
+            "start_time",
             "tempo"
         ]
 
@@ -97,6 +99,43 @@ class SongHandler(AbletonOSCHandler):
         # Callbacks for Song: Track properties
         #--------------------------------------------------------------------------------
         self.osc_server.add_handler("/live/song/get/num_tracks", lambda _: (len(self.song.tracks),))
+        self.osc_server.add_handler("/live/song/get/num_return_tracks", lambda _: (len(self.song.return_tracks),))
+
+        #--------------------------------------------------------------------------------
+        # The Main (master) track's devices, which /live/track/... can't address: e.g. to
+        # empty the Main track of a set built from a template.
+        #--------------------------------------------------------------------------------
+        self.osc_server.add_handler("/live/song/get/master_track/num_devices",
+                                    lambda _: (len(self.song.master_track.devices),))
+        self.osc_server.add_handler("/live/song/get/master_track/devices/name",
+                                    lambda _: tuple(device.name for device in self.song.master_track.devices))
+        self.osc_server.add_handler("/live/song/master_track/delete_device",
+                                    lambda params: self.song.master_track.delete_device(int(params[0])))
+
+        #--------------------------------------------------------------------------------
+        # Moves a device to another track's chain, keeping the instance (its state and
+        # parameters): track_index, device_index, target_track_index, target_position.
+        # Replies with the device's new index.
+        #--------------------------------------------------------------------------------
+        def song_move_device(params: Tuple[Any]):
+            track_index, device_index, target_index, position = (int(p) for p in params[:4])
+            device = self.song.tracks[track_index].devices[device_index]
+            return (self.song.move_device(device, self.song.tracks[target_index], position),)
+
+        self.osc_server.add_handler("/live/song/move_device", song_move_device)
+
+        #--------------------------------------------------------------------------------
+        # Which set is open: the file it was loaded from or saved to ("" if never saved),
+        # and an id that changes whenever Live opens a set, even the same file again.
+        #--------------------------------------------------------------------------------
+        self.osc_server.add_handler("/live/song/get/file_path", lambda _: (self.song.file_path or "",))
+        self.osc_server.add_handler("/live/song/get/id", lambda _: (str(self.song._live_ptr),))
+
+        # Every track's devices' parameter counts in one reply, for waiting until Max for
+        # Live devices have loaded; one query per device would take a tick each.
+        def song_get_device_parameter_counts(_):
+            return tuple(len(device.parameters) for track in self.song.tracks for device in track.devices)
+        self.osc_server.add_handler("/live/song/get/device_parameter_counts", song_get_device_parameter_counts)
 
         def song_get_track_names(params):
             if len(params) == 0:

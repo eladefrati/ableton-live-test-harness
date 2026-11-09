@@ -2,7 +2,6 @@
 name: Documentation
 about: Improvements or additions in documentation for some file, feature, or codebase
 title: ''
-labels: 'Type: Documentation :books:'
 assignees: ''
 
 ---

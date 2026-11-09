@@ -2,7 +2,6 @@
 name: New Feature
 about: Introduction of a completely new feature
 title: ''
-labels: 'Type: New Feature :heavy_plus_sign:'
 assignees: ''
 
 ---

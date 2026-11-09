@@ -133,6 +133,9 @@ def test_song_property_record_mode(client):
     _test_song_property(client, "record_mode", [1, 0])
     client.send_message("/live/song/stop_playing")
 
+def test_song_property_start_time(client):
+    _test_song_property(client, "start_time", [2.5, 0])
+
 def test_song_property_tempo(client):
     _test_song_property(client, "tempo", [125.5, 120])
 
