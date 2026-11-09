@@ -210,9 +210,9 @@ home (uncommitted changes included; the remote can't fetch from this Mac), runs 
 `~/dev/<repo>` there and exits with its status. Checks find the harness through
 `~/dev/ableton-live-test-harness`, so the layout must match. The remote is the host named
 as `remote` in `harness/local.json`, a file git ignores (`local.example.json` shows its
-keys); `LIVE_REMOTE` names another for one run. `clickHost` in the same file names the one
-machine `device-ui.js` may click on: name a machine nobody is using, since a click takes
-its pointer (ADR-0005). `remote.sh` copies the file with the rest, so both machines read
+keys); `LIVE_REMOTE` names another for one run. `clickHost` in the same file is the hostname (without `.local`)
+of the one machine `device-ui.js` may click on. A click takes that machine's pointer, so
+name your own only if the agent may take it from you (ADR-0005). `remote.sh` copies the file with the rest, so both machines read
 the same values. The remote's own `.venv`, `node_modules` and `__pycache__` are not copied or deleted: a
 project that needs them installs them there over ssh. A check's logs are not copied or
 deleted either: `remote.sh` moves them to this Mac after the command, after a failure too,
