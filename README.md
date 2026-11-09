@@ -42,11 +42,8 @@ Max for Live. Live's language must be English: the harness finds its menus and d
 - Keep Count-In at None, Live's default (the metronome's drop-down menu in the Control Bar).
   The LOM can't change it, and a recording with Count-In on starts late.
 - Add each project's `builds/` folder to Live's Places, and `harness/devices/` for the example
-  Max for Live check below. An agent does this with Live quit: in `Library.cfg` in Live's
-  preferences folder (`~/Library/Preferences/Ableton/Live <version>/`, for the version you
-  run), add
-  `<UserFolderInfo Id="<higher than any Id in the file>" Path="<absolute path>" DisplayName="<folder name>" IconName="" />`
-  to `<UserFolderInfoList>`. By hand: Add Folder under Places in Live's browser.
+  Max for Live check below. An agent does this with Live quit:
+  `node harness/add-place.js <folder>`. By hand: Add Folder under Places in Live's browser.
 - For an agent, link `skills/verify-ableton` into its skills folder. For Claude Code:
   `ln -s ~/dev/ableton-live-test-harness/skills/verify-ableton ~/.claude/skills/verify-ableton`
 - To run checks on a second Mac, or to press a device's controls with the mouse, copy

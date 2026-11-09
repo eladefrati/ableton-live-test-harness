@@ -120,6 +120,10 @@ Node 18 or later. See [ADR-0001](../docs/adr/0001-fork-abletonosc.md) for the de
   stops Live as `relaunch.js` does (same answers, same kill after 10 s, `--kill` kills at
   once, stops at any other dialog), then moves Live's recovery data aside and deletes its
   Temp Projects. Any other option is refused.
+- `add-place.js <folder> [--suite] [--app <path>]`: adds a folder to Places in `Library.cfg`,
+  for the Live `relaunch.js` would start with those options. It refuses while Live runs and
+  does nothing if the folder is already there. Places are told apart by path, so any number
+  can be named `builds`. Live shows the new one when it next starts. Any other option is refused.
 - `max/hook.js` and `Live.openHooks()`/`waitForHook()`: the test hook of
   [ADR-0002](../docs/adr/0002-test-hook.md), for reading what a development build of a
   device reports (status line, check results) over UDP 11002. Take the time before the
@@ -230,7 +234,8 @@ is working in Live there; if one is, it agrees slots with that session.
 On the remote, link AbletonOSC into `~/Music/Ableton/User Library/Remote Scripts` from the
 remote's copy of this repo, and give Live the same settings as on this Mac (Control Surface,
 Count-In, any Options.txt entries). A project's builds folder must be in the remote's Places, pointing at the remote's copy
-(`<remote home>/dev/<repo>/builds`; "Installation" in the main README says how to add one).
+(`<remote home>/dev/<repo>/builds`): with Live quit there,
+`harness/remote.sh <repo> node ../ableton-live-test-harness/harness/add-place.js builds`.
 `macos.js` there runs under sshd, so give
 `/usr/libexec/sshd-keygen-wrapper` Accessibility (System Settings > Privacy & Security);
 System Events then needs no separate Automation approval. A command run
