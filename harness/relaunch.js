@@ -329,4 +329,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { answerFor, tempProjectsSince, crashPrefix, parseArgs, warmUp, livePids, stop };
+module.exports = { answerFor, tempProjectsSince, crashPrefix, parseArgs, warmUp, livePids, stop, BETA, SUITE };

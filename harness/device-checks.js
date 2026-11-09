@@ -239,7 +239,8 @@ async function run(cases, {
 // name: the LOM gives no folder's path), or null if it can.
 function placesProblem(build, builds, places) {
   if (places.length === 0) {
-    return `${build} isn't in Live's Places: add ${builds} to Places in Live's browser. `
+    return `${build} isn't in Live's Places: add ${builds} to Places, with Live quit: `
+      + `node ${path.join(__dirname, "add-place.js")} "${builds}" (or Add Folder in Live's browser). `
       + "If it is there, Live hasn't indexed the new build yet: wait a moment and run again.";
   }
   if (places.length > 1) {

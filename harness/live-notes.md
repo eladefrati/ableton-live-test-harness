@@ -175,6 +175,10 @@ unexpected.
 
 ## Logs and settings
 
+- Places are in `Library.cfg` in Live's preferences folder, one file per Live version. Two
+  entries with one `Id` make Live reject the whole file as corrupt, and AbletonOSC then
+  doesn't answer (2026-11-08). Live renumbers the `Id`s between launches, so an `Id` can't
+  be kept. `add-place.js` makes the edit.
 - Live logs every Max console message to `~/Library/Preferences/Ableton/Live <version>/Log.txt`
   (the version without a Beta's build, e.g. `Live 12.4.25b1`), appended to at each launch
   after an `info: Started: Live <version>` line, as
