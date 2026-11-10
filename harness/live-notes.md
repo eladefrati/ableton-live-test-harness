@@ -81,9 +81,13 @@ unexpected.
   in question cannot be armed!"): delete the recording track before its source.
 - Live's input routing list follows a track rename a tick later, and the routing setter
   only logs an unknown name; use `setInputRouting()`, which waits and checks.
-- With Options.txt's `-EnableArmOnSelection`, selecting a track arms it, and loading a
-  device from the browser selects its track: `signalTracks` disarms the source track
-  after loading its instrument, or `recordArrangement` refuses.
+- Loading a device from the browser selects its track.
+- `-EnableArmOnSelection` is an optional Options.txt entry; without it, none of this
+  applies. With it, the arm follows the selection: while a track is armed, selecting another
+  moves the arm to it; with no track armed, selecting a track arms nothing (Live 12.4.16,
+  2026-11-10). Loading an instrument armed its track (2026-10-31): `signalTracks` disarms the source track after loading its
+  instrument, or `recordArrangement` refuses. Loading a MIDI effect onto a track, with no
+  track armed, armed nothing.
 - `/live/view/set/selected_track` once left the selection unchanged, with no error sent or
   logged: after a track had been armed, recorded in the Arrangement (`recordArrangement`)
   and disarmed, setting another track and then `sync()` still read the old track from
