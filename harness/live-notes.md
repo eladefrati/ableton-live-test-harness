@@ -84,6 +84,15 @@ unexpected.
 - With Options.txt's `-EnableArmOnSelection`, selecting a track arms it, and loading a
   device from the browser selects its track: `signalTracks` disarms the source track
   after loading its instrument, or `recordArrangement` refuses.
+- `/live/view/set/selected_track` once left the selection unchanged, with no error sent or
+  logged: after a track had been armed, recorded in the Arrangement (`recordArrangement`)
+  and disarmed, setting another track and then `sync()` still read the old track from
+  `/live/view/get/selected_track`, and the Detail View still showed it. Live was frontmost
+  in Arrangement view (Live 12.4.16, 2026-11-09). The same steps on a Live whose window
+  wasn't redrawing (it showed none of the changes) selected the track every time, so the
+  cause is not known.
+  `/live/view/set/selected_device` on a device of the wanted track selected that track.
+  Read `get/selected_track` back after setting it.
 - A value listener left on a parameter by an earlier session kept sending after its client
   was gone (`stop_listen` answered "Observer not connected"). Its updates arrive on
   `/live/device/get/parameter/value`, the address a `parameter/value` query answers on, so
