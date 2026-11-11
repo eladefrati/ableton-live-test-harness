@@ -172,7 +172,7 @@ const machine = {
   },
   window: async () => JSON.parse(await helper("window")),
   async read(windowId) {
-    const folder = fs.mkdtempSync(path.join(os.tmpdir(), "device-ui-"));
+    const folder = mac.tempFolder("device-ui-");
     try {
       const image = path.join(folder, "window.png");
       await exec("screencapture", ["-x", "-o", "-l", windowId, image]);
