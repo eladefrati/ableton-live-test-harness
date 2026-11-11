@@ -5,7 +5,7 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
-const { inHarnessTemp, emptyHarnessTemp } = require("../macos.js");
+const { inHarnessTemp, emptyHarnessTemp, livePids, MacError } = require("../macos.js");
 
 test("inHarnessTemp takes files inside the root only, through /var's link, and refuses what is missing", () => {
   // Under os.tmpdir(), which is /var/folders/..., a link to /private/var/folders/...
@@ -45,4 +45,12 @@ test("emptyHarnessTemp deletes every folder in the temp folder and says how many
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }
+});
+
+test("livePids reads pgrep's exit 1 as no Live, and refuses to guess on any other failure", async () => {
+  const failing = (code) => () => Promise.reject(new Error("pgrep -x Live failed", { cause: { code } }));
+  assert.deepEqual(await livePids(() => Promise.resolve("101\n202\n")), [101, 202]);
+  assert.deepEqual(await livePids(failing(1)), []);
+  await assert.rejects(livePids(failing(3)), (error) => error instanceof MacError && /Can't tell whether Live is running/.test(error.message));
+  await assert.rejects(livePids(failing("ENOENT")), MacError);
 });

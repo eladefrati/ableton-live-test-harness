@@ -195,9 +195,18 @@ function emptyHarnessTemp(say, root = HARNESS_TEMP) {
   if (old.length) say(`info deleted ${old.length} items in ${root}`);
 }
 
-// The process ids of the Lives running, Suite and Beta alike.
-async function livePids() {
-  return (await tools.run("pgrep", ["-x", "Live"]).catch(() => "")).split("\n").filter(Boolean).map(Number);
+// The process ids of the Lives running, Suite and Beta alike. pgrep exits 1 when none
+// matches; any other failure throws, so it is never read as "no Live is running" by a
+// caller about to delete what a running Live has open.
+async function livePids(find = () => tools.run("pgrep", ["-x", "Live"])) {
+  let out;
+  try {
+    out = await find();
+  } catch (error) {
+    if (error.cause && error.cause.code === 1) return [];
+    throw new MacError(`Can't tell whether Live is running: ${error.message}`);
+  }
+  return out.split("\n").filter(Boolean).map(Number);
 }
 
 // Saves the set to its file, `file`, and resolves once the file has been rewritten. A set
