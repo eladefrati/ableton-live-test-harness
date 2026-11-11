@@ -55,9 +55,12 @@ It checks that Live is running (only one at a time), AbletonOSC answers, no
 Live dialog is open, and no track is armed, and reports the bit depth Live records at
 (`info records at 24-bit` or `32-bit float`) and the sample rate it runs at. It warns when
 the Remote Script's files changed since Live started (run `harness/cli.js reload`; a changed
-`manager.py` needs a relaunch) and when Automation Arm is on. On "UDP 11001 is in use", another client is
+`manager.py` needs a relaunch) and when Automation Arm is on. It also names the running Live
+app and its version, the tracks and the open set's file. On "UDP 11001 is in use", another client is
 running: find out who before going on. On "AbletonOSC does not answer", ask the user to
-select it as a Control Surface.
+select it as a Control Surface. On "System Events can't name its app", the terminal app
+lacks Accessibility or Automation permission ("What Live needs" in `harness/README.md`): ask
+the user to allow it.
 
 ## Drive
 
@@ -101,7 +104,9 @@ Click inside Live only through `harness/device-ui.js`, which refuses anywhere bu
 host and clicks only after Live's Info View names the control. Bring
 Live to the front only when a step needs it: keystrokes through System Events go to the frontmost app. To see Live, capture
 its window in the background, which works with Live behind other windows:
-`node ~/dev/ableton-live-test-harness/harness/cli.js capture <png>`. Before acting on a Live window, list Live's windows (System
+`node ~/dev/ableton-live-test-harness/harness/cli.js capture <png>`. That shows Live's
+main window only. A dialog or panel is a window of its own: get its CGWindowID (a short
+Swift script over `CGWindowListCopyWindowInfo`), then `screencapture -x -o -l <id>`. Before acting on a Live window, list Live's windows (System
 Events) so a panel on top isn't missed. A dialog the Live API can't answer: capture it and
 ask the user, naming it.
 

@@ -149,8 +149,9 @@ Node 18 or later. See [ADR-0001](../docs/adr/0001-fork-abletonosc.md) for the de
 - `cli.js`: `node harness/cli.js ping | reload | query <address> [args] | send <address> [args] | notes <track> <clip> [--arrangement] | song-notes <track> | max-log [since] | capture <png>`.
   `max-log` reads Live's log, not OSC, so it runs beside a check; `since` is ms or a local
   time such as `2026-10-31T11:18`, and defaults to Live's start. `capture` saves a picture of
-  Live's main window, taken with Live behind other windows (`captureWindow` in
-  `device-ui.js`); it needs Screen Recording for the terminal app.
+  Live's main window only (a dialog or panel is a window of its own), taken with Live behind
+  other windows (`captureWindow` in `device-ui.js`). It needs Screen Recording for the
+  terminal app, and Automation for System Events: it wakes the display first, as `macos.js` does.
 - `checks/record-roundtrip.js`: checks the recording path itself. It adds two tracks,
   records one's clip into the other through MIDI routing, compares, and deletes them.
 - `checks/plugin-record.js [--keep]`: checks the plug-in path on Apple's AUDelay, which
