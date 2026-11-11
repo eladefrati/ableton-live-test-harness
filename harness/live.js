@@ -439,14 +439,15 @@ class Live {
     return notes;
   }
 
+  // The track's Arrangement clips, in Live's order: { index, start_time, end_time,
+  // start_marker, looping, loop_start, loop_end, is_midi_clip } each, from one reply.
   async arrangementClips(track) {
-    const starts = (await this.query("/live/track/get/arrangement_clips/start_time", track)).slice(1);
+    const properties = ["start_time", "end_time", "start_marker", "looping", "loop_start", "loop_end", "is_midi_clip"];
+    const values = (await this.query("/live/track/get/arrangement_clips/properties", track)).slice(1);
     const clips = [];
-    for (let index = 0; index < starts.length; index++) {
+    for (let index = 0; index * properties.length < values.length; index++) {
       const clip = { index };
-      for (const property of ["start_time", "end_time", "start_marker", "looping", "loop_start", "loop_end", "is_midi_clip"]) {
-        clip[property] = await this.get("arrangement_clip", property, track, index);
-      }
+      properties.forEach((property, i) => { clip[property] = values[index * properties.length + i]; });
       clips.push(clip);
     }
     return clips;

@@ -126,6 +126,15 @@ class TrackHandler(AbletonOSCHandler):
         def track_get_arrangement_clip_start_times(track, _):
             return tuple(clip.start_time for clip in track.arrangement_clips)
 
+        # What a client needs to place each Arrangement clip's notes in song time, for all of
+        # a track's clips in one reply; a query per property per clip takes a tick each.
+        arrangement_clip_properties = ("start_time", "end_time", "start_marker", "looping",
+                                       "loop_start", "loop_end", "is_midi_clip")
+
+        def track_get_arrangement_clip_properties(track, _):
+            return tuple(getattr(clip, prop) for clip in track.arrangement_clips
+                         for prop in arrangement_clip_properties)
+
         """
         Returns a list of clip properties, or Nil if clip is empty
         """
@@ -135,6 +144,7 @@ class TrackHandler(AbletonOSCHandler):
         self.osc_server.add_handler("/live/track/get/arrangement_clips/name", create_track_callback(track_get_arrangement_clip_names))
         self.osc_server.add_handler("/live/track/get/arrangement_clips/length", create_track_callback(track_get_arrangement_clip_lengths))
         self.osc_server.add_handler("/live/track/get/arrangement_clips/start_time", create_track_callback(track_get_arrangement_clip_start_times))
+        self.osc_server.add_handler("/live/track/get/arrangement_clips/properties", create_track_callback(track_get_arrangement_clip_properties))
 
         def track_duplicate_clip_to_arrangement(track, params):
             clip_index, destination_time = int(params[0]), float(params[1])

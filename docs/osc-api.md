@@ -295,6 +295,7 @@ To query the properties of multiple tracks, see [Song: Properties of cue points,
 | /live/track/get/arrangement_clips/name       | track_id     | track_id, [name, ....]      | Query all arrangement view clip names on track   |
 | /live/track/get/arrangement_clips/length     | track_id     | track_id, [length, ...]     | Query all arrangement view clip lengths on track |
 | /live/track/get/arrangement_clips/start_time | track_id     | track_id, [start_time, ...] | Query all arrangement view clip times on track   |
+| /live/track/get/arrangement_clips/properties | track_id     | track_id, [start_time, end_time, start_marker, looping, loop_start, loop_end, is_midi_clip, ...] | Query those seven properties of every arrangement view clip on track, seven values per clip |
 | /live/track/duplicate_clip_to_arrangement   | track_id, clip_id, time | track_id, arrangement_clip_id | Copy the Session clip in slot clip_id into the Arrangement at beat `time`; replies with the new clip's index |
 
 ### Track: Properties of devices

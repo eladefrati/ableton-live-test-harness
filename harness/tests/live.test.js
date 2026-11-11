@@ -84,14 +84,9 @@ test("requests run one at a time, in order", () => withFake({
 }));
 
 test("songNotes places notes in song time and drops notes outside the clip", () => withFake({
-  "/live/track/get/arrangement_clips/start_time": ([track]) => [["/live/track/get/arrangement_clips/start_time", track, 8]],
-  "/live/arrangement_clip/get/start_time": ([t, c]) => [["/live/arrangement_clip/get/start_time", t, c, 8]],
-  "/live/arrangement_clip/get/end_time": ([t, c]) => [["/live/arrangement_clip/get/end_time", t, c, 12]],
-  "/live/arrangement_clip/get/start_marker": ([t, c]) => [["/live/arrangement_clip/get/start_marker", t, c, 1]],
-  "/live/arrangement_clip/get/is_midi_clip": ([t, c]) => [["/live/arrangement_clip/get/is_midi_clip", t, c, true]],
-  "/live/arrangement_clip/get/looping": ([t, c]) => [["/live/arrangement_clip/get/looping", t, c, false]],
-  "/live/arrangement_clip/get/loop_start": ([t, c]) => [["/live/arrangement_clip/get/loop_start", t, c, 0]],
-  "/live/arrangement_clip/get/loop_end": ([t, c]) => [["/live/arrangement_clip/get/loop_end", t, c, 4]],
+  // one clip: start_time, end_time, start_marker, looping, loop_start, loop_end, is_midi_clip
+  "/live/track/get/arrangement_clips/properties": ([track]) =>
+    [["/live/track/get/arrangement_clips/properties", track, 8, 12, 1, false, 0, 4, true]],
   "/live/arrangement_clip/get/notes": ([t, c]) => [["/live/arrangement_clip/get/notes", t, c, 0, 1,
     60, 0, 1, 100, false, // before the start marker: outside the clip
     62, 1, 1, 100, false, // at the start marker: beat 8
@@ -100,6 +95,17 @@ test("songNotes places notes in song time and drops notes outside the clip", () 
 }, async (live) => {
   const notes = await live.songNotes(2);
   assert.deepEqual(notes.map((n) => [n.pitch, n.start]), [[62, 8], [64, 11.5]]);
+}));
+
+test("arrangementClips reads every clip of the track from one reply, and none from an empty one", () => withFake({
+  "/live/track/get/arrangement_clips/properties": ([track]) => [["/live/track/get/arrangement_clips/properties", track,
+    ...(track === 1 ? [0, 4, 0, false, 0, 4, true, 8, 16, 2, true, 2, 6, false] : [])]],
+}, async (live) => {
+  assert.deepEqual(await live.arrangementClips(1), [
+    { index: 0, start_time: 0, end_time: 4, start_marker: 0, looping: false, loop_start: 0, loop_end: 4, is_midi_clip: true },
+    { index: 1, start_time: 8, end_time: 16, start_marker: 2, looping: true, loop_start: 2, loop_end: 6, is_midi_clip: false },
+  ]);
+  assert.deepEqual(await live.arrangementClips(0), []);
 }));
 
 test("a looping clip plays from its start marker to the loop end, then repeats the loop", () => {
