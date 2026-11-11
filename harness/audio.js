@@ -43,8 +43,8 @@ async function signalTracks(live, { track, device, notes, beats, instrument = ["
   try {
     const source = await live.createMidiTrack(NAMES.source);
     await live.loadDevice(source, instrument[0], instrument[1]);
-    // Loading selects the track, and with Options.txt's -EnableArmOnSelection Live arms
-    // it; recordArrangement then refuses (measured 2026-10-31).
+    // With Options.txt's -EnableArmOnSelection, loading the instrument armed its track, and
+    // recordArrangement then refuses (measured 2026-10-31; live-notes.md).
     live.set("track", "arm", source, 0);
     live.send("/live/clip_slot/create_clip", source, 0, float(beats));
     live.send("/live/clip/add/notes", source, 0,
