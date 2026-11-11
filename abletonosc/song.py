@@ -175,7 +175,14 @@ class SongHandler(AbletonOSCHandler):
                         if property_name == "num_devices":
                             value = len(track.devices)
                         else:
-                            value = getattr(track, property_name)
+                            #--------------------------------------------------------------------------------
+                            # A property that doesn't apply to a track reads None, as it does
+                            # through /live/track/get/, rather than failing the whole reply.
+                            #--------------------------------------------------------------------------------
+                            try:
+                                value = getattr(track, property_name)
+                            except RuntimeError:
+                                value = None
                             if isinstance(value, Live.Track.Track):
                                 #--------------------------------------------------------------------------------
                                 # Map Track objects to their track_index to return via OSC

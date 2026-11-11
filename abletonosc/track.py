@@ -126,14 +126,16 @@ class TrackHandler(AbletonOSCHandler):
         def track_get_arrangement_clip_start_times(track, _):
             return tuple(clip.start_time for clip in track.arrangement_clips)
 
-        # What a client needs to place each Arrangement clip's notes in song time, for all of
-        # a track's clips in one reply; a query per property per clip takes a tick each.
-        arrangement_clip_properties = ("start_time", "end_time", "start_marker", "looping",
-                                       "loop_start", "loop_end", "is_midi_clip")
-
-        def track_get_arrangement_clip_properties(track, _):
-            return tuple(getattr(clip, prop) for clip in track.arrangement_clips
-                         for prop in arrangement_clip_properties)
+        # The properties the client names, for all of a track's Arrangement clips in one
+        # reply; a query per property per clip takes a tick each. A property that doesn't
+        # apply to a clip reads None, as it does through /live/arrangement_clip/get/.
+        def track_get_arrangement_clip_properties(track, params):
+            def read(clip, prop):
+                try:
+                    return getattr(clip, prop)
+                except RuntimeError:
+                    return None
+            return tuple(read(clip, prop) for clip in track.arrangement_clips for prop in params)
 
         """
         Returns a list of clip properties, or Nil if clip is empty

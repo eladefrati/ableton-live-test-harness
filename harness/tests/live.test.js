@@ -83,10 +83,14 @@ test("requests run one at a time, in order", () => withFake({
   assert.deepEqual(results, [120, 0, 120]);
 }));
 
+// The reply of a fake /live/track/get/arrangement_clips/properties: the properties asked
+// for, by name, clip by clip.
+const clipValues = (properties, clips) => clips.flatMap((clip) => properties.map((property) => clip[property]));
+const SONG_CLIP = { start_time: 8, end_time: 12, start_marker: 1, looping: false, loop_start: 0, loop_end: 4, is_midi_clip: true };
+
 test("songNotes places notes in song time and drops notes outside the clip", () => withFake({
-  // one clip: start_time, end_time, start_marker, looping, loop_start, loop_end, is_midi_clip
-  "/live/track/get/arrangement_clips/properties": ([track]) =>
-    [["/live/track/get/arrangement_clips/properties", track, 8, 12, 1, false, 0, 4, true]],
+  "/live/track/get/arrangement_clips/properties": ([track, ...properties]) =>
+    [["/live/track/get/arrangement_clips/properties", track, ...clipValues(properties, [SONG_CLIP])]],
   "/live/arrangement_clip/get/notes": ([t, c]) => [["/live/arrangement_clip/get/notes", t, c, 0, 1,
     60, 0, 1, 100, false, // before the start marker: outside the clip
     62, 1, 1, 100, false, // at the start marker: beat 8
@@ -97,16 +101,20 @@ test("songNotes places notes in song time and drops notes outside the clip", () 
   assert.deepEqual(notes.map((n) => [n.pitch, n.start]), [[62, 8], [64, 11.5]]);
 }));
 
-test("arrangementClips reads every clip of the track from one reply, and none from an empty one", () => withFake({
-  "/live/track/get/arrangement_clips/properties": ([track]) => [["/live/track/get/arrangement_clips/properties", track,
-    ...(track === 1 ? [0, 4, 0, false, 0, 4, true, 8, 16, 2, true, 2, 6, false] : [])]],
-}, async (live) => {
-  assert.deepEqual(await live.arrangementClips(1), [
-    { index: 0, start_time: 0, end_time: 4, start_marker: 0, looping: false, loop_start: 0, loop_end: 4, is_midi_clip: true },
-    { index: 1, start_time: 8, end_time: 16, start_marker: 2, looping: true, loop_start: 2, loop_end: 6, is_midi_clip: false },
-  ]);
-  assert.deepEqual(await live.arrangementClips(0), []);
-}));
+test("arrangementClips asks for its properties by name and reads every clip from one reply", () => {
+  const clips = [
+    { start_time: 0, end_time: 4, start_marker: 0, looping: false, loop_start: 0, loop_end: 4, is_midi_clip: true },
+    { start_time: 8, end_time: 16, start_marker: 2, looping: true, loop_start: 2, loop_end: 6, is_midi_clip: false },
+  ];
+  return withFake({
+    "/live/track/get/arrangement_clips/properties": ([track, ...properties]) => [["/live/track/get/arrangement_clips/properties", track,
+      ...(track === 2 ? [1, 2, 3] : clipValues(properties, track === 1 ? clips : []))]],
+  }, async (live) => {
+    assert.deepEqual(await live.arrangementClips(1), clips.map((clip, index) => ({ index, ...clip })));
+    assert.deepEqual(await live.arrangementClips(0), []);
+    await assert.rejects(live.arrangementClips(2), /isn't rows of 7/);
+  });
+});
 
 test("a looping clip plays from its start marker to the loop end, then repeats the loop", () => {
   const clip = { start_time: 10, end_time: 19, start_marker: 1, looping: true, loop_start: 0, loop_end: 4 };
@@ -194,16 +202,26 @@ function playingSong(song = { cues: [] }) {
   };
 }
 
+// A fake /live/song/get/track_data over `tracks`: the track properties asked for, by name,
+// track by track.
+const trackDataOf = (tracks) => ([, , ...properties]) => [["/live/song/get/track_data",
+  ...tracks.flatMap((track) => properties.map((property) => track[property.replace(/^track\./, "")]))]];
+
 const withSessionClip = (numerator, denominator) => ({
   // one track: unarmed, its Session clip in slot 0 active
-  "/live/song/get/track_data": () => [["/live/song/get/track_data", false, 0]],
+  "/live/song/get/track_data": trackDataOf([{ arm: false, playing_slot_index: 0 }]),
   "/live/song/get/signature_numerator": () => [["/live/song/get/signature_numerator", numerator]],
   "/live/song/get/signature_denominator": () => [["/live/song/get/signature_denominator", denominator]],
 });
 
 test("recordArrangement refuses while a track the caller didn't arm is armed", () =>
-  withFake({ ...playingSong(), "/live/song/get/track_data": () => [["/live/song/get/track_data", true, -1, true, -1]] }, async (live) => {
+  withFake({ ...playingSong(), "/live/song/get/track_data": trackDataOf([{ arm: true, playing_slot_index: -1 }, { arm: true, playing_slot_index: -1 }]) }, async (live) => {
     await assert.rejects(live.recordArrangement({ start: 0, length: 1, tracks: [0] }), /Track 1 is armed and not part of this test/);
+  }));
+
+test("recordArrangement takes a track that reads no arm or slot as unarmed, with no Session clip", () =>
+  withFake({ ...playingSong(), "/live/song/get/track_data": trackDataOf([{ arm: null, playing_slot_index: null }]) }, async (live) => {
+    assert.deepEqual(await live.recordArrangement({ start: 1, length: 0.5, tracks: [] }), []);
   }));
 
 test("placeClip writes the notes to the first Session slot and duplicates the clip to beat 0", () => {

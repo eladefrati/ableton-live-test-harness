@@ -14,6 +14,15 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 class LiveError extends Error {}
 
+// A flat reply of `width` values per item, as rows. Refuses a reply that isn't whole rows:
+// read by position, a short one would put values under the wrong names.
+function rows(values, width) {
+  if (values.length % width) throw new LiveError(`A reply of ${values.length} values isn't rows of ${width}`);
+  const out = [];
+  for (let at = 0; at < values.length; at += width) out.push(values.slice(at, at + width));
+  return out;
+}
+
 // The notes an Arrangement clip plays, in song beats. The clip plays from its start
 // marker; a looping clip plays on to its loop end, then repeats loop start..loop end
 // until the clip ends. Notes that start outside a played span are not played.
@@ -228,10 +237,7 @@ class Live {
   // Properties of every track from one reply (a query per track takes a tick each):
   // trackData("name", "arm") resolves with [[name, arm], ...], one entry per track.
   async trackData(...properties) {
-    const values = await this.query("/live/song/get/track_data", 0, -1, ...properties.map((p) => `track.${p}`));
-    const rows = [];
-    for (let at = 0; at < values.length; at += properties.length) rows.push(values.slice(at, at + properties.length));
-    return rows;
+    return rows(await this.query("/live/song/get/track_data", 0, -1, ...properties.map((p) => `track.${p}`)), properties.length);
   }
 
   // Adds a track at the end of the set, named `name`, with the devices Live's default track
@@ -460,14 +466,9 @@ class Live {
   // start_marker, looping, loop_start, loop_end, is_midi_clip } each, from one reply.
   async arrangementClips(track) {
     const properties = ["start_time", "end_time", "start_marker", "looping", "loop_start", "loop_end", "is_midi_clip"];
-    const values = (await this.query("/live/track/get/arrangement_clips/properties", track)).slice(1);
-    const clips = [];
-    for (let index = 0; index * properties.length < values.length; index++) {
-      const clip = { index };
-      properties.forEach((property, i) => { clip[property] = values[index * properties.length + i]; });
-      clips.push(clip);
-    }
-    return clips;
+    const values = (await this.query("/live/track/get/arrangement_clips/properties", track, ...properties)).slice(1);
+    return rows(values, properties.length).map((row, index) =>
+      Object.assign({ index }, Object.fromEntries(properties.map((property, i) => [property, row[i]]))));
   }
 
   // Notes of every MIDI clip in the track's Arrangement as Live plays them, in song
@@ -531,7 +532,8 @@ class Live {
     const states = await this.trackData("arm", "playing_slot_index");
     const armed = states.findIndex(([arm], track) => arm && !tracks.includes(track));
     if (armed >= 0) throw new LiveError(`Track ${armed} is armed and not part of this test; disarm it first`);
-    const sessionTrack = states.findIndex(([, slot]) => slot >= 0);
+    // a track with no Session slots reads no number
+    const sessionTrack = states.findIndex(([, slot]) => typeof slot === "number" && slot >= 0);
     if (sessionTrack >= 0) {
       const bar = (4 * (await this.get("song", "signature_numerator"))) / (await this.get("song", "signature_denominator"));
       const barStart = Math.floor(start / bar + 1e-9) * bar;
