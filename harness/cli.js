@@ -13,12 +13,15 @@
 //                                         time (ms, or a date such as 2026-10-31T11:18), or
 //                                         since Live started; needs no OSC, so it runs
 //                                         beside a check
+//   node harness/cli.js capture <png>     a picture of Live's main window, taken with Live
+//                                         behind other windows; needs no OSC either
 //
 // Arguments: "12" is an int, "12.0" a float, true/false booleans, anything else a string.
 
 const { connect } = require("./live.js");
 const { float } = require("./osc.js");
 const { maxMessages } = require("./log.js");
+const { captureWindow } = require("./device-ui.js");
 
 function parseArg(text) {
   if (text === "true") return true;
@@ -29,7 +32,7 @@ function parseArg(text) {
 }
 
 const USAGE = "usage: cli.js ping | reload | query <address> [args] | send <address> [args] | "
-  + "notes <track> <clip> [--arrangement] | song-notes <track> | max-log [since]";
+  + "notes <track> <clip> [--arrangement] | song-notes <track> | max-log [since] | capture <png>";
 
 async function run(argv) {
   const [command, ...rest] = argv;
@@ -39,6 +42,10 @@ async function run(argv) {
     const since = args[0] === undefined ? undefined : /^\d+$/.test(args[0]) ? Number(args[0]) : new Date(args[0]);
     if (since !== undefined && Number.isNaN(new Date(since).getTime())) throw new Error(`Not a time: ${args[0]}`);
     return maxMessages({ since });
+  }
+  if (command === "capture") {
+    if (!args[0]) throw new Error(USAGE);
+    return { file: args[0], window: await captureWindow(args[0]) };
   }
   const live = await connect();
   try {

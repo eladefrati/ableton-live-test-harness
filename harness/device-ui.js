@@ -185,6 +185,16 @@ const machine = {
   click: (windowId, x, y) => helper("click", windowId, x, y),
 };
 
+// Saves a picture of Live's main window to `file` (PNG), with Live left where it is: the
+// capture works behind other windows. Needs Screen Recording for the terminal app, not the
+// click host. Resolves with the window, { id, x, y, w, h } in points.
+async function captureWindow(file, system = machine) {
+  await system.wake();
+  const window = await system.window();
+  await exec("screencapture", ["-x", "-o", "-l", window.id, file]);
+  return window;
+}
+
 class DeviceUi {
   constructor(live, { track, device, title, controls }, system) {
     Object.assign(this, { live, track, device, title, controls, system });
@@ -253,4 +263,4 @@ async function openDeviceUi(live, { track, device, build }, system = machine) {
   return new DeviceUi(live, { track, device, title, controls: readControls(fs.readFileSync(build)) }, system);
 }
 
-module.exports = { DeviceUiError, openDeviceUi, readControls, controlPoint, findTitle, infoTitle, readClickHost };
+module.exports = { DeviceUiError, openDeviceUi, captureWindow, readControls, controlPoint, findTitle, infoTitle, readClickHost };

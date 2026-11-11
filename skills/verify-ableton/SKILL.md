@@ -98,9 +98,8 @@ returning. `harness/README.md` has the API and what it needs.
 Click inside Live only through `harness/device-ui.js`, which refuses anywhere but the click
 host and clicks only after Live's Info View names the control. Bring
 Live to the front only when a step needs it: keystrokes through System Events go to the frontmost app. To see Live, capture
-its window in the background, which works with Live behind other windows: get its
-CGWindowID (a short Swift script over `CGWindowListCopyWindowInfo`), then
-`screencapture -x -o -l <id>`. Before acting on a Live window, list Live's windows (System
+its window in the background, which works with Live behind other windows:
+`node ~/dev/ableton-live-test-harness/harness/cli.js capture <png>`. Before acting on a Live window, list Live's windows (System
 Events) so a panel on top isn't missed. A dialog the Live API can't answer: capture it and
 ask the user, naming it.
 
