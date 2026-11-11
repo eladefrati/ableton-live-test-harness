@@ -146,7 +146,6 @@ for [Live Object Model - Song](https://docs.cycling74.com/max8/vignettes/live_ob
 | /live/song/get/num_tracks  |              | num_tracks             | Query the number of tracks                                                  |
 | /live/song/get/num_return_tracks |            | num_return_tracks      | Query the number of return tracks                                           |
 | /live/song/get/master_track/num_devices |     | num_devices            | Query the number of devices on the Main track                               |
-| /live/song/get/master_track/devices/name |    | [name, ...]            | Query the names of the Main track's devices                                 |
 | /live/song/master_track/delete_device | device_index |                | Delete a device from the Main track (no reply: sync to wait)                |
 | /live/song/move_device | track_id, device_id, target_track_id, position | | Move a device to another track, keeping the instance and its state |
 | /live/song/get/file_path              |               | file_path                  | The open set's file, or "" if never saved |
@@ -508,7 +507,6 @@ Loads devices and presets from Live's browser categories, the User Library or a 
 
 | Address                         | Query params           | Response params                         | Description |
 |:--------------------------------|:-----------------------|:----------------------------------------|:------------|
-| /live/browser/get/user_folders  |                        | [name, ...]                             | The Places folders |
 | /live/browser/get/places_with   | path                   | [name, ...]                             | The Places folders that have the item, by name (empty if none) |
 | /live/browser/get/children      | root, [path]           | root, path, chunk_index, chunk_count, [name, ...] | Item names under a browser item, in chunks of up to 100 |
 | /live/browser/load              | track_id, root, path   | track_id, device_id, device_name        | Select the track and load the item onto it; device_id is the added device's index, or -1. Refused while Hot-Swap is active, or if the track could not be selected. A Max for Live device's parameters arrive seconds later. |

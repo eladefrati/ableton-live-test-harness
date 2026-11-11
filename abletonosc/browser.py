@@ -96,10 +96,6 @@ class BrowserHandler(AbletonOSCHandler):
         return item
 
     def init_api(self):
-        def browser_get_user_folders(params: Tuple[Any] = ()):
-            browser = Live.Application.get_application().browser
-            return tuple(folder.name for folder in browser.user_folders)
-
         def browser_get_places_with(params: Tuple[Any]):
             return tuple(name for name, _ in self._find_in_places(params[0]))
 
@@ -146,7 +142,6 @@ class BrowserHandler(AbletonOSCHandler):
                     return track_index, device_index, device.name
             return track_index, -1, ""
 
-        self.osc_server.add_handler("/live/browser/get/user_folders", browser_get_user_folders)
         self.osc_server.add_handler("/live/browser/get/places_with", browser_get_places_with)
         self.osc_server.add_handler("/live/browser/get/children", browser_get_children)
         self.osc_server.add_handler("/live/browser/load", browser_load)

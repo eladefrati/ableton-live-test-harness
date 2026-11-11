@@ -107,8 +107,6 @@ class SongHandler(AbletonOSCHandler):
         #--------------------------------------------------------------------------------
         self.osc_server.add_handler("/live/song/get/master_track/num_devices",
                                     lambda _: (len(self.song.master_track.devices),))
-        self.osc_server.add_handler("/live/song/get/master_track/devices/name",
-                                    lambda _: tuple(device.name for device in self.song.master_track.devices))
         self.osc_server.add_handler("/live/song/master_track/delete_device",
                                     lambda params: self.song.master_track.delete_device(int(params[0])))
 
