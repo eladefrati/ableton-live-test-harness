@@ -80,8 +80,8 @@ else, on Live's stock Pitch device.
 
 # Usage
 
-AbletonOSC listens for OSC messages on port **11000**, and sends replies on port **11001**. Replies will be sent to the
-same IP as the originating message. When querying properties, OSC wildcard patterns can be used; for example, `/live/clip/get/* 0 0` will query all the properties of track 0, clip 0.
+AbletonOSC listens for OSC messages on port **11000**, on 127.0.0.1 only, and sends replies on port **11001** of the
+same machine. When querying properties, OSC wildcard patterns can be used; for example, `/live/clip/get/* 0 0` will query all the properties of track 0, clip 0.
 
 The addresses are listed in [docs/osc-api.md](docs/osc-api.md).
 
