@@ -244,6 +244,9 @@ class Live {
   // template for its kind adds removed, so they can't alter what a test records. Resolves
   // with its index.
   async createTrack(kind, name) {
+    // any other kind (a return track) isn't the last of the song's tracks, so the steps
+    // below would rename and strip another track
+    if (kind !== "midi" && kind !== "audio") throw new LiveError(`createTrack makes a midi or an audio track, not ${kind}`);
     this.send(`/live/song/create_${kind}_track`, -1);
     const track = (await this.get("song", "num_tracks")) - 1;
     this.set("track", "name", track, name);

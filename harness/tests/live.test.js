@@ -241,6 +241,10 @@ test("placeClip writes the notes to the first Session slot and duplicates the cl
   });
 });
 
+test("createTrack refuses a kind other than midi and audio, sending nothing", () => withFake({}, async (live) => {
+  await assert.rejects(live.createTrack("return", "x"), /a midi or an audio track, not return/);
+}));
+
 test("trackData groups one reply's values by track", () => withFake({
   "/live/song/get/track_data": (args) => [["/live/song/get/track_data", ...(args.join(" ") === "0 -1 track.name track.arm" ? ["a", false, "b", true] : [])]],
 }, async (live) => {
