@@ -383,9 +383,15 @@ async function windowTitle() {
   return osascript(inLive(`get name of first window whose subrole is "AXStandardWindow"`));
 }
 
+// When the process `pid` started, in ms, or null if that can't be read (it has exited).
+async function liveStartTime(pid) {
+  const started = Date.parse(await tools.run("ps", ["-o", "lstart=", "-p", pid]).catch(() => ""));
+  return Number.isNaN(started) ? null : started;
+}
+
 module.exports = {
   MacError, osascript, activate, wakeDisplay, isFrontmost, menuItems, clickMenu, isChecked, undoName,
   setToggle, setKeyMapMode, setMidiMapMode, liveApp, saveSet, saveSetAs, openInBackground, openSet,
   openSetAndWait, windowTitle, sameFile, SAVE_CHANGES, TEMP_FILES, STOP_AUDIO, HARNESS_TEMP, inHarnessTemp, tempFolder,
-  emptyHarnessTemp, livePids,
+  emptyHarnessTemp, livePids, liveStartTime,
 };

@@ -41,13 +41,11 @@ const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 const { connect } = require("./live.js");
-const { osascript, liveApp, livePids, sameFile, openInBackground, SAVE_CHANGES, TEMP_FILES, tempFolder, emptyHarnessTemp } = require("./macos.js");
+const { osascript, liveApp, livePids, liveStartTime, sameFile, openInBackground, SAVE_CHANGES, TEMP_FILES, tempFolder, emptyHarnessTemp } = require("./macos.js");
 const { preferencesFolder } = require("./settings.js");
-const tools = require("./tools.js");
 const { buildPluginSet, checkPluginLoaded, writeSet } = require("./plugin.js");
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-const run = (cmd, args) => tools.run(cmd, args).then((out) => out.trim());
 
 const HANG_MS = 10000; // Live exited about 3 s after the last answer in every run measured
 const START_MS = 90000;
@@ -269,7 +267,7 @@ async function warmUp(live, timeout = WARM_MS) {
 
 async function stop(live, pid, forceKill, say) {
   const old = await liveApp();
-  const started = Date.parse(await run("ps", ["-o", "lstart=", "-p", String(pid)]));
+  const started = await liveStartTime(pid);
   const exited = !forceKill && (await quit(live, old, pid, say));
   if (exited) say("info Live quit");
   else {
@@ -277,7 +275,9 @@ async function stop(live, pid, forceKill, say) {
     await kill(pid, say);
   }
   discardRecovery(await preferencesFolder(old), say);
-  deleteTempProjects(started, say);
+  // Without its start time, which Temp Projects were this Live's isn't known: none is deleted.
+  if (started === null) say("info Live's start time couldn't be read, so its Temp Projects are left");
+  else deleteTempProjects(started, say);
 }
 
 async function main(argv) {

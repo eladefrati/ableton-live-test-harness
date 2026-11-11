@@ -11,9 +11,8 @@ const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 const { connect } = require("./live.js");
-const { liveApp, livePids } = require("./macos.js");
+const { liveApp, livePids, liveStartTime } = require("./macos.js");
 const { liveVersion, recordBitDepth, describeDepth, sampleRate } = require("./settings.js");
-const { run } = require("./tools.js");
 
 async function main() {
   let failed = 0;
@@ -34,12 +33,13 @@ async function main() {
   }
   // Live keeps the Remote Script's modules from when it started: code changed since then
   // runs only after a reload (manager.py: a restart).
-  // No start time (Live exited meanwhile) only skips the warning; the checks below still run.
-  const started = Date.parse(await run("ps", ["-o", "lstart=", "-p", pids[0]]).catch(() => ""));
+  const started = await liveStartTime(pids[0]);
   const repo = path.join(__dirname, "..");
-  const changed = ["manager.py", ...fs.readdirSync(path.join(repo, "abletonosc")).map((f) => path.join("abletonosc", f))]
+  const changed = started === null ? [] : ["manager.py", ...fs.readdirSync(path.join(repo, "abletonosc")).map((f) => path.join("abletonosc", f))]
     .filter((f) => f.endsWith(".py") && fs.statSync(path.join(repo, f)).mtimeMs > started);
-  if (changed.length) {
+  if (started === null) {
+    console.log("warn can't read when Live started, so whether the Remote Script changed since isn't checked");
+  } else if (changed.length) {
     console.log(`warn changed since Live started (${new Date(started).toLocaleTimeString()}): ${changed.join(", ")}; `
       + "if not reloaded since, run node harness/cli.js reload" + (changed.includes("manager.py") ? "; manager.py needs a Live restart" : ""));
   }
