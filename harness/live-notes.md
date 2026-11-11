@@ -41,6 +41,9 @@ unexpected.
   Live's windows on another Space, Live comes to the front without them: Accessibility
   lists no windows and `saveSetAs` can't find or close its panel. Keep Live on the Space the harness runs on.
 - AbletonOSC keeps running across opening another set.
+- `relaunch.js` and `quit.js` empty the harness's temp folder, where every set the harness
+  saves or starts Live on is, while they hold UDP 11001, the port a check holds while it
+  runs. So `quit.js` refuses while another client runs, also when Live isn't running.
 - A new Live writes one `Temp Project` folder in `~/Music/Ableton/Live Recordings`, named
   for a time some seconds after it started, and records into it a set never saved or one
   saved outside a Live project (a lone `.als`). Quitting asks about deleting it only for a
@@ -199,8 +202,6 @@ unexpected.
   `<local time, microseconds>: error: Message from Max:  <text>`. A gen~ codebox
   that fails to compile ("declarations must come before any expressions") leaves a device
   that loads, answers OSC and outputs silence, with the reason only there (found 2026-10-31).
-- `quit.js` refuses while another client holds UDP 11001, also when Live isn't running: it
-  empties the harness's temp folder, which a running check or `relaunch.js` may be using.
 - Live keeps its settings in `Preferences.cfg` in its preferences folder, a binary file
   `settings.js` reads (its layout is at the top of that file, worked out from Live
   12.2 to 12.4.25b1's files). Bit Depth is `SongPrefData.RecordBitDepth`: 1 is 24-bit

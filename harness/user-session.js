@@ -11,9 +11,9 @@
 // status come back through files.
 
 const fs = require("node:fs");
+const os = require("node:os");
 const path = require("node:path");
 const { execFile } = require("node:child_process");
-const { tempFolder } = require("./macos.js");
 const { escapeXml } = require("./tools.js");
 
 class UserSessionError extends Error {}
@@ -49,7 +49,9 @@ function jobPlist(label, folder, cmd, args) {
 
 async function runAsGuiJob(cmd, args, timeoutMs) {
   const uid = process.getuid();
-  const folder = tempFolder("gui-job-");
+  // Not in the harness's temp folder, which relaunch.js and quit.js empty: a job can run
+  // while no client holds UDP 11001.
+  const folder = fs.mkdtempSync(path.join(os.tmpdir(), "ableton-harness-job-"));
   const label = `local.ableton-live-test-harness.${path.basename(folder)}`;
   const plist = path.join(folder, "job.plist");
   fs.writeFileSync(plist, jobPlist(label, folder, cmd, args));

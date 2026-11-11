@@ -288,11 +288,11 @@ async function main(argv) {
   if (!fs.existsSync(app)) throw new Error(`${app} isn't installed: name the Live to start with --app <path>`);
   const pids = await livePids();
   if (pids.length > 1) throw new Error("More than one Live is running: the harness can't tell them apart");
-  // Built before Live is quit, so a plug-in that can't be found or read leaves Live as it is.
-  const plugin = name ? await buildPluginSet(name) : null;
   // Holding UDP 11001 across the relaunch also keeps other clients out until Live is back.
   const live = await connect({ timeout: 1000 });
   try {
+    // Built before Live is quit, so a plug-in that can't be found or read leaves Live as it is.
+    const plugin = name ? await buildPluginSet(name) : null;
     if (pids.length === 1) await stop(live, pids[0], forceKill, say);
     else say("info Live is not running");
     discardRecovery(await preferencesFolder(app), say);
