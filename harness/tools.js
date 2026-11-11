@@ -50,4 +50,4 @@ async function helperBinary(source) {
 
 const escapeXml = (text) => text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
-module.exports = { run, helperBinary, escapeXml, HELPER_CACHE };
+module.exports = { run, helperBinary, escapeXml };

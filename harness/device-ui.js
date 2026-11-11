@@ -104,11 +104,11 @@ function infoTitle(lines, title, scale) {
 const HELPER_SOURCE = path.join(__dirname, "device-ui.swift");
 
 const exec = (cmd, args) => tools.run(cmd, args).catch((e) => {
-  throw new DeviceUiError(e.message);
+  throw new DeviceUiError(e.message, { cause: e });
 });
 
 const helperBinary = () => tools.helperBinary(HELPER_SOURCE).catch((e) => {
-  throw new DeviceUiError(e.message);
+  throw new DeviceUiError(e.message, { cause: e });
 });
 
 async function helper(...args) {

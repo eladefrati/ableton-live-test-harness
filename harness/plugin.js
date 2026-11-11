@@ -27,6 +27,8 @@ const { openSetAndWait, tempFolder, inHarnessTemp } = require("./macos.js");
 const { runInUserSession } = require("./user-session.js");
 const tools = require("./tools.js");
 
+const { escapeXml } = tools;
+
 class PluginError extends Error {}
 
 const fourCCValue = (s) => Buffer.from(s, "latin1").readUInt32BE(0);
@@ -92,7 +94,7 @@ function mapParameters(raw) {
 // Runs a command in this process's own session (plutil); auval and the helper go through
 // runInUserSession instead.
 const run = (cmd, args) => tools.run(cmd, args).catch((e) => {
-  throw new PluginError(e.message);
+  throw new PluginError(e.message, { cause: e });
 });
 
 const HELPER_SOURCE = path.join(__dirname, "au-parameters.swift");
@@ -100,7 +102,7 @@ const HELPER_MARK = "AU-PARAMETERS ";
 
 // The path of the compiled helper (helperBinary in tools.js).
 const helperBinary = () => tools.helperBinary(HELPER_SOURCE).catch((e) => {
-  throw new PluginError(e.message);
+  throw new PluginError(e.message, { cause: e });
 });
 
 // The parameters of the AU with these component codes (four-character strings), from the
@@ -192,7 +194,6 @@ async function findComponent(name, folders = COMPONENT_FOLDERS) {
     + `${where ? ` (${where})` : ""}${not}; expected one`);
 }
 
-const { escapeXml } = tools;
 
 function findAuDevice(xml, name) {
   const found = [];

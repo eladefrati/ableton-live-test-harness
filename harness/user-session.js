@@ -31,7 +31,6 @@ function exec(cmd, args) {
   });
 }
 
-
 // A launchd job that runs `cmd args` once in `folder`, writing its stdout, stderr and exit
 // status there. The status file is written last, by rename, so it appears whole.
 function jobPlist(label, folder, cmd, args) {

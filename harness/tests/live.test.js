@@ -230,7 +230,9 @@ test("placeClip writes the notes to the first Session slot and duplicates the cl
   return withFake({
     "/live/clip_slot/create_clip": note("/live/clip_slot/create_clip"),
     "/live/clip/add/notes": note("/live/clip/add/notes"),
-    "/live/track/duplicate_clip_to_arrangement": ([track]) => [["/live/track/duplicate_clip_to_arrangement", track, 3]],
+    // answers only for the first Session slot, duplicated to beat 0
+    "/live/track/duplicate_clip_to_arrangement": ([track, slot, beat]) =>
+      (slot === 0 && beat === 0 ? [["/live/track/duplicate_clip_to_arrangement", track, 3]] : []),
   }, async (live) => {
     const index = await live.placeClip(2, [{ pitch: 60, start: 0.5, duration: 0.25, velocity: 100 }, { pitch: 62, start: 1, duration: 0.5, velocity: 90, mute: true }], 4);
     assert.equal(index, 3);

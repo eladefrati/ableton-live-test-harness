@@ -39,7 +39,7 @@ test("emptyHarnessTemp deletes every folder in the temp folder and says how many
     const said = [];
     emptyHarnessTemp((text) => said.push(text), root);
     assert.deepEqual(fs.readdirSync(root), []);
-    assert.deepEqual(said, [`info deleted 2 folders in ${root}`]);
+    assert.deepEqual(said, [`info deleted 2 items in ${root}`]);
     emptyHarnessTemp((text) => said.push(text), path.join(root, "missing"));
     assert.equal(said.length, 1);
   } finally {

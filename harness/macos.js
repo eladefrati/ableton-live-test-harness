@@ -192,7 +192,7 @@ function tempFolder(prefix) {
 function emptyHarnessTemp(say, root = HARNESS_TEMP) {
   const old = fs.existsSync(root) ? fs.readdirSync(root) : [];
   for (const name of old) fs.rmSync(path.join(root, name), { recursive: true, force: true });
-  if (old.length) say(`info deleted ${old.length} folders in ${root}`);
+  if (old.length) say(`info deleted ${old.length} items in ${root}`);
 }
 
 // The process ids of the Lives running, Suite and Beta alike.
