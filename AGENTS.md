@@ -7,7 +7,7 @@ projects that run in Live. Built on AbletonOSC. macOS only.
 
 - `manager.py`, `abletonosc/`: the Remote Script. Python, runs inside Live and answers OSC.
 - `harness/`: the Node client that drives Live, with its own checks and unit tests.
-- `tests/`, `client/`, `run-console.py`: AbletonOSC's own Python tests, client and console.
+- `tests/`, `client/`: AbletonOSC's own Python tests and their client.
 
 ## Where to go
 

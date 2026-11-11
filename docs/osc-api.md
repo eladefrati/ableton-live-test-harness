@@ -536,15 +536,13 @@ Note that, for consistency with other object types (and Live's internal API), **
 
 ## Utilities
 
-Included with the framework is a command-line console utility `run-console.py`, which can be used as a quick and easy way to send OSC queries to AbletonOSC. Example:
+`harness/cli.js` sends OSC queries to AbletonOSC from the command line. Example:
 
 ```
-(1653)(AbletonOSC)$ ./run-console.py
-AbletonOSC command console
-Usage: /live/osc/command [params]
->>> /live/song/set/tempo 123.0
->>> /live/song/get/tempo
-(123.0,)
->>> /live/song/get/track_names
-('1-MIDI', '2-MIDI', '3-Audio', '4-Audio')
+$ node harness/cli.js send /live/song/set/tempo 123.0
+"ok"
+$ node harness/cli.js query /live/song/get/tempo
+[123]
+$ node harness/cli.js query /live/song/get/track_names
+["1-MIDI","2-MIDI","3-Audio","4-Audio"]
 ```
