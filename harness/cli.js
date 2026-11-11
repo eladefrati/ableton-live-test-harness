@@ -13,15 +13,19 @@
 //                                         time (ms, or a date such as 2026-10-31T11:18), or
 //                                         since Live started; needs no OSC, so it runs
 //                                         beside a check
-//   node harness/cli.js capture <png>     a picture of Live's main window, taken with Live
-//                                         behind other windows; needs no OSC either
+//   node harness/cli.js windows           Live's windows on screen, front to back; a dialog or
+//                                         panel is one of them; needs no OSC either
+//   node harness/cli.js capture <png> [--window <id>]
+//                                         a picture of Live's main window, or of the window
+//                                         with that id, taken with Live behind other windows;
+//                                         needs no OSC either
 //
 // Arguments: "12" is an int, "12.0" a float, true/false booleans, anything else a string.
 
 const { connect } = require("./live.js");
 const { float } = require("./osc.js");
 const { maxMessages } = require("./log.js");
-const { captureWindow } = require("./device-ui.js");
+const { captureWindow, liveWindows } = require("./device-ui.js");
 
 function parseArg(text) {
   if (text === "true") return true;
@@ -32,7 +36,7 @@ function parseArg(text) {
 }
 
 const USAGE = "usage: cli.js ping | reload | query <address> [args] | send <address> [args] | "
-  + "notes <track> <clip> [--arrangement] | song-notes <track> | max-log [since] | capture <png>";
+  + "notes <track> <clip> [--arrangement] | song-notes <track> | max-log [since] | windows | capture <png> [--window <id>]";
 
 async function run(argv) {
   const [command, ...rest] = argv;
@@ -43,9 +47,12 @@ async function run(argv) {
     if (since !== undefined && Number.isNaN(new Date(since).getTime())) throw new Error(`Not a time: ${args[0]}`);
     return maxMessages({ since });
   }
+  if (command === "windows") return liveWindows();
   if (command === "capture") {
-    if (!args[0]) throw new Error(USAGE);
-    return { file: args[0], window: await captureWindow(args[0]) };
+    // --window's id is the argument after the file
+    const id = flags.has("--window") ? Number(args[1]) : undefined;
+    if (!args[0] || (flags.has("--window") && !Number.isInteger(id))) throw new Error(USAGE);
+    return { file: args[0], window: await captureWindow(args[0], { window: id }) };
   }
   const live = await connect();
   try {

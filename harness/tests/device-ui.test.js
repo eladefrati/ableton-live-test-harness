@@ -202,3 +202,18 @@ test("text returns the lines inside a rectangle of the panel, top first", async 
   assert.deepEqual(await ui.text([0, 0, 190, 160]), ["text"]);
   assert.deepEqual(await ui.text([200, 0, 60, 20]), []);
 });
+
+test("captureWindow captures Live's main window, or one of Live's windows by id, and refuses another id", async () => {
+  const { captureWindow } = require("../device-ui.js");
+  const captured = [];
+  const system = {
+    wake: async () => {},
+    window: async () => ({ id: 7, x: 0, y: 0, w: 800, h: 600 }),
+    windows: async () => [{ id: 9, title: "Save", x: 10, y: 10, w: 300, h: 200 }, { id: 7, title: "Set", x: 0, y: 0, w: 800, h: 600 }],
+    capture: async (id, file) => { captured.push([id, file]); },
+  };
+  assert.equal((await captureWindow("/tmp/main.png", {}, system)).id, 7);
+  assert.equal((await captureWindow("/tmp/panel.png", { window: 9 }, system)).title, "Save");
+  await assert.rejects(captureWindow("/tmp/other.png", { window: 4 }, system), /Live has no window 4 on screen/);
+  assert.deepEqual(captured, [[7, "/tmp/main.png"], [9, "/tmp/panel.png"]]);
+});

@@ -1,6 +1,8 @@
 // Sees and clicks Live's window for device-ui.js (ADR-0004):
 //
 //   device-ui window                  Live's main window: {"id", "x", "y", "w", "h"} in points
+//   device-ui windows                 all of Live's windows on screen, front to back:
+//                                     [{"id", "title", "x", "y", "w", "h"}]
 //   device-ui text <png>              the text in an image, in pixels: {"width", "lines":
 //                                     [{"text", "x", "y", "w", "h", "words": [{"text", "x"}]}]}
 //   device-ui hover <window> <x> <y>  moves the pointer to a point on the screen, in points
@@ -42,6 +44,15 @@ func mainWindow() {
     else { fail("Live has no window on screen") }
     let r = bounds(window)
     printJSON(["id": number(window), "x": r.minX, "y": r.minY, "w": r.width, "h": r.height])
+}
+
+func liveWindows() {
+    let live = windows().filter { ($0[kCGWindowOwnerName as String] as? String) == "Live" }
+    printJSON(live.map { window -> [String: Any] in
+        let r = bounds(window)
+        return ["id": number(window), "title": window[kCGWindowName as String] as? String ?? "",
+                "x": r.minX, "y": r.minY, "w": r.width, "h": r.height]
+    })
 }
 
 func text(in path: String) {
@@ -113,6 +124,8 @@ func pointer() -> (Int, CGPoint) {
 switch arguments.count > 1 ? arguments[1] : "" {
 case "window":
     mainWindow()
+case "windows":
+    liveWindows()
 case "text":
     guard arguments.count == 3 else { fail("usage: device-ui text <png>") }
     text(in: arguments[2])
@@ -131,5 +144,5 @@ case "click":
     post(.leftMouseUp, point)
     usleep(100_000)
 default:
-    fail("usage: device-ui window | text <png> | hover <window> <x> <y> | click <window> <x> <y>")
+    fail("usage: device-ui window | windows | text <png> | hover <window> <x> <y> | click <window> <x> <y>")
 }

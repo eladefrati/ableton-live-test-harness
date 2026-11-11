@@ -148,11 +148,13 @@ const machine = {
     if (!(await mac.isFrontmost())) throw new DeviceUiError("Live isn't frontmost. Not clicked");
   },
   window: async () => JSON.parse(await helper("window")),
+  windows: async () => JSON.parse(await helper("windows")),
+  capture: (windowId, file) => exec("screencapture", ["-x", "-o", "-l", windowId, file]),
   async read(windowId) {
     const folder = mac.tempFolder("device-ui-");
     try {
       const image = path.join(folder, "window.png");
-      await exec("screencapture", ["-x", "-o", "-l", windowId, image]);
+      await machine.capture(windowId, image);
       return JSON.parse(await helper("text", image));
     } finally {
       fs.rmSync(folder, { recursive: true, force: true });
@@ -162,13 +164,22 @@ const machine = {
   click: (windowId, x, y) => helper("click", windowId, x, y),
 };
 
-// Saves a picture of Live's main window to `file` (PNG), with Live left where it is: the
-// capture works behind other windows. Needs Screen Recording for the terminal app, not the
-// click host. Resolves with the window, { id, x, y, w, h } in points.
-async function captureWindow(file, system = machine) {
+// Live's windows on screen, front to back: [{ id, title, x, y, w, h }] in points. A dialog
+// or a panel (the Save panel) is a window of its own.
+async function liveWindows(system = machine) {
   await system.wake();
-  const window = await system.window();
-  await exec("screencapture", ["-x", "-o", "-l", window.id, file]);
+  return system.windows();
+}
+
+// Saves a picture of one of Live's windows to `file` (PNG), with Live left where it is: the
+// capture works behind other windows. The window is Live's main one, or the one with the id
+// `window` (from liveWindows); a window that isn't Live's is refused. Needs Screen Recording
+// for the terminal app, not the click host. Resolves with the window captured.
+async function captureWindow(file, { window: id } = {}, system = machine) {
+  await system.wake();
+  const window = id === undefined ? await system.window() : (await system.windows()).find((w) => w.id === id);
+  if (!window) throw new DeviceUiError(`Live has no window ${id} on screen`);
+  await system.capture(window.id, file);
   return window;
 }
 
@@ -240,4 +251,4 @@ async function openDeviceUi(live, { track, device, build }, system = machine) {
   return new DeviceUi(live, { track, device, title, controls: readControls(fs.readFileSync(build)) }, system);
 }
 
-module.exports = { DeviceUiError, openDeviceUi, captureWindow, readControls, controlPoint, findTitle, infoTitle, readClickHost };
+module.exports = { DeviceUiError, openDeviceUi, captureWindow, liveWindows, readControls, controlPoint, findTitle, infoTitle, readClickHost };

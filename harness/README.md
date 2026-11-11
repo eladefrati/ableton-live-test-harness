@@ -146,12 +146,14 @@ Node 18 or later. See [ADR-0001](../docs/adr/0001-fork-abletonosc.md) for the de
   (`{at, level, text}`) Live logged from `since` (ms timestamp or Date) on: take the time
   before a run and read them after it, to see why a device that loaded and answers OSC
   does nothing.
-- `cli.js`: `node harness/cli.js ping | reload | query <address> [args] | send <address> [args] | notes <track> <clip> [--arrangement] | song-notes <track> | max-log [since] | capture <png>`.
+- `cli.js`: `node harness/cli.js ping | reload | query <address> [args] | send <address> [args] | notes <track> <clip> [--arrangement] | song-notes <track> | max-log [since] | windows | capture <png> [--window <id>]`.
   `max-log` reads Live's log, not OSC, so it runs beside a check; `since` is ms or a local
-  time such as `2026-10-31T11:18`, and defaults to Live's start. `capture` saves a picture of
-  Live's main window only (a dialog or panel is a window of its own), taken with Live behind
-  other windows (`captureWindow` in `device-ui.js`). It needs Screen Recording for the
-  terminal app, and Automation for System Events: it wakes the display first, as `macos.js` does.
+  time such as `2026-10-31T11:18`, and defaults to Live's start. `windows` lists Live's
+  windows on screen (`liveWindows` in `device-ui.js`): a dialog or a panel is a window of its
+  own. `capture` saves a picture of Live's main window, or with `--window <id>` of one from
+  that list, taken with Live behind other windows (`captureWindow`). Both need Screen
+  Recording for the terminal app, and Automation for System Events: they wake the display
+  first, as `macos.js` does.
 - `checks/record-roundtrip.js`: checks the recording path itself. It adds two tracks,
   records one's clip into the other through MIDI routing, compares, and deletes them.
 - `checks/plugin-record.js [--keep]`: checks the plug-in path on Apple's AUDelay, which
