@@ -30,6 +30,7 @@ function parseArgs(argv) {
     else throw new Error(`One folder at a time: got ${options.folder} and ${argv[i]}`);
   }
   if (options.folder === null) throw new Error("usage: add-place.js <folder> [--suite | --app <path>]");
+  if (options.suite && options.app) throw new Error("--suite and --app both name a Live: pass one");
   return options;
 }
 

@@ -66,4 +66,5 @@ test("parseArgs takes one folder and which Live, and refuses anything else", () 
   assert.throws(() => parseArgs(["a", "b"]), /One folder at a time/);
   assert.throws(() => parseArgs(["a", "--app"]), /--app needs/);
   assert.throws(() => parseArgs(["a", "--beta"]), /Unknown option --beta/);
+  assert.throws(() => parseArgs(["a", "--suite", "--app", "/A.app"]), /pass one/);
 });

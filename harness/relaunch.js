@@ -206,9 +206,10 @@ function freshSet(say, plugin) {
   return file;
 }
 
-// The options: { kill, suite, plugin } (plugin: the name after --plugin, or null). Refuses
-// anything else, since a relaunch discards the running Live's set: a mistyped option must
-// not restart Live on the wrong set.
+// The options: { kill, suite, plugin, app } (plugin: the name after --plugin, or null; app:
+// the path after --app, or null). Refuses anything else, and --suite with --app, since a
+// relaunch discards the running Live's set: a mistyped option must not restart Live on the
+// wrong set.
 function parseArgs(argv) {
   const options = { kill: false, suite: false, plugin: null, app: null };
   for (let i = 0; i < argv.length; i++) {
@@ -220,6 +221,7 @@ function parseArgs(argv) {
     else if (argv[i] === "--plugin") throw new Error("--plugin needs the plug-in's name, e.g. --plugin AUDelay");
     else throw new Error(`Unknown option ${argv[i]}: relaunch.js takes --kill, --suite, --app <path> and --plugin <name>`);
   }
+  if (options.suite && options.app) throw new Error("--suite and --app both name a Live: pass one");
   return options;
 }
 

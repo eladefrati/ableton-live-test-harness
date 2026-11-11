@@ -85,6 +85,7 @@ test("parseArgs reads --kill, --suite, --app <path> and --plugin <name>, and ref
   assert.throws(() => parseArgs(["--plugin", "--kill"]), /needs the plug-in's name/);
   assert.throws(() => parseArgs(["--plugin=Plugin"]), /Unknown option --plugin=Plugin/);
   assert.throws(() => parseArgs(["--plugins", "Plugin"]), /Unknown option --plugins/);
+  assert.throws(() => parseArgs(["--suite", "--app", "/Applications/Live.app"]), /pass one/);
 });
 
 test("emptyHarnessTemp deletes every folder in the temp folder and says how many", () => {

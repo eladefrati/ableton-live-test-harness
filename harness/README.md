@@ -102,7 +102,7 @@ Node 18 or later. See [ADR-0001](../docs/adr/0001-fork-abletonosc.md) for the de
 - `doctor.js`: read-only check that Live is worth driving: Live running,
   AbletonOSC answering, no dialog open, no armed tracks. It also reports the record bit
   depth. Run it first.
-- `relaunch.js [--kill] [--suite] [--app <path>] [--plugin <name>]`: quits Live if it runs and starts Ableton Live 12 Beta
+- `relaunch.js [--kill] [--suite | --app <path>] [--plugin <name>]`: quits Live if it runs and starts Ableton Live 12 Beta
   (Suite with `--suite`, another Live with `--app <path>`, which it checks exists before quitting anything), behind other windows, on a fresh copy of `sets/empty.als` (one MIDI track, unarmed, no
   devices, no returns, nothing on Main, Main at -inf dB so runs are silent (recordings take tracks' Post FX, before Main); saved by Live 12.4.25b1, opens in Suite 12.4.3), not
   the user's template. It answers "Save changes?" with Don't Save and "delete the temporary files?" with Delete, and kills Live if it is
@@ -115,15 +115,15 @@ Node 18 or later. See [ADR-0001](../docs/adr/0001-fork-abletonosc.md) for the de
   Live for over 2 s, long enough for a check's next get to time out. Holds UDP 11001 throughout. With `--plugin <name>` Live starts instead on a set
   holding only the Audio Unit effect named `name` on track 0, every parameter listed
   (`buildPluginSet`, checked with `checkPluginLoaded`); the set is built before Live is quit, so a plug-in that
-  can't be found or read leaves Live running as it was. Any other option is refused.
+  can't be found or read leaves Live running as it was. Any other option is refused, and so is `--suite` with `--app`.
 - `quit.js [--kill]`: quits Live and leaves it quit, for when the user asks for that. It
   stops Live as `relaunch.js` does (same answers, same kill after 10 s, `--kill` kills at
   once, stops at any other dialog), then moves Live's recovery data aside, deletes its
   Temp Projects and empties the harness's temp folder. Any other option is refused.
-- `add-place.js <folder> [--suite] [--app <path>]`: adds a folder to Places in `Library.cfg`,
+- `add-place.js <folder> [--suite | --app <path>]`: adds a folder to Places in `Library.cfg`,
   for the Live `relaunch.js` would start with those options. It refuses while Live runs and
   does nothing if the folder is already there. Places are told apart by path, so any number
-  can be named `builds`. Live shows the new one when it next starts. Any other option is refused.
+  can be named `builds`. Live shows the new one when it next starts. Any other option is refused, and so is `--suite` with `--app`.
 - `max/hook.js` and `Live.openHooks()`/`waitForHook()`: the test hook of
   [ADR-0002](../docs/adr/0002-test-hook.md), for reading what a development build of a
   device reports (status line, check results) over UDP 11002. Take the time before the
