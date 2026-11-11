@@ -114,7 +114,7 @@ async function auParameters({ type, subtype, manufacturer }) {
   const codes = [type, subtype, manufacturer];
   const binary = await helperBinary();
   const inSession = (cmd, args) => runInUserSession(cmd, args).catch((e) => {
-    throw new PluginError(e.message);
+    throw new PluginError(e.message, { cause: e });
   });
   const [out, validation] = await Promise.all([
     inSession(binary, codes.map((c) => String(fourCCValue(c)))),
@@ -193,7 +193,6 @@ async function findComponent(name, folders = COMPONENT_FOLDERS) {
   throw new PluginError(`${found.length} installed effects (${EFFECT_TYPES.join(", ")}) are named ${name}`
     + `${where ? ` (${where})` : ""}${not}; expected one`);
 }
-
 
 function findAuDevice(xml, name) {
   const found = [];

@@ -26,17 +26,21 @@ function parseArgs(argv) {
   return options;
 }
 
-async function main(argv) {
-  const say = (text) => console.log(text);
+// `system` is what main uses of the machine and of Live, so a test can stand in for it.
+async function main(argv, system = {}) {
+  const {
+    say = (text) => console.log(text), pidsOf = livePids, open = () => connect({ timeout: 1000 }),
+    stopLive = stop, empty = emptyHarnessTemp,
+  } = system;
   const { kill } = parseArgs(argv);
-  const pids = await livePids();
+  const pids = await pidsOf();
   if (pids.length > 1) throw new Error("More than one Live is running: the harness can't tell them apart");
   // UDP 11001 is held throughout, as relaunch.js holds it: every check holds it while it
   // runs, so none is saving a set into the temp folder while it is emptied.
-  const live = await connect({ timeout: 1000 });
+  const live = await open();
   try {
-    if (pids.length === 1) await stop(live, pids[0], kill, say);
-    emptyHarnessTemp(say);
+    if (pids.length === 1) await stopLive(live, pids[0], kill, say);
+    empty(say);
   } finally {
     live.close();
   }
@@ -50,4 +54,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { parseArgs };
+module.exports = { parseArgs, main };
