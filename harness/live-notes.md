@@ -159,7 +159,7 @@ unexpected.
   `Manual` is the value Live shows, not read from the plug-in nor pushed into it at load
   (a float with `Manual` below its default showed the `Manual` while the plug-in held its
   default, 2026-11-03): normalized 0..1 for a float
-  (AUDelay's 50 % Dry/Wet is 0.5, its -100..100 % Feedback at 50 % is 0.75), on a log
+  (AUDelay's 50 % Dry/Wet is 0.5, its -99.9..99.9 % Feedback at 50 % is 0.75), on a log
   scale for one flagged Display Logarithmic (its 10..22050 Hz Lowpass at 15000 Hz is 0.95), an item index
   for an enum; unfilled it reads 0.1234567687. An enum slot left at `LastItemCount` 1 reads
   every value as 0. An unconfigured device keeps a slot named "Bypass" with ID -1 in
