@@ -234,11 +234,11 @@ class Live {
     return rows;
   }
 
-  // Adds a MIDI track at the end of the set, named `name`, with the devices Live's default
-  // MIDI track template adds removed, so they can't alter what a test records. Resolves
+  // Adds a track at the end of the set, named `name`, with the devices Live's default track
+  // template for its kind adds removed, so they can't alter what a test records. Resolves
   // with its index.
-  async createMidiTrack(name) {
-    this.send("/live/song/create_midi_track", -1);
+  async createTrack(kind, name) {
+    this.send(`/live/song/create_${kind}_track`, -1);
     const track = (await this.get("song", "num_tracks")) - 1;
     this.set("track", "name", track, name);
     const devices = await this.get("track", "num_devices", track);
@@ -247,16 +247,24 @@ class Live {
     return track;
   }
 
-  // Adds an audio track at the end of the set, named `name`, with the devices Live's
-  // default audio track template adds removed. Resolves with its index.
-  async createAudioTrack(name) {
-    this.send("/live/song/create_audio_track", -1);
-    const track = (await this.get("song", "num_tracks")) - 1;
-    this.set("track", "name", track, name);
-    const devices = await this.get("track", "num_devices", track);
-    for (let device = devices - 1; device >= 0; device--) this.send("/live/track/delete_device", track, device);
-    await this.sync();
-    return track;
+  createMidiTrack(name) {
+    return this.createTrack("midi", name);
+  }
+
+  createAudioTrack(name) {
+    return this.createTrack("audio", name);
+  }
+
+  // Places `notes` ([{pitch, start, duration, velocity, mute?}], in beats) on a MIDI track
+  // in the Arrangement, from beat 0, as a clip `beats` long: a clip made in the track's
+  // first Session slot, which stays there, and duplicated to the Arrangement. Resolves with
+  // the Arrangement clip's index.
+  async placeClip(track, notes, beats) {
+    this.send("/live/clip_slot/create_clip", track, 0, float(beats));
+    this.send("/live/clip/add/notes", track, 0,
+      ...notes.flatMap((n) => [n.pitch, float(n.start), float(n.duration), n.velocity, Boolean(n.mute)]));
+    const [, index] = await this.query("/live/track/duplicate_clip_to_arrangement", track, 0, float(0));
+    return index;
   }
 
   // Finds the device named `name` (its name in the chain, e.g. a plug-in's name) on any

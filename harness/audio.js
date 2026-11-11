@@ -9,7 +9,6 @@
 // whatever track it sat on (an effect after an instrument can't take audio input in place).
 
 const fs = require("node:fs");
-const { float } = require("./osc.js");
 const { readWav } = require("./wav.js");
 const { requireRecordBitDepth, describeDepth } = require("./settings.js");
 
@@ -46,10 +45,7 @@ async function signalTracks(live, { track, device, notes, beats, instrument = ["
     // With Options.txt's -EnableArmOnSelection, loading the instrument armed its track, and
     // recordArrangement then refuses (measured 2026-10-31; live-notes.md).
     live.set("track", "arm", source, 0);
-    live.send("/live/clip_slot/create_clip", source, 0, float(beats));
-    live.send("/live/clip/add/notes", source, 0,
-      ...notes.flatMap((n) => [n.pitch, float(n.start), float(n.duration), n.velocity, false]));
-    await live.query("/live/track/duplicate_clip_to_arrangement", source, 0, float(0));
+    await live.placeClip(source, notes, beats);
     // The Session clip is deleted; the Arrangement copy plays.
     live.send("/live/clip_slot/delete_clip", source, 0);
 

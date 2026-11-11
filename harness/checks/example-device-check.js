@@ -15,7 +15,6 @@ const path = require("node:path");
 // In a project's tests/live/, fall back to the clone's harness folder instead of this one.
 const HARNESS = process.env.LIVE_HARNESS || path.resolve(__dirname, "..");
 const { connect } = require(path.join(HARNESS, "live.js"));
-const { float } = require(path.join(HARNESS, "osc.js"));
 const { compareNotes, summary } = require(path.join(HARNESS, "compare.js"));
 const { clipNotes } = require(path.join(HARNESS, "device-checks.js"));
 
@@ -40,10 +39,7 @@ async function main() {
     const device = await live.loadDevice(deviceTrack, "MIDI Effects", "Pitch");
     const parameters = await live.parameterIndices(deviceTrack, device);
 
-    live.send("/live/clip_slot/create_clip", deviceTrack, 0, float(BEATS));
-    live.send("/live/clip/add/notes", deviceTrack, 0,
-      ...NOTES.flatMap((n) => [n.pitch, float(n.start), float(n.duration), n.velocity, false]));
-    await live.query("/live/track/duplicate_clip_to_arrangement", deviceTrack, 0, float(0));
+    await live.placeClip(deviceTrack, NOTES, BEATS);
     await live.setInputRouting(recordTrack, DEVICE_TRACK, "Post FX");
     const tempo = await live.get("song", "tempo");
 

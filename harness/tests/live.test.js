@@ -206,6 +206,23 @@ test("recordArrangement refuses while a track the caller didn't arm is armed", (
     await assert.rejects(live.recordArrangement({ start: 0, length: 1, tracks: [0] }), /Track 1 is armed and not part of this test/);
   }));
 
+test("placeClip writes the notes to the first Session slot and duplicates the clip to beat 0", () => {
+  const seen = [];
+  const note = (address) => (args) => { seen.push([address, ...args]); return []; };
+  return withFake({
+    "/live/clip_slot/create_clip": note("/live/clip_slot/create_clip"),
+    "/live/clip/add/notes": note("/live/clip/add/notes"),
+    "/live/track/duplicate_clip_to_arrangement": ([track]) => [["/live/track/duplicate_clip_to_arrangement", track, 3]],
+  }, async (live) => {
+    const index = await live.placeClip(2, [{ pitch: 60, start: 0.5, duration: 0.25, velocity: 100 }, { pitch: 62, start: 1, duration: 0.5, velocity: 90, mute: true }], 4);
+    assert.equal(index, 3);
+    assert.deepEqual(seen, [
+      ["/live/clip_slot/create_clip", 2, 0, 4],
+      ["/live/clip/add/notes", 2, 0, 60, 0.5, 0.25, 100, false, 62, 1, 0.5, 90, true],
+    ]);
+  });
+});
+
 test("trackData groups one reply's values by track", () => withFake({
   "/live/song/get/track_data": (args) => [["/live/song/get/track_data", ...(args.join(" ") === "0 -1 track.name track.arm" ? ["a", false, "b", true] : [])]],
 }, async (live) => {

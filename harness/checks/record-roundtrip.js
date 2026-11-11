@@ -7,7 +7,6 @@
 // Count-In off. Exits 1 on a failed comparison.
 
 const { connect } = require("../live.js");
-const { float } = require("../osc.js");
 const { compareNotes, summary } = require("../compare.js");
 
 const SOURCE = "harness-source";
@@ -31,11 +30,7 @@ async function main() {
     const source = await live.createMidiTrack(SOURCE);
     const record = await live.createMidiTrack(RECORD);
     await live.setInputRouting(record, SOURCE);
-    live.send("/live/clip_slot/create_clip", source, 0, float(BEATS));
-    const notes = testNotes();
-    live.send("/live/clip/add/notes", source, 0,
-      ...notes.flatMap((n) => [n.pitch, float(n.start), float(n.duration), n.velocity, false]));
-    await live.query("/live/track/duplicate_clip_to_arrangement", source, 0, float(0));
+    await live.placeClip(source, testNotes(), BEATS);
     live.set("track", "arm", record, 1);
     await live.recordArrangement({ start: 0, length: BEATS, tracks: [record] });
     live.set("track", "arm", record, 0);

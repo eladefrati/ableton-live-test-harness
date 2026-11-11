@@ -160,10 +160,7 @@ async function run(cases, {
     const parameters = await live.parameterIndices(deviceTrack, device, longNames && longNames(buildFile));
     console.log(`Loaded ${build}`);
 
-    live.send("/live/clip_slot/create_clip", deviceTrack, 0, float(beats));
-    live.send("/live/clip/add/notes", deviceTrack, 0,
-      ...notes.flatMap((n) => [n.pitch, float(n.start), float(n.duration), n.velocity, Boolean(n.mute)]));
-    const [, clipIndex] = await live.query("/live/track/duplicate_clip_to_arrangement", deviceTrack, 0, float(0));
+    const clipIndex = await live.placeClip(deviceTrack, notes, beats);
     const clip = (await live.arrangementClips(deviceTrack)).find((c) => c.index === clipIndex);
     await live.setInputRouting(recordTrack, deviceTrackName, "Post FX");
     const song = {
