@@ -83,14 +83,18 @@ test("requests run one at a time, in order", () => withFake({
   assert.deepEqual(results, [120, 0, 120]);
 }));
 
-// The reply of a fake /live/track/get/arrangement_clips/properties: the properties asked
-// for, by name, clip by clip.
-const clipValues = (properties, clips) => clips.flatMap((clip) => properties.map((property) => clip[property]));
+// A fake bulk reply: the properties asked for, by name, item by item, after `head`. A
+// property the items don't have answers /live/error, as the Remote Script does.
+function bulkReply(address, head, items, properties) {
+  const unknown = properties.find((property) => items.some((item) => !(property in item)));
+  if (unknown) return [["/live/error", `no attribute ${unknown}`]];
+  return [[address, ...head, ...items.flatMap((item) => properties.map((property) => item[property]))]];
+}
+const clipsReply = (track, clips, properties) => bulkReply("/live/track/get/arrangement_clips/properties", [track], clips, properties);
 const SONG_CLIP = { start_time: 8, end_time: 12, start_marker: 1, looping: false, loop_start: 0, loop_end: 4, is_midi_clip: true };
 
 test("songNotes places notes in song time and drops notes outside the clip", () => withFake({
-  "/live/track/get/arrangement_clips/properties": ([track, ...properties]) =>
-    [["/live/track/get/arrangement_clips/properties", track, ...clipValues(properties, [SONG_CLIP])]],
+  "/live/track/get/arrangement_clips/properties": ([track, ...properties]) => clipsReply(track, [SONG_CLIP], properties),
   "/live/arrangement_clip/get/notes": ([t, c]) => [["/live/arrangement_clip/get/notes", t, c, 0, 1,
     60, 0, 1, 100, false, // before the start marker: outside the clip
     62, 1, 1, 100, false, // at the start marker: beat 8
@@ -107,12 +111,14 @@ test("arrangementClips asks for its properties by name and reads every clip from
     { start_time: 8, end_time: 16, start_marker: 2, looping: true, loop_start: 2, loop_end: 6, is_midi_clip: false },
   ];
   return withFake({
-    "/live/track/get/arrangement_clips/properties": ([track, ...properties]) => [["/live/track/get/arrangement_clips/properties", track,
-      ...(track === 2 ? [1, 2, 3] : clipValues(properties, track === 1 ? clips : []))]],
+    "/live/track/get/arrangement_clips/properties": ([track, ...properties]) => (track === 2
+      ? [["/live/track/get/arrangement_clips/properties", track, 1, 2, 3]]
+      : clipsReply(track, track === 1 ? clips : track === 3 ? [clips[0], { ...clips[1], loop_end: null }] : [], properties)),
   }, async (live) => {
     assert.deepEqual(await live.arrangementClips(1), clips.map((clip, index) => ({ index, ...clip })));
     assert.deepEqual(await live.arrangementClips(0), []);
     await assert.rejects(live.arrangementClips(2), /isn't rows of 7/);
+    await assert.rejects(live.arrangementClips(3), /Arrangement clip 1 on track 3 has no loop_end/);
   });
 });
 
@@ -204,24 +210,30 @@ function playingSong(song = { cues: [] }) {
 
 // A fake /live/song/get/track_data over `tracks`: the track properties asked for, by name,
 // track by track.
-const trackDataOf = (tracks) => ([, , ...properties]) => [["/live/song/get/track_data",
-  ...tracks.flatMap((track) => properties.map((property) => track[property.replace(/^track\./, "")]))]];
+const trackDataOf = (tracks) => ([, , ...properties]) =>
+  bulkReply("/live/song/get/track_data", [], tracks, properties.map((property) => property.replace(/^track\./, "")));
+const track = (arm, slot = -1, canBeArmed = true) => ({ arm, can_be_armed: canBeArmed, playing_slot_index: slot });
 
 const withSessionClip = (numerator, denominator) => ({
   // one track: unarmed, its Session clip in slot 0 active
-  "/live/song/get/track_data": trackDataOf([{ arm: false, playing_slot_index: 0 }]),
+  "/live/song/get/track_data": trackDataOf([track(false, 0)]),
   "/live/song/get/signature_numerator": () => [["/live/song/get/signature_numerator", numerator]],
   "/live/song/get/signature_denominator": () => [["/live/song/get/signature_denominator", denominator]],
 });
 
 test("recordArrangement refuses while a track the caller didn't arm is armed", () =>
-  withFake({ ...playingSong(), "/live/song/get/track_data": trackDataOf([{ arm: true, playing_slot_index: -1 }, { arm: true, playing_slot_index: -1 }]) }, async (live) => {
+  withFake({ ...playingSong(), "/live/song/get/track_data": trackDataOf([track(true), track(true)]) }, async (live) => {
     await assert.rejects(live.recordArrangement({ start: 0, length: 1, tracks: [0] }), /Track 1 is armed and not part of this test/);
   }));
 
-test("recordArrangement takes a track that reads no arm or slot as unarmed, with no Session clip", () =>
-  withFake({ ...playingSong(), "/live/song/get/track_data": trackDataOf([{ arm: null, playing_slot_index: null }]) }, async (live) => {
+test("recordArrangement takes a track that can't be armed and reads no arm or slot as unarmed, with no Session clip", () =>
+  withFake({ ...playingSong(), "/live/song/get/track_data": trackDataOf([track(null, null, false)]) }, async (live) => {
     assert.deepEqual(await live.recordArrangement({ start: 1, length: 0.5, tracks: [] }), []);
+  }));
+
+test("recordArrangement refuses when a track that can be armed reads no arm", () =>
+  withFake({ ...playingSong(), "/live/song/get/track_data": trackDataOf([track(false), track(null)]) }, async (live) => {
+    await assert.rejects(live.recordArrangement({ start: 0, length: 1, tracks: [] }), /Track 1's arm state can't be read/);
   }));
 
 test("placeClip writes the notes to the first Session slot and duplicates the clip to beat 0", () => {
@@ -243,9 +255,14 @@ test("placeClip writes the notes to the first Session slot and duplicates the cl
   });
 });
 
-test("createTrack refuses a kind other than midi and audio, sending nothing", () => withFake({}, async (live) => {
-  await assert.rejects(live.createTrack("return", "x"), /a midi or an audio track, not return/);
-}));
+test("createTrack refuses a kind other than midi and audio, sending nothing", () => {
+  let sent = 0;
+  return withFake({ "/live/song/create_return_track": () => { sent++; return []; }, "/live/test": () => [["/live/test", "ok"]] }, async (live) => {
+    await assert.rejects(live.createTrack("return", "x"), /a midi or an audio track, not return/);
+    await live.sync(); // anything sent before it has arrived
+    assert.equal(sent, 0);
+  });
+});
 
 test("trackData groups one reply's values by track", () => withFake({
   "/live/song/get/track_data": (args) => [["/live/song/get/track_data", ...(args.join(" ") === "0 -1 track.name track.arm" ? ["a", false, "b", true] : [])]],

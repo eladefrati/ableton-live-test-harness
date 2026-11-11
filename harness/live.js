@@ -470,8 +470,12 @@ class Live {
   async arrangementClips(track) {
     const properties = ["start_time", "end_time", "start_marker", "looping", "loop_start", "loop_end", "is_midi_clip"];
     const values = (await this.query("/live/track/get/arrangement_clips/properties", track, ...properties)).slice(1);
-    return rows(values, properties.length).map((row, index) =>
-      Object.assign({ index }, Object.fromEntries(properties.map((property, i) => [property, row[i]]))));
+    return rows(values, properties.length).map((row, index) => {
+      // null (a property that doesn't apply) would count as 0 where notes are placed
+      const missing = properties.find((property, i) => row[i] === null);
+      if (missing) throw new LiveError(`Arrangement clip ${index} on track ${track} has no ${missing}`);
+      return { index, ...Object.fromEntries(properties.map((property, i) => [property, row[i]])) };
+    });
   }
 
   // Notes of every MIDI clip in the track's Arrangement as Live plays them, in song
@@ -532,11 +536,15 @@ class Live {
   // action goes out at the first tick past its beat rather than up to a poll later.
   async recordArrangement({ start = 0, length, tracks, pollMs = 50, finePollMs = 2, during = [] }) {
     if (!Array.isArray(tracks)) throw new LiveError("recordArrangement needs the tracks the caller armed");
-    const states = await this.trackData("arm", "playing_slot_index");
+    const states = await this.trackData("arm", "can_be_armed", "playing_slot_index");
+    // A property that doesn't apply to a track reads null. No arm on a track that can't be
+    // armed is fine; on any other, an armed track can't be ruled out.
+    const unread = states.findIndex(([arm, canBeArmed]) => arm === null && canBeArmed !== false);
+    if (unread >= 0) throw new LiveError(`Track ${unread}'s arm state can't be read, so it may be armed; not recording`);
     const armed = states.findIndex(([arm], track) => arm && !tracks.includes(track));
     if (armed >= 0) throw new LiveError(`Track ${armed} is armed and not part of this test; disarm it first`);
     // a track with no Session slots reads no number
-    const sessionTrack = states.findIndex(([, slot]) => typeof slot === "number" && slot >= 0);
+    const sessionTrack = states.findIndex(([, , slot]) => typeof slot === "number" && slot >= 0);
     if (sessionTrack >= 0) {
       const bar = (4 * (await this.get("song", "signature_numerator"))) / (await this.get("song", "signature_denominator"));
       const barStart = Math.floor(start / bar + 1e-9) * bar;
