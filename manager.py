@@ -7,6 +7,7 @@ from . import abletonosc
 import importlib
 import traceback
 import logging
+import logging.handlers
 import sys
 import os
 
@@ -45,7 +46,8 @@ class Manager(ControlSurface):
         if not os.path.exists(log_dir):
             os.mkdir(log_dir, 0o755)
         log_path = os.path.join(log_dir, "abletonosc.log")
-        self.log_file_handler = logging.FileHandler(log_path)
+        # Rotated: at info level a long session of checks writes tens of megabytes.
+        self.log_file_handler = logging.handlers.RotatingFileHandler(log_path, maxBytes=10 * 1024 * 1024, backupCount=1)
         self.log_file_handler.setLevel(self.log_level.upper())
         formatter = logging.Formatter('(%(asctime)s) [%(levelname)s] %(message)s')
         self.log_file_handler.setFormatter(formatter)

@@ -33,7 +33,8 @@ pytest
 
 Logging can be performed from any of the AbletonOSCHandler classes via the `self.logger` property.
 
-AbletonOSC logs internal events to `logs/abletonosc.log` relative to the AbletonOSC directory.
+AbletonOSC logs internal events to `logs/abletonosc.log` relative to the AbletonOSC directory. At 10 MB the
+file becomes `abletonosc.log.1` and a new one starts; one old file is kept.
 
 ## Debugging compile-time issues
 
