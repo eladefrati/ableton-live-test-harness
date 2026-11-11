@@ -14,6 +14,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 const { execFile } = require("node:child_process");
 const { tempFolder } = require("./macos.js");
+const { escapeXml } = require("./tools.js");
 
 class UserSessionError extends Error {}
 
@@ -30,7 +31,6 @@ function exec(cmd, args) {
   });
 }
 
-const escapeXml = (s) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
 // A launchd job that runs `cmd args` once in `folder`, writing its stdout, stderr and exit
 // status there. The status file is written last, by rename, so it appears whole.

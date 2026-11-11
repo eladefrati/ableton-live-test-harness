@@ -12,12 +12,12 @@
 // A press clicks only after the checks in ADR-0004 pass, and throws DeviceUiError otherwise.
 // It says nothing about what the click did: the check reads that from Live.
 
-const crypto = require("node:crypto");
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
-const { execFile } = require("node:child_process");
 const mac = require("./macos.js");
+const tools = require("./tools.js");
+const { patcherChunk } = require("./amxd.js");
 
 class DeviceUiError extends Error {}
 
@@ -36,16 +36,10 @@ const INFO_VIEW_SETTLE_MS = 350;
 // Text recognition reads 0 as O and 1 as I or l.
 const normalized = (text) => text.toUpperCase().replace(/O/g, "0").replace(/[IL]/g, "1");
 
-// The patcher's controls by parameter long name (or scripting name), from an .amxd's bytes:
-// the "ptch" chunk of its chunked container holds the patcher JSON unless the device is frozen.
+// The patcher's controls by parameter long name (or scripting name), from an .amxd's bytes
+// (amxd.js); a frozen device's patcher isn't JSON.
 function readControls(amxd) {
-  let patch = null;
-  for (let at = 0; at + 8 <= amxd.length; at += 8 + amxd.readUInt32LE(at + 4)) {
-    if (amxd.toString("latin1", at, at + 4) === "ptch") {
-      patch = amxd.subarray(at + 8, at + 8 + amxd.readUInt32LE(at + 4));
-      break;
-    }
-  }
+  const patch = patcherChunk(amxd);
   if (!patch) throw new DeviceUiError("The .amxd has no patcher chunk");
   if (patch[0] !== 0x7b) throw new DeviceUiError("The .amxd's patcher isn't plain JSON (a frozen device?)");
   const { patcher } = JSON.parse(patch.toString("utf8").replace(/\0+$/, ""));
@@ -108,31 +102,14 @@ function infoTitle(lines, title, scale) {
 }
 
 const HELPER_SOURCE = path.join(__dirname, "device-ui.swift");
-const HELPER_CACHE = path.join(os.tmpdir(), "ableton-harness-tools"); // as plugin.js's
 
-function exec(cmd, args) {
-  return new Promise((resolve, reject) => {
-    execFile(cmd, args.map(String), { maxBuffer: 16 * 1024 * 1024 }, (error, stdout, stderr) => {
-      if (error) reject(new DeviceUiError(`${path.basename(cmd)} ${args[0]}: ${(stderr || error.message).trim()}`));
-      else resolve(stdout);
-    });
-  });
-}
+const exec = (cmd, args) => tools.run(cmd, args).catch((e) => {
+  throw new DeviceUiError(e.message);
+});
 
-async function helperBinary() {
-  const hash = crypto.createHash("sha256").update(fs.readFileSync(HELPER_SOURCE)).digest("hex").slice(0, 16);
-  const binary = path.join(HELPER_CACHE, `device-ui-${hash}`);
-  if (fs.existsSync(binary)) return binary;
-  fs.mkdirSync(HELPER_CACHE, { recursive: true });
-  const partial = `${binary}.${process.pid}.${Date.now()}`;
-  try {
-    await exec("swiftc", ["-O", HELPER_SOURCE, "-o", partial]);
-    fs.renameSync(partial, binary);
-  } finally {
-    fs.rmSync(partial, { force: true });
-  }
-  return binary;
-}
+const helperBinary = () => tools.helperBinary(HELPER_SOURCE).catch((e) => {
+  throw new DeviceUiError(e.message);
+});
 
 async function helper(...args) {
   return exec(await helperBinary(), args);

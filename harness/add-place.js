@@ -15,8 +15,8 @@ const fs = require("node:fs");
 const path = require("node:path");
 const { livePids, BETA, SUITE } = require("./relaunch.js");
 const { preferencesFolder } = require("./settings.js");
+const { escapeXml } = require("./tools.js");
 
-const escapeXml = (text) => text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 const unescapeXml = (text) => text.replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, "\"").replace(/&amp;/g, "&");
 
 function parseArgs(argv) {

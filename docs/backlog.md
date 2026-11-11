@@ -8,9 +8,6 @@ Open work, not scheduled. An item leaves this list when it is done or dropped.
   are the first users. Build it when a project needs one.
 - **VST3 plug-ins.** `plugin.js` handles Audio Unit effects only and refuses VST3, because
   reading a VST3 plug-in's parameter IDs needs a VST3 host.
-- **One helper compiler.** `device-ui.js` and `plugin.js` each have their own `helperBinary`
-  and `HELPER_CACHE`, which compile a Swift helper once per version of its source into the
-  same cache folder. Move them into one module.
 - **The circular require between `settings.js` and `log.js`.** `log.js` requires
   `settings.js` for the preferences folder, so `sampleRate` in `settings.js` requires
   `log.js` inside the function. Move one side so both can require at the top.

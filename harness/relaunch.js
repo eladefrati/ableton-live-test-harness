@@ -40,16 +40,14 @@
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
-const { execFile } = require("node:child_process");
 const { connect } = require("./live.js");
 const { osascript, liveApp, sameFile, openInBackground, SAVE_CHANGES, TEMP_FILES, HARNESS_TEMP, tempFolder } = require("./macos.js");
 const { preferencesFolder } = require("./settings.js");
+const tools = require("./tools.js");
 const { buildPluginSet, checkPluginLoaded, writeSet } = require("./plugin.js");
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-const run = (cmd, args) => new Promise((resolve, reject) => {
-  execFile(cmd, args, (error, stdout) => (error ? reject(error) : resolve(stdout.trim())));
-});
+const run = (cmd, args) => tools.run(cmd, args).then((out) => out.trim());
 
 const HANG_MS = 10000; // Live exited about 3 s after the last answer in every run measured
 const START_MS = 90000;

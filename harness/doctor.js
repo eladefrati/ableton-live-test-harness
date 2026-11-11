@@ -10,14 +10,11 @@
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
-const { execFile } = require("node:child_process");
 const { connect } = require("./live.js");
 const { liveApp } = require("./macos.js");
-const { recordBitDepth, describeDepth, sampleRate } = require("./settings.js");
-
-const run = (cmd, args) => new Promise((resolve) => {
-  execFile(cmd, args, (error, stdout) => resolve(error ? null : stdout.trim()));
-});
+const { liveVersion, recordBitDepth, describeDepth, sampleRate } = require("./settings.js");
+const { livePids } = require("./relaunch.js");
+const { run } = require("./tools.js");
 
 async function main() {
   let failed = 0;
@@ -26,7 +23,7 @@ async function main() {
     console.log(`${ok ? "ok  " : "FAIL"} ${text}`);
   };
 
-  const pids = ((await run("pgrep", ["-x", "Live"])) || "").split("\n").filter(Boolean);
+  const pids = await livePids();
   if (pids.length === 0) {
     const relaunch = path.join(__dirname, "relaunch.js").replace(os.homedir(), "~");
     line(false, `Live is not running: start it with node ${relaunch} (--suite or --app <path> for another Live)`);
@@ -52,7 +49,7 @@ async function main() {
     appError = error.message;
     return null;
   });
-  const version = app ? await run("defaults", ["read", `${app}/Contents/Info`, "CFBundleShortVersionString"]) : null;
+  const version = app ? await liveVersion(app).catch(() => null) : null;
   line(Boolean(app), app ? `Live running: ${app} ${version || ""}`.trim()
     : `Live is running, but System Events can't name its app: ${appError} (see "What Live needs" in harness/README.md)`);
   // Checks that need a bit depth refuse to record at another; this only reports it.

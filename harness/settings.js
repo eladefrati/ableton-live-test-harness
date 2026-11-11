@@ -26,18 +26,19 @@
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
-const { execFile } = require("node:child_process");
 const { liveApp } = require("./macos.js");
+const { run } = require("./tools.js");
+
+// The version of the Live app at `app`, as its Info.plist gives it. A Beta's carries its
+// build: "12.4.25b1 (2026-10-28_e04f372900)".
+async function liveVersion(app) {
+  return (await run("defaults", ["read", `${app}/Contents/Info`, "CFBundleShortVersionString"])).trim();
+}
 
 async function preferencesFolder(app) {
   app = app || (await liveApp());
-  let version = await new Promise((resolve, reject) => {
-    execFile("defaults", ["read", `${app}/Contents/Info`, "CFBundleShortVersionString"],
-      (error, stdout) => (error ? reject(error) : resolve(stdout.trim())));
-  });
-  // A Beta's version carries its build, "12.4.25b1 (2026-10-28_e04f372900)"; the folder
-  // is named for the version alone.
-  version = version.split(" ")[0];
+  // The folder is named for the version alone, without a Beta's build.
+  const version = (await liveVersion(app)).split(" ")[0];
   return path.join(os.homedir(), "Library", "Preferences", "Ableton", `Live ${version}`);
 }
 
@@ -187,6 +188,6 @@ async function requireSampleRate(rate, options) {
 }
 
 module.exports = {
-  preferencesFolder, parseSchema, readSetting, parseRecordBitDepth, recordBitDepth,
+  liveVersion, preferencesFolder, parseSchema, readSetting, parseRecordBitDepth, recordBitDepth,
   requireRecordBitDepth, describeDepth, parseSampleRate, sampleRate, requireSampleRate,
 };

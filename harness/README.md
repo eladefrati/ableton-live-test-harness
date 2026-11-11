@@ -131,6 +131,9 @@ Node 18 or later. See [ADR-0001](../docs/adr/0001-fork-abletonosc.md) for the de
   device reports (status line, check results) over UDP 11002. Take the time before the
   action and pass it as `since`: `const since = Date.now(); live.setParameter(...);
   await live.waitForHook("check", { since })`.
+- `tools.js` and `amxd.js`: shared by the modules above. `run(cmd, args)` runs a command,
+  `helperBinary(source)` compiles a Swift helper once per version of its source,
+  `escapeXml(text)`; `patcherChunk(bytes)` finds the patcher in an `.amxd`.
 - `settings.js`: Live's settings, read from `Preferences.cfg` without touching Live's
   window. `recordBitDepth()` resolves with `{bits, float}` (16, 24, or 32 and float);
   `requireRecordBitDepth(bits)` rejects unless Live records at `bits`, with a message

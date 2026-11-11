@@ -19,14 +19,13 @@
 // --plugin starts Live on that set; exposePluginParameters opens it in a running Live.
 // VST3 plug-ins are not covered: their parameter IDs need a VST3 host to read.
 
-const crypto = require("node:crypto");
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 const zlib = require("node:zlib");
-const { execFile } = require("node:child_process");
 const { openSetAndWait, tempFolder, inHarnessTemp } = require("./macos.js");
 const { runInUserSession } = require("./user-session.js");
+const tools = require("./tools.js");
 
 class PluginError extends Error {}
 
@@ -90,43 +89,19 @@ function mapParameters(raw) {
   });
 }
 
-// Runs a command in this process's own session (plutil, swiftc); auval and the helper go
-// through runInUserSession instead.
-function run(cmd, args) {
-  return new Promise((resolve, reject) => {
-    execFile(cmd, args, { maxBuffer: 16 * 1024 * 1024 }, (error, stdout, stderr) => {
-      if (error) reject(new PluginError(`${cmd} ${args.join(" ")} failed: ${(stderr || error.message).trim()}`));
-      else resolve(stdout);
-    });
-  });
-}
+// Runs a command in this process's own session (plutil); auval and the helper go through
+// runInUserSession instead.
+const run = (cmd, args) => tools.run(cmd, args).catch((e) => {
+  throw new PluginError(e.message);
+});
 
 const HELPER_SOURCE = path.join(__dirname, "au-parameters.swift");
-// Compiled helpers, by source hash. Not in HARNESS_TEMP, which relaunch.js empties after
-// building a plug-in's set: the first build with an empty module cache took 53 s on the remote Mac.
-const HELPER_CACHE = path.join(os.tmpdir(), "ableton-harness-tools");
 const HELPER_MARK = "AU-PARAMETERS ";
 
-// The path of the compiled helper, built with swiftc if this source hasn't been. It is
-// built under a name of its own and renamed into place, so a run never finds half a binary.
-async function helperBinary() {
-  const hash = crypto.createHash("sha256").update(fs.readFileSync(HELPER_SOURCE)).digest("hex").slice(0, 16);
-  const binary = path.join(HELPER_CACHE, `au-parameters-${hash}`);
-  if (fs.existsSync(binary)) return binary;
-  // xcode-select fails without developer tools; swiftc would open the install dialog.
-  await run("xcode-select", ["-p"]).catch(() => {
-    throw new PluginError(`Building ${HELPER_SOURCE} needs Xcode or the Command Line Tools (xcode-select --install)`);
-  });
-  fs.mkdirSync(HELPER_CACHE, { recursive: true });
-  const partial = `${binary}.${process.pid}.${Date.now()}`;
-  try {
-    await run("swiftc", ["-O", HELPER_SOURCE, "-o", partial]);
-    fs.renameSync(partial, binary);
-  } finally {
-    fs.rmSync(partial, { force: true });
-  }
-  return binary;
-}
+// The path of the compiled helper (helperBinary in tools.js).
+const helperBinary = () => tools.helperBinary(HELPER_SOURCE).catch((e) => {
+  throw new PluginError(e.message);
+});
 
 // The parameters of the AU with these component codes (four-character strings), from the
 // helper (mapParameters), in the AU's ParameterList order. `auval -v` validates the
@@ -217,7 +192,7 @@ async function findComponent(name, folders = COMPONENT_FOLDERS) {
     + `${where ? ` (${where})` : ""}${not}; expected one`);
 }
 
-const escapeXml = (s) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+const { escapeXml } = tools;
 
 function findAuDevice(xml, name) {
   const found = [];

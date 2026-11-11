@@ -12,6 +12,7 @@ const path = require("node:path");
 const { connect, playedNotes } = require("./live.js");
 const { float } = require("./osc.js");
 const { compareNotes, summary } = require("./compare.js");
+const { patcherChunk } = require("./amxd.js");
 
 function latestBuild(folder, device) {
   const escaped = device.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -35,23 +36,15 @@ function chooseBuild(option, builds, device) {
 }
 
 // The script of the one box in a built .amxd whose text matches `boxText` (default: the
-// [v8] object; [v8ui] views are not "v8 ..." objects). The file holds chunks "ampf", "meta"
-// and "ptch" (4-byte tag, little-endian length, payload), the last the patcher JSON. Box
+// [v8] object; [v8ui] views are not "v8 ..." objects), from the file's patcher (amxd.js). Box
 // ids may be renumbered when a build tool writes the file, so the box is found by its text.
 function buildScript(file, boxText = /^v8 /) {
-  const data = fs.readFileSync(file);
-  for (let at = 0; at + 8 <= data.length;) {
-    const tag = data.toString("latin1", at, at + 4);
-    const length = data.readUInt32LE(at + 4);
-    if (tag === "ptch") {
-      const patcher = JSON.parse(data.toString("utf8", at + 8, at + 8 + length).replace(/\0+$/, "")).patcher;
-      const scripts = patcher.boxes.map((b) => b.box).filter((b) => boxText.test(b.text || "") && b.textfile);
-      if (scripts.length !== 1) throw new Error(`Expected one ${boxText} script in ${file}, found ${scripts.length}`);
-      return scripts[0].textfile.text;
-    }
-    at += 8 + length;
-  }
-  throw new Error(`No patcher in ${file}`);
+  const chunk = patcherChunk(fs.readFileSync(file));
+  if (!chunk) throw new Error(`No patcher in ${file}`);
+  const patcher = JSON.parse(chunk.toString("utf8").replace(/\0+$/, "")).patcher;
+  const scripts = patcher.boxes.map((b) => b.box).filter((b) => boxText.test(b.text || "") && b.textfile);
+  if (scripts.length !== 1) throw new Error(`Expected one ${boxText} script in ${file}, found ${scripts.length}`);
+  return scripts[0].textfile.text;
 }
 
 // The default test clip: 16 notes over 12 beats, no two of the same pitch overlapping (Live
