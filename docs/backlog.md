@@ -17,6 +17,11 @@ Open work, not scheduled. An item leaves this list when it is done or dropped.
   Options.txt, `doctor.js` reports no armed tracks before the check and track 0 armed after
   it (Live 12.4.25b1, 2026-11-11, 3 of 3 runs). Which step arms it isn't known; `restore()`
   in `audio.js` is the place to disarm what it leaves.
+- **A check on a set with a group track.** No harness check runs on one, and the harness
+  can't make one, so what `doctor.js` and `recordArrangement()` read from a group track
+  (`arm`, `playing_slot_index`) is untested; a property that doesn't apply reads nil, proven
+  only with `fold_state` on a MIDI track. Add a fixture set holding a group track, saved
+  from Live as `sets/empty.als` was, and a check that runs both on it.
 - **A selection setter that checks.** `/live/view/set/selected_track` can leave the selection
   unchanged with no error (`harness/live-notes.md`), and `send` waits for nothing. Add a
   `selectTrack()` to `live.js` that sets the track, reads `get/selected_track` back and
