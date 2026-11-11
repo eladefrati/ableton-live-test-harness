@@ -32,15 +32,18 @@ class AbletonOSCHandler(Component):
         self.logger.info("Setting property for %s: %s (new value %s)" % (self.class_identifier, prop, params[0]))
         setattr(target, prop, params[0])
 
-    def _get_property(self, target, prop, params: Optional[Tuple] = ()) -> Tuple[Any]:
+    def _read(self, target, prop):
+        """
+        The value of a property, or None for one that doesn't apply to the object
+        (e.g. track.fold_state for a non-group track), which raises a RuntimeError.
+        """
         try:
-            value = getattr(target, prop)
+            return getattr(target, prop)
         except RuntimeError:
-            #--------------------------------------------------------------------------------
-            # Gracefully handle errors, which may occur when querying parameters that don't apply
-            # to a particular object (e.g. track.fold_state for a non-group track)
-            #--------------------------------------------------------------------------------
-            value = None
+            return None
+
+    def _get_property(self, target, prop, params: Optional[Tuple] = ()) -> Tuple[Any]:
+        value = self._read(target, prop)
         self.logger.info("Getting property for %s: %s = %s" % (self.class_identifier, prop, value))
         return (value, *params)
 

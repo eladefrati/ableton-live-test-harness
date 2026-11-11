@@ -152,7 +152,7 @@ for [Live Object Model - Song](https://docs.cycling74.com/max8/vignettes/live_ob
 | /live/song/get/id                     |               | id                         | An id that changes whenever Live opens a set, even the same file again |
 | /live/song/get/device_parameter_counts |              | [count, ...]               | Parameter counts of every device on every track, in order; stable once Max for Live devices have loaded |
 | /live/song/get/track_names |              | [index_min, index_max] | Query track names (optionally, over a given range)                          |
-| /live/song/get/track_data  |              | [various]              | Query bulk properties of multiple tracks/clips. See below for further info. One message, so it fails above the UDP datagram size limit; a track property that doesn't apply to a track reads nil. |
+| /live/song/get/track_data  |              | [various]              | Query bulk properties of multiple tracks/clips. See below for further info. One message, so it fails above the UDP datagram size limit; a property that doesn't apply to its object reads nil. |
 
 
 #### Querying track/clip data in bulk with /live/song/get/track_data
@@ -294,7 +294,7 @@ To query the properties of multiple tracks, see [Song: Properties of cue points,
 | /live/track/get/arrangement_clips/name       | track_id     | track_id, [name, ....]      | Query all arrangement view clip names on track   |
 | /live/track/get/arrangement_clips/length     | track_id     | track_id, [length, ...]     | Query all arrangement view clip lengths on track |
 | /live/track/get/arrangement_clips/start_time | track_id     | track_id, [start_time, ...] | Query all arrangement view clip times on track   |
-| /live/track/get/arrangement_clips/properties | track_id, property, [property, ...] | track_id, [value, ...] | Query the named clip properties of every arrangement view clip on track: one value per property per clip, clip by clip. One message, so it fails above the UDP datagram size limit (about 340 clips with seven properties) |
+| /live/track/get/arrangement_clips/properties | track_id, property, [property, ...] | track_id, [value, ...] | Query the named clip properties of every arrangement view clip on track: one value per property per clip, clip by clip. A property that doesn't apply to a clip reads nil; naming none is an error. One message, so it fails above the UDP datagram size limit (about 340 clips with seven properties) |
 | /live/track/duplicate_clip_to_arrangement   | track_id, clip_id, time | track_id, arrangement_clip_id | Copy the Session clip in slot clip_id into the Arrangement at beat `time`; replies with the new clip's index |
 
 ### Track: Properties of devices

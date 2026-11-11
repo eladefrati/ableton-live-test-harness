@@ -130,12 +130,10 @@ class TrackHandler(AbletonOSCHandler):
         # reply; a query per property per clip takes a tick each. A property that doesn't
         # apply to a clip reads None, as it does through /live/arrangement_clip/get/.
         def track_get_arrangement_clip_properties(track, params):
-            def read(clip, prop):
-                try:
-                    return getattr(clip, prop)
-                except RuntimeError:
-                    return None
-            return tuple(read(clip, prop) for clip in track.arrangement_clips for prop in params)
+            if not params:
+                # an empty reply would read as a track with no clips
+                raise ValueError("Name at least one clip property")
+            return tuple(self._read(clip, prop) for clip in track.arrangement_clips for prop in params)
 
         """
         Returns a list of clip properties, or Nil if clip is empty
