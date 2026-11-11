@@ -13,6 +13,10 @@ Open work, not scheduled. An item leaves this list when it is done or dropped.
   `log.js` inside the function. Move one side so both can require at the top.
 - **A lock for `remote.sh`.** Two runs at once can replace files under a running check; the
   slot rule in `harness/README.md` is the only guard.
+- **`plugin-record.js` leaves the plug-in's track armed.** With `-EnableArmOnSelection` in
+  Options.txt, `doctor.js` reports no armed tracks before the check and track 0 armed after
+  it (Live 12.4.25b1, 2026-11-11, 3 of 3 runs). Which step arms it isn't known; `restore()`
+  in `audio.js` is the place to disarm what it leaves.
 - **A selection setter that checks.** `/live/view/set/selected_track` can leave the selection
   unchanged with no error (`harness/live-notes.md`), and `send` waits for nothing. Add a
   `selectTrack()` to `live.js` that sets the track, reads `get/selected_track` back and
