@@ -53,7 +53,9 @@ node ~/dev/ableton-live-test-harness/harness/doctor.js
 
 It checks that Live is running (only one at a time), AbletonOSC answers, no
 Live dialog is open, and no track is armed, and reports the bit depth Live records at
-(`info records at 24-bit` or `32-bit float`). On "UDP 11001 is in use", another client is
+(`info records at 24-bit` or `32-bit float`) and the sample rate it runs at. It warns when
+the Remote Script's files changed since Live started (run `harness/cli.js reload`; a changed
+`manager.py` needs a relaunch) and when Automation Arm is on. On "UDP 11001 is in use", another client is
 running: find out who before going on. On "AbletonOSC does not answer", ask the user to
 select it as a Control Surface.
 

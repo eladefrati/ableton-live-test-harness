@@ -101,9 +101,9 @@ Node 18 or later. See [ADR-0001](../docs/adr/0001-fork-abletonosc.md) for the de
   control; a `live.tab` must be a single column. A press takes about 9 s on the remote Mac, nearly
   all of it reading text from captures. `press` resolves when the click is sent: read what
   it did from Live.
-- `doctor.js`: read-only check that Live is worth driving: Live running,
-  AbletonOSC answering, no dialog open, no armed tracks. It also reports the record bit
-  depth. Run it first.
+- `doctor.js`: read-only check that Live is ready to be driven; run it first. What it
+  checks and what to do about each line: the
+  [`verify-ableton` skill](../skills/verify-ableton/SKILL.md).
 - `relaunch.js [--kill] [--suite | --app <path>] [--plugin <name>]`: quits Live if it runs and starts Ableton Live 12 Beta
   (Suite with `--suite`, another Live with `--app <path>`, which it checks exists before quitting anything), behind other windows, on a fresh copy of `sets/empty.als` (one MIDI track, unarmed, no
   devices, no returns, nothing on Main, Main at -inf dB so runs are silent (recordings take tracks' Post FX, before Main); saved by Live 12.4.25b1, opens in Suite 12.4.3), not
