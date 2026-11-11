@@ -46,9 +46,15 @@ async function main() {
     console.log(`warn changed since Live started (${new Date(started).toLocaleTimeString()}): ${changed.join(", ")}; `
       + "if not reloaded since, run node harness/cli.js reload" + (changed.includes("manager.py") ? "; manager.py needs a Live restart" : ""));
   }
-  const app = await liveApp().catch(() => null);
+  // System Events names the app; it refuses without Accessibility and Automation permission.
+  let appError = "";
+  const app = await liveApp().catch((error) => {
+    appError = error.message;
+    return null;
+  });
   const version = app ? await run("defaults", ["read", `${app}/Contents/Info`, "CFBundleShortVersionString"]) : null;
-  line(Boolean(app), `Live running: ${app || "unknown app"} ${version || ""}`.trim());
+  line(Boolean(app), app ? `Live running: ${app} ${version || ""}`.trim()
+    : `Live is running, but System Events can't name its app: ${appError} (see "What Live needs" in harness/README.md)`);
   // Checks that need a bit depth refuse to record at another; this only reports it.
   try {
     const depth = await recordBitDepth();
