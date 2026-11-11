@@ -121,7 +121,8 @@ Node 18 or later. See [ADR-0001](../docs/adr/0001-fork-abletonosc.md) for the de
 - `quit.js [--kill]`: quits Live and leaves it quit, for when the user asks for that. It
   stops Live as `relaunch.js` does (same answers, same kill after 10 s, `--kill` kills at
   once, stops at any other dialog), then moves Live's recovery data aside, deletes its
-  Temp Projects and empties the harness's temp folder. Any other option is refused.
+  Temp Projects and empties the harness's temp folder. Holds UDP 11001 throughout, so it
+  refuses while another client runs. Any other option is refused.
 - `add-place.js <folder> [--suite | --app <path>]`: adds a folder to Places in `Library.cfg`,
   for the Live `relaunch.js` would start with those options. It refuses while Live runs and
   does nothing if the folder is already there. Places are told apart by path, so any number

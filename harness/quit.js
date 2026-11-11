@@ -31,19 +31,16 @@ async function main(argv) {
   const { kill } = parseArgs(argv);
   const pids = await livePids();
   if (pids.length > 1) throw new Error("More than one Live is running: the harness can't tell them apart");
-  if (pids.length === 0) {
-    emptyHarnessTemp(say);
-    say("ok   Live is not running");
-    return;
-  }
+  // UDP 11001 is held throughout, as relaunch.js holds it: it keeps other harness runs from
+  // making folders in the temp folder while it is emptied.
   const live = await connect({ timeout: 1000 });
   try {
-    await stop(live, pids[0], kill, say);
+    if (pids.length === 1) await stop(live, pids[0], kill, say);
+    emptyHarnessTemp(say);
   } finally {
     live.close();
   }
-  emptyHarnessTemp(say);
-  say("ok   Live is quit");
+  say(pids.length === 1 ? "ok   Live is quit" : "ok   Live is not running");
 }
 
 if (require.main === module) {

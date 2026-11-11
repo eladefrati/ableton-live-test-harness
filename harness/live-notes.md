@@ -199,6 +199,8 @@ unexpected.
   `<local time, microseconds>: error: Message from Max:  <text>`. A gen~ codebox
   that fails to compile ("declarations must come before any expressions") leaves a device
   that loads, answers OSC and outputs silence, with the reason only there (found 2026-10-31).
+- `quit.js` refuses while another client holds UDP 11001, also when Live isn't running: it
+  empties the harness's temp folder, which a running check or `relaunch.js` may be using.
 - Live keeps its settings in `Preferences.cfg` in its preferences folder, a binary file
   `settings.js` reads (its layout is at the top of that file, worked out from Live
   12.2 to 12.4.25b1's files). Bit Depth is `SongPrefData.RecordBitDepth`: 1 is 24-bit
