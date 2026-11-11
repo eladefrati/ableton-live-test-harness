@@ -186,14 +186,20 @@ function deleteTempProjects(started, say) {
   }
 }
 
+// Deletes every folder in the harness's temp folder: the sets earlier runs saved or started
+// Live on. Call it only with no Live running, since a running Live may have one of them open.
+function emptyHarnessTemp(say, root = HARNESS_TEMP) {
+  const old = fs.existsSync(root) ? fs.readdirSync(root) : [];
+  for (const name of old) fs.rmSync(path.join(root, name), { recursive: true, force: true });
+  if (old.length) say(`info deleted ${old.length} folders in ${root}`);
+}
+
 // The set Live starts on, in a folder of its own, after emptying HARNESS_TEMP of earlier
 // ones and sets saved as: a copy of the empty set, or `plugin`'s xml (buildPluginSet). Call
 // it only once Live has quit, since the old Live had one of them open; holding UDP 11001
 // keeps checks from making new ones meanwhile.
 function freshSet(say, plugin) {
-  const old = fs.existsSync(HARNESS_TEMP) ? fs.readdirSync(HARNESS_TEMP) : [];
-  for (const name of old) fs.rmSync(path.join(HARNESS_TEMP, name), { recursive: true, force: true });
-  if (old.length) say(`info deleted ${old.length} folders in ${HARNESS_TEMP}`);
+  emptyHarnessTemp(say);
   const file = path.join(tempFolder("relaunch-"), plugin ? "harness-plugin.als" : "empty.als");
   if (plugin) writeSet(file, plugin.xml);
   else fs.copyFileSync(EMPTY_SET, file);
@@ -329,4 +335,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { answerFor, tempProjectsSince, crashPrefix, parseArgs, warmUp, livePids, stop, BETA, SUITE };
+module.exports = { answerFor, tempProjectsSince, crashPrefix, parseArgs, warmUp, livePids, stop, emptyHarnessTemp, BETA, SUITE };

@@ -86,7 +86,7 @@ Node 18 or later. See [ADR-0001](../docs/adr/0001-fork-abletonosc.md) for the de
   open a set (behind other windows, stopping the transport first, and answering "Save changes?" and "This action
   will stop audio?"), Key Map and MIDI Map Mode, and the name of the step Edit > Undo would
   undo (`undoName`). `tempFolder(prefix)` makes a folder in `<system temp>/ableton-harness/`, where every
-  set the harness saves goes; `relaunch.js` empties it.
+  set the harness saves goes; `relaunch.js` and `quit.js` empty it.
 - `device-ui.js`: presses a Max for Live device's controls with real mouse events, only on
   the machine `local.json` names as `clickHost` (ADR-0004, ADR-0005).
   `openDeviceUi(live, {track, device, build})` takes the controls from the
@@ -118,8 +118,8 @@ Node 18 or later. See [ADR-0001](../docs/adr/0001-fork-abletonosc.md) for the de
   can't be found or read leaves Live running as it was. Any other option is refused.
 - `quit.js [--kill]`: quits Live and leaves it quit, for when the user asks for that. It
   stops Live as `relaunch.js` does (same answers, same kill after 10 s, `--kill` kills at
-  once, stops at any other dialog), then moves Live's recovery data aside and deletes its
-  Temp Projects. Any other option is refused.
+  once, stops at any other dialog), then moves Live's recovery data aside, deletes its
+  Temp Projects and empties the harness's temp folder. Any other option is refused.
 - `add-place.js <folder> [--suite] [--app <path>]`: adds a folder to Places in `Library.cfg`,
   for the Live `relaunch.js` would start with those options. It refuses while Live runs and
   does nothing if the folder is already there. Places are told apart by path, so any number

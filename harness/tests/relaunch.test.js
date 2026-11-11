@@ -3,7 +3,10 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const dgram = require("node:dgram");
-const { answerFor, tempProjectsSince, crashPrefix, parseArgs, warmUp } = require("../relaunch.js");
+const fs = require("node:fs");
+const os = require("node:os");
+const path = require("node:path");
+const { answerFor, tempProjectsSince, crashPrefix, parseArgs, warmUp, emptyHarnessTemp } = require("../relaunch.js");
 const { Live } = require("../live.js");
 const { encode, decode } = require("../osc.js");
 
@@ -82,4 +85,21 @@ test("parseArgs reads --kill, --suite, --app <path> and --plugin <name>, and ref
   assert.throws(() => parseArgs(["--plugin", "--kill"]), /needs the plug-in's name/);
   assert.throws(() => parseArgs(["--plugin=Plugin"]), /Unknown option --plugin=Plugin/);
   assert.throws(() => parseArgs(["--plugins", "Plugin"]), /Unknown option --plugins/);
+});
+
+test("emptyHarnessTemp deletes every folder in the temp folder and says how many", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "harness-test-"));
+  try {
+    fs.mkdirSync(path.join(root, "relaunch-a"));
+    fs.mkdirSync(path.join(root, "save-b", "Set Project"), { recursive: true });
+    fs.writeFileSync(path.join(root, "save-b", "Set Project", "Set.als"), "");
+    const said = [];
+    emptyHarnessTemp((text) => said.push(text), root);
+    assert.deepEqual(fs.readdirSync(root), []);
+    assert.deepEqual(said, [`info deleted 2 folders in ${root}`]);
+    emptyHarnessTemp((text) => said.push(text), path.join(root, "missing"));
+    assert.equal(said.length, 1);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
 });
