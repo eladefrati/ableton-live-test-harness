@@ -68,6 +68,14 @@ unexpected.
 
 - New MIDI tracks get the devices of Live's default MIDI track template; `createMidiTrack()`
   removes them so they can't alter a recording.
+- A property that doesn't apply to a track or a clip raises in the LOM (`fold_state` on a
+  track that isn't a group); AbletonOSC answers nil for it, and `trackData()` passes that on
+  as null (`fold_state` read null on a MIDI track, Live 12.4.25b1, 2026-11-11). The harness
+  refuses rather than guess: `recordArrangement()` when a track that can be armed reads no
+  `arm`, `arrangementClips()` when a clip reads no value for one of its properties, and
+  both when a reply isn't whole rows.
+- `createTrack()` makes MIDI and audio tracks only and refuses another kind: a return track
+  isn't among the song's tracks, so the last of those would be renamed and stripped instead.
 - New audio tracks get the devices of Live's default audio track template, as MIDI tracks
   do; `createAudioTrack()` removes them.
 - A Max for Live device's parameters arrive seconds after the device; `loadDevice()` waits.

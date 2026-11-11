@@ -10,7 +10,7 @@ Node 18 or later. See [ADR-0001](../docs/adr/0001-fork-abletonosc.md) for the de
   `/live/error` fails the request in flight. Setters and methods send no reply: call
   `sync()` to wait until Live has handled them. `deleteTracks(names, from)` deletes tracks;
   `dialog()` resolves with Live's open dialog, or null. `trackData(...properties)` reads
-  properties of every track in one reply; `placeClip(track, notes, beats)` puts a clip of
+  properties of every track in one reply (null for one that doesn't apply to a track); `placeClip(track, notes, beats)` puts a clip of
   notes on a MIDI track in the Arrangement from beat 0.
 - `compare.js`: `compareNotes` compares expected notes with recorded ones, with timing errors in ms. Live
   records at audio-sample resolution, so the errors have a floor of one sample: 0.021 ms at
@@ -262,7 +262,9 @@ must stay off there: waking doesn't reliably dismiss it.
 - AbletonOSC selected as a Control Surface.
 - For `macos.js` and `doctor.js`: the terminal app that runs node allowed in System Settings > Privacy &
   Security > Accessibility, and under Automation > (that app) > System Events.
-- For `device-ui.js`: Screen Recording for the terminal app, to capture Live's window.
+- For `device-ui.js` and `cli.js windows` and `capture`: Screen Recording for the terminal
+  app, to capture Live's window; the two `cli.js` commands also need the Automation
+  permission above.
 - Live in front while `saveSetAs()` types into it: keystrokes go to the frontmost app. It
   brings Live forward itself, types nothing if Live doesn't come, and puts the app that was
   in front back afterwards. Don't type in another app meanwhile. Menu commands

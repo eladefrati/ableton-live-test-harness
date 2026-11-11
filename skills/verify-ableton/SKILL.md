@@ -41,7 +41,9 @@ a dialog it doesn't know, it prints the message: ask the user. If the permission
 denies it, don't start Live another way: tell the user, who can start Live or allow the command.
 
 When the user asks to quit Live, run `node ~/dev/ableton-live-test-harness/harness/quit.js`
-(on the remote through `remote.sh`). It discards unsaved changes and recordings too.
+(on the remote through `remote.sh`). It discards unsaved changes and recordings too. It
+refuses with "UDP 11001 is in use" while another client runs, also when Live isn't running:
+find out who before going on.
 
 ## Doctor
 
