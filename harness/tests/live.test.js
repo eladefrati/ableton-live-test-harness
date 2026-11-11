@@ -166,7 +166,7 @@ function playingSong(song = { cues: [] }) {
   const now = () => (startedAt === null ? stoppedAt : (song.fromZero ? 0 : marker) + (Date.now() - startedAt) / 500);
   const cues = () => song.cues.flatMap((time, i) => [String(i + 1), time]);
   return {
-    "/live/song/get/num_tracks": () => [["/live/song/get/num_tracks", 0]],
+    "/live/song/get/track_data": () => [["/live/song/get/track_data"]],
     "/live/song/get/tempo": () => [["/live/song/get/tempo", 120]],
     "/live/song/start_playing": () => { startedAt = Date.now(); return []; },
     "/live/song/stop_playing": () => {
@@ -195,12 +195,22 @@ function playingSong(song = { cues: [] }) {
 }
 
 const withSessionClip = (numerator, denominator) => ({
-  "/live/song/get/num_tracks": () => [["/live/song/get/num_tracks", 1]],
-  "/live/track/get/arm": ([t]) => [["/live/track/get/arm", t, 0]],
-  "/live/track/get/playing_slot_index": ([t]) => [["/live/track/get/playing_slot_index", t, 0]],
+  // one track: unarmed, its Session clip in slot 0 active
+  "/live/song/get/track_data": () => [["/live/song/get/track_data", false, 0]],
   "/live/song/get/signature_numerator": () => [["/live/song/get/signature_numerator", numerator]],
   "/live/song/get/signature_denominator": () => [["/live/song/get/signature_denominator", denominator]],
 });
+
+test("recordArrangement refuses while a track the caller didn't arm is armed", () =>
+  withFake({ ...playingSong(), "/live/song/get/track_data": () => [["/live/song/get/track_data", true, -1, true, -1]] }, async (live) => {
+    await assert.rejects(live.recordArrangement({ start: 0, length: 1, tracks: [0] }), /Track 1 is armed and not part of this test/);
+  }));
+
+test("trackData groups one reply's values by track", () => withFake({
+  "/live/song/get/track_data": (args) => [["/live/song/get/track_data", ...(args.join(" ") === "0 -1 track.name track.arm" ? ["a", false, "b", true] : [])]],
+}, async (live) => {
+  assert.deepEqual(await live.trackData("name", "arm"), [["a", false], ["b", true]]);
+}));
 
 test("recordArrangement refuses a start off the bar while a track has an active Session clip", () =>
   withFake({ ...playingSong(), ...withSessionClip(4, 4) }, async (live) => {

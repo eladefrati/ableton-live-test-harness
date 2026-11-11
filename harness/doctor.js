@@ -86,11 +86,9 @@ async function main() {
     }
     const dialog = await live.dialog();
     line(!dialog, dialog ? `A Live dialog is open: ${dialog.message || "no message (e.g. the Save panel)"}` : "No Live dialog open");
-    const names = await live.query("/live/song/get/track_names");
-    const armed = [];
-    for (let track = 0; track < names.length; track++) {
-      if (await live.get("track", "arm", track)) armed.push(names[track]);
-    }
+    const tracks = await live.trackData("name", "arm");
+    const names = tracks.map(([name]) => name);
+    const armed = tracks.filter(([, arm]) => arm).map(([name]) => name);
     line(armed.length === 0, armed.length ? `Armed tracks (recording checks will refuse): ${armed.join(", ")}` : "No armed tracks");
     if (await live.get("song", "session_automation_record")) {
       console.log("warn Automation Arm is on: recordArrangement turns it off while it records, but a parameter "

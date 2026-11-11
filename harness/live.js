@@ -225,6 +225,15 @@ class Live {
     this.send(`/live/${object}/set/${property}`, ...indicesAndValue);
   }
 
+  // Properties of every track from one reply (a query per track takes a tick each):
+  // trackData("name", "arm") resolves with [[name, arm], ...], one entry per track.
+  async trackData(...properties) {
+    const values = await this.query("/live/song/get/track_data", 0, -1, ...properties.map((p) => `track.${p}`));
+    const rows = [];
+    for (let at = 0; at < values.length; at += properties.length) rows.push(values.slice(at, at + properties.length));
+    return rows;
+  }
+
   // Adds a MIDI track at the end of the set, named `name`, with the devices Live's default
   // MIDI track template adds removed, so they can't alter what a test records. Resolves
   // with its index.
@@ -511,14 +520,10 @@ class Live {
   // action goes out at the first tick past its beat rather than up to a poll later.
   async recordArrangement({ start = 0, length, tracks, pollMs = 50, finePollMs = 2, during = [] }) {
     if (!Array.isArray(tracks)) throw new LiveError("recordArrangement needs the tracks the caller armed");
-    const count = await this.get("song", "num_tracks");
-    let sessionTrack = -1;
-    for (let track = 0; track < count; track++) {
-      if (!tracks.includes(track) && (await this.get("track", "arm", track))) {
-        throw new LiveError(`Track ${track} is armed and not part of this test; disarm it first`);
-      }
-      if (sessionTrack < 0 && (await this.get("track", "playing_slot_index", track)) >= 0) sessionTrack = track;
-    }
+    const states = await this.trackData("arm", "playing_slot_index");
+    const armed = states.findIndex(([arm], track) => arm && !tracks.includes(track));
+    if (armed >= 0) throw new LiveError(`Track ${armed} is armed and not part of this test; disarm it first`);
+    const sessionTrack = states.findIndex(([, slot]) => slot >= 0);
     if (sessionTrack >= 0) {
       const bar = (4 * (await this.get("song", "signature_numerator"))) / (await this.get("song", "signature_denominator"));
       const barStart = Math.floor(start / bar + 1e-9) * bar;
