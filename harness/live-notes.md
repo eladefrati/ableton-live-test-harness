@@ -96,7 +96,8 @@ unexpected.
   wasn't redrawing (it showed none of the changes) selected the track every time, so the
   cause is not known.
   `/live/view/set/selected_device` on a device of the wanted track selected that track.
-  Read `get/selected_track` back after setting it.
+  Read `get/selected_track` back after setting it. `/live/browser/load` does: it refuses,
+  loading nothing, when the track it selected isn't the selected one.
 - A value listener left on a parameter by an earlier session kept sending after its client
   was gone (`stop_listen` answered "Observer not connected"). Its updates arrive on
   `/live/device/get/parameter/value`, the address a `parameter/value` query answers on, so

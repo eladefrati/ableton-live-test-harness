@@ -133,6 +133,12 @@ class BrowserHandler(AbletonOSCHandler):
                 raise ValueError("Hot-Swap is active; turn it off before loading")
             track = self.song.tracks[track_index]
             self.song.view.selected_track = track
+            #--------------------------------------------------------------------------------
+            # The selection has been seen to stay where it was with no error; loading then
+            # would put the device on another track.
+            #--------------------------------------------------------------------------------
+            if self.song.view.selected_track != track:
+                raise ValueError("Track %d could not be selected; nothing loaded" % track_index)
             devices_before = [device._live_ptr for device in track.devices]
             browser.load_item(item)
             for device_index, device in enumerate(track.devices):

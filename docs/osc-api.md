@@ -511,7 +511,7 @@ Loads devices and presets from Live's browser categories, the User Library or a 
 | /live/browser/get/user_folders  |                        | [name, ...]                             | The Places folders |
 | /live/browser/get/places_with   | path                   | [name, ...]                             | The Places folders that have the item, by name (empty if none) |
 | /live/browser/get/children      | root, [path]           | root, path, chunk_index, chunk_count, [name, ...] | Item names under a browser item, in chunks of up to 100 |
-| /live/browser/load              | track_id, root, path   | track_id, device_id, device_name        | Select the track and load the item onto it; device_id is the added device's index, or -1. Refused while Hot-Swap is active. A Max for Live device's parameters arrive seconds later. |
+| /live/browser/load              | track_id, root, path   | track_id, device_id, device_name        | Select the track and load the item onto it; device_id is the added device's index, or -1. Refused while Hot-Swap is active, or if the track could not be selected. A Max for Live device's parameters arrive seconds later. |
 
 
 ## MidiMap API
