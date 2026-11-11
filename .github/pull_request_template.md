@@ -7,5 +7,4 @@ Please include a summary of the change, and the motivation. If it closes one or 
 - [ ] The title is descriptive and summarises the new changes
 - [ ] The code and any comments are consistent with the current code style
 - [ ] For any new or modified API endpoints, I have added appropriate documentation to [docs/osc-api.md](/docs/osc-api.md)
-- [ ] For any new or modified API endpoints, I have added [unit tests](/tests/) covering the new functionality
 - [ ] I have verified that all unit tests pass (see [CONTRIBUTING.md](/CONTRIBUTING.md) for guidance)

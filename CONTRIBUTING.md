@@ -15,15 +15,18 @@ code comments or commit messages.
 
 The repo names no project that uses it: tests and docs use plain stand-ins.
 
-## Tests
+## AbletonOSC's tests
 
-For unit tests to pass:
+`tests/` is AbletonOSC's own pytest suite, kept from upstream. It isn't run before commits
+here, and the addresses this repo added have no tests in it: the harness's unit tests and
+checks above cover what the harness uses. It drives a running Live and changes the open set.
+For it to pass:
 
 - Live must be configured with default audio input and output devices, and
 - Live must be started with a blank default set, and
 - `Count-In` must be `None`, as in [Installation](README.md#installation)
 
-To run unit tests, `pip3 install pytest`, start Live, change to the repo root, and run:
+To run it, `pip3 install pytest`, start Live, change to the repo root, and run:
 
 ```
 pytest
