@@ -56,11 +56,6 @@ class DeviceHandler(AbletonOSCHandler):
         def device_get_parameters_name(device, params: Tuple[Any] = ()):
             return tuple(parameter.name for parameter in device.parameters)
 
-        def device_get_parameters_original_name(device, params: Tuple[Any] = ()):
-            # A Max for Live parameter's name is its short name, often shared by several
-            # parameters; original_name may be the long name.
-            return tuple(parameter.original_name for parameter in device.parameters)
-
         def device_get_parameters_value(device, params: Tuple[Any] = ()):
             return tuple(parameter.value for parameter in device.parameters)
 
@@ -79,7 +74,6 @@ class DeviceHandler(AbletonOSCHandler):
 
         self.osc_server.add_handler("/live/device/get/num_parameters", create_device_callback(device_get_num_parameters))
         self.osc_server.add_handler("/live/device/get/parameters/name", create_device_callback(device_get_parameters_name))
-        self.osc_server.add_handler("/live/device/get/parameters/original_name", create_device_callback(device_get_parameters_original_name))
         self.osc_server.add_handler("/live/device/get/parameters/value", create_device_callback(device_get_parameters_value))
         self.osc_server.add_handler("/live/device/get/parameters/min", create_device_callback(device_get_parameters_min))
         self.osc_server.add_handler("/live/device/get/parameters/max", create_device_callback(device_get_parameters_max))
