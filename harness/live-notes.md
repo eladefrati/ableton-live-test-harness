@@ -13,6 +13,10 @@ unexpected.
   Delete. "This action will stop audio. Proceed?" (0 Cancel, 1 OK) comes when a set is
   opened while the transport plays and the open set has no unsaved changes; stopped, Live
   doesn't ask.
+- A dialog is a window of its own, with no title: with "Save changes?" open, `cli.js
+  windows` listed it (405 x 123 points) in front of two full-size windows, one untitled and
+  one with the set's name. `cli.js capture --window <id>` captured it with its message and
+  buttons; the main window's capture doesn't show it (Live 12.4.25b1, 2026-11-11).
 - After a kill, Live starts at "Live unexpectedly quit... Would you like to recover your
   work?" (No, Yes). It isn't a LOM dialog, takes keys only with Live frontmost, and Escape
   doesn't answer it. Live asks while its recovery data (`CrashRecoveryInfo.cfg`, `Undo`,
