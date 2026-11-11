@@ -34,7 +34,8 @@ async function main() {
   }
   // Live keeps the Remote Script's modules from when it started: code changed since then
   // runs only after a reload (manager.py: a restart).
-  const started = Date.parse(await run("ps", ["-o", "lstart=", "-p", pids[0]]));
+  // No start time (Live exited meanwhile) only skips the warning; the checks below still run.
+  const started = Date.parse(await run("ps", ["-o", "lstart=", "-p", pids[0]]).catch(() => ""));
   const repo = path.join(__dirname, "..");
   const changed = ["manager.py", ...fs.readdirSync(path.join(repo, "abletonosc")).map((f) => path.join("abletonosc", f))]
     .filter((f) => f.endsWith(".py") && fs.statSync(path.join(repo, f)).mtimeMs > started);
