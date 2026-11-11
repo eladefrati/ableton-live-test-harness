@@ -13,7 +13,8 @@
 
 const fs = require("node:fs");
 const path = require("node:path");
-const { livePids, BETA, SUITE } = require("./relaunch.js");
+const { BETA, SUITE } = require("./relaunch.js");
+const { livePids } = require("./macos.js");
 const { preferencesFolder } = require("./settings.js");
 const { escapeXml } = require("./tools.js");
 

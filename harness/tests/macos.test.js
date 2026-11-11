@@ -5,7 +5,7 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
-const { inHarnessTemp } = require("../macos.js");
+const { inHarnessTemp, emptyHarnessTemp } = require("../macos.js");
 
 test("inHarnessTemp takes files inside the root only, through /var's link, and refuses what is missing", () => {
   // Under os.tmpdir(), which is /var/folders/..., a link to /private/var/folders/...
@@ -27,5 +27,22 @@ test("inHarnessTemp takes files inside the root only, through /var's link, and r
     assert.equal(inHarnessTemp(inside, path.join(base, "no-such-root")), false);
   } finally {
     fs.rmSync(base, { recursive: true, force: true });
+  }
+});
+
+test("emptyHarnessTemp deletes every folder in the temp folder and says how many", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "harness-test-"));
+  try {
+    fs.mkdirSync(path.join(root, "relaunch-a"));
+    fs.mkdirSync(path.join(root, "save-b", "Set Project"), { recursive: true });
+    fs.writeFileSync(path.join(root, "save-b", "Set Project", "Set.als"), "");
+    const said = [];
+    emptyHarnessTemp((text) => said.push(text), root);
+    assert.deepEqual(fs.readdirSync(root), []);
+    assert.deepEqual(said, [`info deleted 2 folders in ${root}`]);
+    emptyHarnessTemp((text) => said.push(text), path.join(root, "missing"));
+    assert.equal(said.length, 1);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
   }
 });

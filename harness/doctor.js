@@ -11,9 +11,8 @@ const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 const { connect } = require("./live.js");
-const { liveApp } = require("./macos.js");
+const { liveApp, livePids } = require("./macos.js");
 const { liveVersion, recordBitDepth, describeDepth, sampleRate } = require("./settings.js");
-const { livePids } = require("./relaunch.js");
 const { run } = require("./tools.js");
 
 async function main() {

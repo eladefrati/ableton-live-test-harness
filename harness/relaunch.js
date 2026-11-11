@@ -41,7 +41,7 @@ const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 const { connect } = require("./live.js");
-const { osascript, liveApp, sameFile, openInBackground, SAVE_CHANGES, TEMP_FILES, HARNESS_TEMP, tempFolder } = require("./macos.js");
+const { osascript, liveApp, livePids, sameFile, openInBackground, SAVE_CHANGES, TEMP_FILES, tempFolder, emptyHarnessTemp } = require("./macos.js");
 const { preferencesFolder } = require("./settings.js");
 const tools = require("./tools.js");
 const { buildPluginSet, checkPluginLoaded, writeSet } = require("./plugin.js");
@@ -82,10 +82,6 @@ function crashPrefix(time) {
   const pad = (n) => String(n).padStart(2, "0");
   return `${d.getFullYear()}_${pad(d.getMonth() + 1)}_${pad(d.getDate())}__`
     + `${pad(d.getHours())}_${pad(d.getMinutes())}_${pad(d.getSeconds())}_`;
-}
-
-async function livePids() {
-  return (await run("pgrep", ["-x", "Live"]).catch(() => "")).split("\n").filter(Boolean).map(Number);
 }
 
 const running = (pid) => {
@@ -182,14 +178,6 @@ function deleteTempProjects(started, say) {
     fs.rmSync(path.join(RECORDINGS, name), { recursive: true, force: true });
     say(`info deleted the old Live's ${path.join(RECORDINGS, name)}`);
   }
-}
-
-// Deletes every folder in the harness's temp folder: the sets earlier runs saved or started
-// Live on. Call it only with no Live running, since a running Live may have one of them open.
-function emptyHarnessTemp(say, root = HARNESS_TEMP) {
-  const old = fs.existsSync(root) ? fs.readdirSync(root) : [];
-  for (const name of old) fs.rmSync(path.join(root, name), { recursive: true, force: true });
-  if (old.length) say(`info deleted ${old.length} folders in ${root}`);
 }
 
 // The set Live starts on, in a folder of its own, after emptying HARNESS_TEMP of earlier
@@ -335,4 +323,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { answerFor, tempProjectsSince, crashPrefix, parseArgs, warmUp, livePids, stop, emptyHarnessTemp, BETA, SUITE };
+module.exports = { answerFor, tempProjectsSince, crashPrefix, parseArgs, warmUp, stop, BETA, SUITE };

@@ -13,7 +13,8 @@
 //   node harness/quit.js --kill   kill Live without asking it to quit (it hangs)
 
 const { connect } = require("./live.js");
-const { livePids, stop, emptyHarnessTemp } = require("./relaunch.js");
+const { stop } = require("./relaunch.js");
+const { livePids, emptyHarnessTemp } = require("./macos.js");
 
 // The options: { kill }. Refuses anything else, since quitting discards the open set.
 function parseArgs(argv) {

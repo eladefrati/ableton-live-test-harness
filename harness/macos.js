@@ -10,6 +10,7 @@ const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 const { execFile } = require("node:child_process");
+const tools = require("./tools.js");
 
 class MacError extends Error {}
 
@@ -184,6 +185,19 @@ function inHarnessTemp(file, root = HARNESS_TEMP) {
 function tempFolder(prefix) {
   fs.mkdirSync(HARNESS_TEMP, { recursive: true });
   return fs.mkdtempSync(path.join(HARNESS_TEMP, prefix));
+}
+
+// Deletes every folder in the harness's temp folder: the sets earlier runs saved or started
+// Live on. Call it only with no Live running, since a running Live may have one of them open.
+function emptyHarnessTemp(say, root = HARNESS_TEMP) {
+  const old = fs.existsSync(root) ? fs.readdirSync(root) : [];
+  for (const name of old) fs.rmSync(path.join(root, name), { recursive: true, force: true });
+  if (old.length) say(`info deleted ${old.length} folders in ${root}`);
+}
+
+// The process ids of the Lives running, Suite and Beta alike.
+async function livePids() {
+  return (await tools.run("pgrep", ["-x", "Live"]).catch(() => "")).split("\n").filter(Boolean).map(Number);
 }
 
 // Saves the set to its file, `file`, and resolves once the file has been rewritten. A set
@@ -364,4 +378,5 @@ module.exports = {
   MacError, osascript, activate, wakeDisplay, isFrontmost, menuItems, clickMenu, isChecked, undoName,
   setToggle, setKeyMapMode, setMidiMapMode, liveApp, saveSet, saveSetAs, openInBackground, openSet,
   openSetAndWait, windowTitle, sameFile, SAVE_CHANGES, TEMP_FILES, STOP_AUDIO, HARNESS_TEMP, inHarnessTemp, tempFolder,
+  emptyHarnessTemp, livePids,
 };
