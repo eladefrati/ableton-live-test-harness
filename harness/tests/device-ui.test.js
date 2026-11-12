@@ -129,6 +129,19 @@ test("findTitle skips a match left of the given edge, as the browser's or the In
   assert.throws(() => findTitle(lines, TITLE), /3 times/);
 });
 
+test("findTitle matches a title Live cut short with an ellipsis by its start", () => {
+  assert.deepEqual(findTitle([line("© AUD...", 567, 1450)], "AUDelay"), { x: 597, y: 1450 });
+  assert.deepEqual(findTitle([line("Device 20...", 100, 50)], TITLE), { x: 100, y: 50 });
+  assert.deepEqual(findTitle([line("Device 2030.11.08.1…", 100, 50)], TITLE), { x: 100, y: 50 });
+});
+
+test("findTitle refuses a shortened start that differs, is under 3 characters, or is on screen twice", () => {
+  assert.throws(() => findTitle([line("AUF...", 0, 0)], "AUDelay"), /isn't on screen/);
+  assert.throws(() => findTitle([line("AU...", 0, 0)], "AUDelay"), /isn't on screen/);
+  assert.throws(() => findTitle([line("Device 21...", 0, 0)], TITLE), /isn't on screen/);
+  assert.throws(() => findTitle([line("AUD...", 0, 0), line("AUDelay", 900, 0)], "AUDelay"), /2 times/);
+});
+
 test("findTitle refuses a title that is missing or on screen twice", () => {
   assert.throws(() => findTitle([line("Drum Rack", 0, 0)], TITLE), /isn't on screen/);
   assert.throws(() => findTitle([line(TITLE, 0, 0), line(TITLE, 900, 0)], TITLE), /2 times/);

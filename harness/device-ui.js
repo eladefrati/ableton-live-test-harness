@@ -132,18 +132,36 @@ function controlPoint(control, item) {
   return [centre, control.y + index * (rowHeight + control.spacing) + rowHeight / 2];
 }
 
+const SHORTENED_MIN = 3;
+const ELLIPSIS = /(\.\.\.|…)$/;
+
+// Whether the recognized words, from the first, read as the title: all its words, or its start
+// cut short with an ellipsis.
+function matchesTitle(words, wanted) {
+  for (let i = 0; i < wanted.length && i < words.length; i++) {
+    if (ELLIPSIS.test(words[i])) {
+      const stem = words[i].replace(ELLIPSIS, "");
+      const shown = [...wanted.slice(0, i), stem].join(" ");
+      return wanted[i].startsWith(stem) && shown.replace(/ /g, "").length >= SHORTENED_MIN;
+    }
+    if (words[i] !== wanted[i]) return false;
+  }
+  return words.length >= wanted.length;
+}
+
 // Where the device's title is in the recognized lines: its first word's left edge and the
 // line's top, in pixels. Text starting left of `fromX` (pixels) is skipped: the Info View and
 // the browser, which can show the same name. Exactly one must match, or the wrong device could
-// be pressed.
+// be pressed. A title too long for its device, which Live cuts short with an ellipsis
+// ("Long Na..."), matches by its start, of at least SHORTENED_MIN characters.
 function findTitle(lines, title, fromX = 0) {
   const wanted = title.split(" ").map(normalized);
   const found = [];
   for (const line of lines) {
     const words = line.words.map((word) => normalized(word.text));
-    for (let start = 0; start + wanted.length <= words.length; start++) {
+    for (let start = 0; start < words.length; start++) {
       if (line.words[start].x < fromX) continue;
-      if (wanted.every((word, i) => words[start + i] === word)) found.push({ x: line.words[start].x, y: line.y });
+      if (matchesTitle(words.slice(start), wanted)) found.push({ x: line.words[start].x, y: line.y });
     }
   }
   if (found.length === 0) throw new DeviceUiError(`The title "${title}" isn't on screen: is the device in view, at 100% zoom? Not clicked`);

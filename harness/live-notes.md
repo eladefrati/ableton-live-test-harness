@@ -76,6 +76,9 @@ unexpected.
   Not tried with both devices on one track.
 - The browser and the Info View can show a device's name in the same window as its title
   bar, left of 240 points; `device-ui.js` looks for titles right of that.
+- Live cuts a title too long for its device short with an ellipsis: a folded AUDelay's title
+  bar reads "AUD..."; unfolded, the device is wider and it reads "AUDelay" (remote Mac,
+  2026-11-11).
 - While the remote Mac's display sleeps, `screencapture -l` fails with "could not create image from
   window", and the session reports the screen locked until the display wakes.
 - A Live started while the display slept never redrew its window: with the LOM at 2 tracks,
