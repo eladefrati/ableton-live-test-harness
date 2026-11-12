@@ -70,6 +70,10 @@ unexpected.
   "LFO Frequency" while the LFO's rate is in Hz. A click on a knob, with no drag, leaves its
   value alone; on Auto Filter's LFO or envelope knobs it switches the display's strip to
   that section (remote Mac, Live 12.4.25b1, 2026-11-11).
+- While a Max device's Map button waits for a target, the Info View still names the knob
+  under the pointer on a device on another track, and the click makes the mapping: Auto
+  Filter's Frequency, Dry/Wet and Resonance, with `settleMs` 1000 (remote Mac, 2026-11-11).
+  Not tried with both devices on one track.
 - The browser and the Info View can show a device's name in the same window as its title
   bar, left of 240 points; `device-ui.js` looks for titles right of that.
 - While the remote Mac's display sleeps, `screencapture -l` fails with "could not create image from
