@@ -11,7 +11,7 @@ const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 const { connect } = require("./live.js");
-const { liveApp, livePids, liveStartTime } = require("./macos.js");
+const { liveApp, livePids, liveStartTime, inHarnessTemp } = require("./macos.js");
 const { liveVersion, recordBitDepth, describeDepth, sampleRate } = require("./settings.js");
 
 async function main() {
@@ -92,7 +92,14 @@ async function main() {
         + "changed during any other recording is written as automation");
     }
     console.log(`info ${names.length} tracks: ${names.join(", ")}`);
-    console.log(`info open set: ${(await live.get("song", "file_path")) || "(never saved)"}`);
+    // Every set the harness opens or saves is in its temp folder (tempFolder); any other set
+    // may be the user's, which a check would change.
+    const file = await live.get("song", "file_path");
+    if (file && inHarnessTemp(file)) console.log(`info open set: ${file} (opened by the harness)`);
+    else {
+      console.log(`warn open set: ${file || "(never saved)"} was not opened by the harness: a check changes it. `
+        + "Unless the user calls it disposable, ask whether Live is free and run relaunch.js first");
+    }
   } finally {
     live.close();
   }
