@@ -194,6 +194,21 @@ async function findComponent(name, folders = COMPONENT_FOLDERS) {
     + `${where ? ` (${where})` : ""}${not}; expected one`);
 }
 
+// When the component's code was last built: the newest modification time of the files in
+// its Contents/MacOS, in ms, or null if it has none. Live plays the build it loaded until it
+// relaunches, so this tells a fresh build from a stale one.
+function builtAt(bundle) {
+  const folder = path.join(bundle, "Contents", "MacOS");
+  let files;
+  try {
+    files = fs.readdirSync(folder);
+  } catch {
+    return null;
+  }
+  const times = files.map((f) => fs.statSync(path.join(folder, f)).mtimeMs);
+  return times.length ? Math.max(...times) : null;
+}
+
 function findAuDevice(xml, name) {
   const found = [];
   const open = /<AuPluginDevice Id="\d+">/g;
@@ -334,6 +349,6 @@ async function exposePluginParameters(live, name, { reopen = false } = {}) {
 }
 
 module.exports = {
-  PluginError, mapParameters, auParameters, componentsNamed, findComponent, findAuDevice,
+  PluginError, mapParameters, auParameters, componentsNamed, findComponent, builtAt, findAuDevice,
   fillPluginSet, buildPluginSet, checkPluginLoaded, exposePluginParameters, readSet, writeSet, AU_PLUGIN_SET,
 };

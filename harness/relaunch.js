@@ -43,7 +43,7 @@ const path = require("node:path");
 const { connect } = require("./live.js");
 const { osascript, liveApp, livePids, liveStartTime, sameFile, openInBackground, keepDisplayOn, SAVE_CHANGES, TEMP_FILES, tempFolder, emptyHarnessTemp } = require("./macos.js");
 const { preferencesFolder } = require("./settings.js");
-const { buildPluginSet, checkPluginLoaded, writeSet } = require("./plugin.js");
+const { buildPluginSet, builtAt, checkPluginLoaded, writeSet } = require("./plugin.js");
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -319,7 +319,10 @@ async function main(argv) {
     if (plugin) {
       await live.settleDevices();
       const { track } = await checkPluginLoaded(live, name, plugin.parameters);
-      loaded = `, ${name} on track ${track} with ${plugin.parameters.length} parameters listed`;
+      const built = builtAt(plugin.component.bundle);
+      const when = built === null ? "build time unknown" : `built ${new Date(built).toLocaleString("sv-SE")}`;
+      loaded = `, ${name} on track ${track} with ${plugin.parameters.length} parameters listed `
+        + `(${plugin.component.bundle.replace(os.homedir(), "~")}, ${when})`;
     }
     say(`ok   Live is back (${path.basename(app, ".app")}) on ${file}${loaded}, ${(ms / 1000).toFixed(1)} s after the start`);
   } finally {

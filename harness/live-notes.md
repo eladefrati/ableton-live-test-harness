@@ -177,6 +177,13 @@ unexpected.
 
 ## Plug-ins
 
+- A plug-in rebuilt while Live runs: Live keeps playing the build it loaded until it
+  relaunches. Seen twice: on the remote Mac (2026-10-31), a check after a fix failed exactly
+  as before until a relaunch; on the main Mac (2026-11-01), a run played the old build while
+  the first load after a relaunch played the new one. That Live keeps the old binary mapped
+  is inferred. A plug-in installed while Live runs is listed only after Settings > Plug-Ins >
+  Rescan or a relaunch. `relaunch.js --plugin` names the component it loaded and when its
+  code was built.
 - A plug-in's parameters are DeviceParameters only when it has at most 64 (Ableton's help
   documents the Options.txt entry `-_PluginAutoPopulateThreshold`, default 64, range 1 to
   128; forum reports say it is unreliable for AU and VST3; not tried here, as it needs a

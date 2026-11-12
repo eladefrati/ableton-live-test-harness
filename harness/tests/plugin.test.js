@@ -3,7 +3,10 @@
 const { execFileSync } = require("node:child_process");
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const { mapParameters, auParameters, findAuDevice, componentsNamed, fillPluginSet, checkPluginLoaded, readSet,
+const fs = require("node:fs");
+const os = require("node:os");
+const path = require("node:path");
+const { mapParameters, auParameters, findAuDevice, componentsNamed, builtAt, fillPluginSet, checkPluginLoaded, readSet,
   AU_PLUGIN_SET } = require("../plugin.js");
 
 // A plug-in's parameters as au-parameters.swift prints them: a float, a Boolean and an
@@ -139,6 +142,23 @@ test("componentsNamed keeps other types of the same name apart, and refuses bad 
   assert.deepEqual(others, [{ bundle: "/a/Twin.component", type: "aumi" }]);
   assert.throws(() => componentsNamed([{ bundle: "/a/X.component", components: [{ ...twin("aufx"), subtype: 123 }] }],
     "Twin"), /not four characters each/);
+});
+
+test("builtAt takes the newest file in Contents/MacOS, or null without one", () => {
+  const bundle = fs.mkdtempSync(path.join(os.tmpdir(), "harness-builtat-"));
+  try {
+    assert.equal(builtAt(bundle), null);
+    const code = path.join(bundle, "Contents", "MacOS");
+    fs.mkdirSync(code, { recursive: true });
+    assert.equal(builtAt(bundle), null);
+    fs.writeFileSync(path.join(code, "Old"), "");
+    fs.writeFileSync(path.join(code, "New"), "");
+    fs.utimesSync(path.join(code, "Old"), 1000, 1000);
+    fs.utimesSync(path.join(code, "New"), 2000, 2000);
+    assert.equal(builtAt(bundle), 2000 * 1000);
+  } finally {
+    fs.rmSync(bundle, { recursive: true });
+  }
 });
 
 test("the fixture holds one stateless AUDelay with every slot free", () => {
