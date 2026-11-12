@@ -1,12 +1,12 @@
 ---
 title: "ADR-0004: Press device controls with real mouse events"
-status: Accepted; decision 2 superseded by ADR-0005
+status: Accepted; decision 2 superseded by ADR-0005, then ADR-0006
 date: 2026-11-08
 ---
 
 # ADR-0004: Press device controls with real mouse events
 
-**Status:** Accepted; decision 2 superseded by ADR-0005
+**Status:** Accepted; decision 2 superseded by ADR-0005, then ADR-0006
 
 ## Context
 

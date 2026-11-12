@@ -1,12 +1,12 @@
 ---
 title: "ADR-0005: Publish as one repo, with each machine's values in a local file"
-status: Accepted
+status: Accepted; decision 3 superseded by ADR-0006
 date: 2026-11-08
 ---
 
 # ADR-0005: Publish as one repo, with each machine's values in a local file
 
-**Status:** Accepted
+**Status:** Accepted; decision 3 superseded by ADR-0006
 
 ## Context
 
