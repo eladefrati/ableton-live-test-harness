@@ -89,8 +89,10 @@ Node 18 or later. See [ADR-0001](../docs/adr/0001-fork-abletonosc.md) for the de
   will stop audio?"), Key Map and MIDI Map Mode, and the name of the step Edit > Undo would
   undo (`undoName`). `tempFolder(prefix)` makes a folder in `<system temp>/ableton-harness/`, where every
   set the harness saves goes; `relaunch.js` and `quit.js` empty it.
-- `device-ui.js`: presses a Max for Live device's controls with real mouse events, only on
-  the machine `local.json` names as `clickHost` (ADR-0004, ADR-0005).
+- `device-ui.js`: presses a Max for Live device's controls with real mouse events (ADR-0004).
+  On the machine `local.json` names as `clickHost` it clicks at once; on any other, a run's
+  first press shows a dialog, and the run clicks only after Allow; Don't Allow or no answer
+  in 2 minutes throws `DeviceUiError` (ADR-0006).
   `openDeviceUi(live, {track, device, build})` takes the controls from the
   `.amxd`; `ui.press(name)` or `ui.press(tabName, item)` clicks, and `ui.text([x, y, w, h])`
   resolves with the lines shown in that part of the panel, in device units. A press looks
@@ -226,8 +228,8 @@ home (uncommitted changes included; the remote can't fetch from this Mac), runs 
 `~/dev/ableton-live-test-harness`, so the layout must match. The remote is the host named
 as `remote` in `harness/local.json`, a file git ignores (`local.example.json` shows its
 keys); `LIVE_REMOTE` names another for one run. `clickHost` in the same file is the hostname (without `.local`)
-of the one machine `device-ui.js` may click on. A click takes that machine's pointer, so
-name your own only if the agent may take it from you (ADR-0005). `remote.sh` copies the file with the rest, so both machines read
+of the one machine `device-ui.js` clicks on without asking. A click takes that machine's pointer, so
+name your own only if the agent may take it from you (ADR-0005); any other machine asks first (ADR-0006). `remote.sh` copies the file with the rest, so both machines read
 the same values. The remote's own `.venv`, `node_modules` and `__pycache__` are not copied or deleted: a
 project that needs them installs them there over ssh. A check's logs are not copied or
 deleted either: `remote.sh` moves them to this Mac after the command, after a failure too,

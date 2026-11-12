@@ -93,7 +93,7 @@ lets a development build report its status line and check results: `live.openHoo
 then take `const since = Date.now()` before the action and `await live.waitForHook(topic,
 { track, device, since })`. A project has it only once its own ADR adopts it.
 
-On the click host (`clickHost` in `harness/local.json`), `harness/device-ui.js`
+`harness/device-ui.js`
 (`docs/adr/0004-press-device-controls-with-real-mouse-events.md`)
 presses a device's controls with real mouse events and reads the text its panel shows, on the
 unmodified build. Use it for a control that isn't a parameter, or when the click itself needs
@@ -102,8 +102,10 @@ returning. `harness/README.md` has the API and what it needs.
 
 ## Live's window
 
-Click inside Live only through `harness/device-ui.js`, which refuses anywhere but the click
-host and clicks only after Live's Info View names the control. Bring
+Click inside Live only through `harness/device-ui.js`, which clicks only after Live's Info
+View names the control. On the click host (`clickHost` in `harness/local.json`) it clicks at
+once; on any other machine the run's first press shows the user a dialog and waits up to 2
+minutes for Allow (ADR-0006), so tell the user before such a run. Bring
 Live to the front only when a step needs it: keystrokes through System Events go to the frontmost app. To see Live, capture
 its window in the background, which works with Live behind other windows:
 `node ~/dev/ableton-live-test-harness/harness/cli.js capture <png>`. That shows Live's
