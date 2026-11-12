@@ -104,7 +104,8 @@ Node 18 or later. See [ADR-0001](../docs/adr/0001-fork-abletonosc.md) for the de
   control; a `live.tab` must be a single column. A press takes about 9 s on the remote Mac, nearly
   all of it reading text from captures. `press` resolves when the click is sent: read what
   it did from Live.
-  Any other device or plug-in is pressed at measured points (ADR-0007):
+  Any other device or plug-in (its controls in Live's device view, not its own window) is
+  pressed at measured points (ADR-0007):
   `openDeviceUi(live, {track, device, controls, width})`, with `controls` as
   `{name: {x, y, info}}`, each control's centre in points from the panel's corner at 100% zoom
   and the Info View title expected over it. With neither `build` nor `controls`, the points
