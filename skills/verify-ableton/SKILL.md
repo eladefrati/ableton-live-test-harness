@@ -95,8 +95,10 @@ then take `const since = Date.now()` before the action and `await live.waitForHo
 
 `harness/device-ui.js`
 (`docs/adr/0004-press-device-controls-with-real-mouse-events.md`)
-presses a device's controls with real mouse events and reads the text its panel shows, on the
-unmodified build. Use it for a control that isn't a parameter, or when the click itself needs
+presses a device's controls with real mouse events, reads the text its panel shows and
+captures the panel, on the unmodified build. A Max device's controls come from its build; any
+other device's or plug-in's are points measured in Live (ADR-0007; Auto Filter's knobs are
+built in). Use it for a control that isn't a parameter, or when the click itself needs
 proving; everything else stays on OSC. Take the evidence from Live, not from the press
 returning. `harness/README.md` has the API and what it needs.
 

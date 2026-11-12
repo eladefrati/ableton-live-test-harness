@@ -89,7 +89,8 @@ Node 18 or later. See [ADR-0001](../docs/adr/0001-fork-abletonosc.md) for the de
   will stop audio?"), Key Map and MIDI Map Mode, and the name of the step Edit > Undo would
   undo (`undoName`). `tempFolder(prefix)` makes a folder in `<system temp>/ableton-harness/`, where every
   set the harness saves goes; `relaunch.js` and `quit.js` empty it.
-- `device-ui.js`: presses a Max for Live device's controls with real mouse events (ADR-0004).
+- `device-ui.js`: presses a device's controls with real mouse events (ADR-0004), and
+  captures its panel.
   On the machine `local.json` names as `clickHost` it clicks at once; on any other, a run's
   first press shows a dialog, and the run clicks only after Allow; Don't Allow or no answer
   in 2 minutes throws `DeviceUiError` (ADR-0006).
@@ -103,6 +104,14 @@ Node 18 or later. See [ADR-0001](../docs/adr/0001-fork-abletonosc.md) for the de
   control; a `live.tab` must be a single column. A press takes about 9 s on the remote Mac, nearly
   all of it reading text from captures. `press` resolves when the click is sent: read what
   it did from Live.
+  Any other device or plug-in is pressed at measured points (ADR-0007):
+  `openDeviceUi(live, {track, device, controls, width})`, with `controls` as
+  `{name: {x, y, info}}`, each control's centre in points from the panel's corner at 100% zoom
+  and the Info View title expected over it. With neither `build` nor `controls`, the points
+  come from the harness's own measurements (`MEASURED_DEVICES`, by class name): Auto Filter's
+  knobs, named as its parameters (`Frequency`, `Resonance`, `Dry/Wet` and the others).
+  `ui.capture(file)` saves a PNG of the device, title bar and frame included, from a capture
+  of Live's window; its width comes from the build, the measured device or `width`.
 - `doctor.js`: read-only check that Live is ready to be driven; run it first. What it
   checks and what to do about each line: the
   [`verify-ableton` skill](../skills/verify-ableton/SKILL.md).
