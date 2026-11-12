@@ -5,7 +5,7 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
-const { DeviceUiError, openDeviceUi, readControls, controlPoint, findTitle, infoTitle, readClickHost } = require("../device-ui.js");
+const { DeviceUiError, openDeviceUi, readControls, controlPoint, findTitle, infoTitle, readClickHost, runName } = require("../device-ui.js");
 
 const chunk = (tag, payload) => {
   const size = Buffer.alloc(4);
@@ -175,13 +175,43 @@ test("no click on a control the build lacks or one with no Info View title", asy
   assert.equal(system.calls.length, 0);
 });
 
-test("opening refuses any machine but the click host", async () => {
-  await assert.rejects(open({ ...fakeMachine(), hostname: () => "another-mac" }),
-    /only on the machine named as "clickHost" in harness\/local\.json .*that is click-mac, and this is another-mac/);
+test("a press on the click host doesn't ask", async () => {
+  const system = { ...fakeMachine(), ask: async () => assert.fail("asked on the click host") };
+  const ui = await open(system);
+  await ui.press("Button");
+  assert.equal(clicks(system).length, 1);
 });
 
-test("opening refuses every machine when no click host is set", async () => {
-  await assert.rejects(open({ ...fakeMachine(), clickHost: () => null }), /none is set, and this is click-mac/);
+test("a press on another machine asks once, before the hover, and clicks after Allow", async () => {
+  const system = fakeMachine();
+  Object.assign(system, { hostname: () => "another-mac", ask: async () => { system.calls.push("ask"); return true; } });
+  const ui = await open(system);
+  await ui.press("Button");
+  await ui.press("Button");
+  assert.equal(system.calls.filter((call) => call === "ask").length, 1);
+  assert.equal(system.calls[0], "ask");
+  assert.equal(clicks(system).length, 2);
+});
+
+test("no hover or click when the person at another machine doesn't allow it", async () => {
+  const system = fakeMachine();
+  Object.assign(system, { hostname: () => "another-mac", ask: async () => false });
+  const ui = await open(system);
+  await assert.rejects(ui.press("Button"), /Clicks in Live on another-mac weren't allowed \(ADR-0006\)\. Not clicked/);
+  assert.equal(system.calls.length, 0);
+});
+
+test("with no click host set, every machine asks", async () => {
+  let asked = 0;
+  const system = { ...fakeMachine(), clickHost: () => null, ask: async () => { asked += 1; return true; } };
+  const ui = await open(system);
+  await ui.press("Button");
+  assert.equal(asked, 1);
+});
+
+test("runName names a project's check from tests/live, and any other script by its file", () => {
+  assert.equal(runName("/a/repo/tests/live/sub/check.js"), "tests/live/sub/check.js");
+  assert.equal(runName("/a/repo/harness/cli.js"), "cli.js");
 });
 
 test("the click host is read from local.json; no file or no key is none", () => {

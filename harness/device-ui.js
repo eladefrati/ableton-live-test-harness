@@ -1,8 +1,9 @@
 "use strict";
 
 // Presses a Max for Live device's controls with real mouse events, for controls the LOM
-// can't reach and to prove that a click lands on one (ADR-0004). Only on the machine
-// harness/local.json names as its "clickHost" (ADR-0005).
+// can't reach and to prove that a click lands on one (ADR-0004). On the machine
+// harness/local.json names as its "clickHost" (ADR-0005); on any other, a run's first press
+// asks the person at it with a dialog and clicks only after Allow (ADR-0006).
 //
 //   const ui = await openDeviceUi(live, { track, device, build: "/path/to/Device.amxd" });
 //   await ui.press("Button");
@@ -18,6 +19,7 @@ const path = require("node:path");
 const mac = require("./macos.js");
 const tools = require("./tools.js");
 const { patcherChunk } = require("./amxd.js");
+const { checkLocation } = require("./run-log.js");
 
 class DeviceUiError extends Error {}
 
@@ -115,8 +117,8 @@ async function helper(...args) {
   return exec(await helperBinary(), args);
 }
 
-// The one machine clicks are allowed on: "clickHost" in harness/local.json, which is not
-// in git (see local.example.json). Null with no file or no key. Never from the
+// The one machine clicks are allowed on without asking: "clickHost" in harness/local.json,
+// which is not in git (see local.example.json). Null with no file or no key. Never from the
 // environment: a variable would lift the guard for a single command (ADR-0005).
 const LOCAL = path.join(__dirname, "local.json");
 function readClickHost(file = LOCAL) {
@@ -136,9 +138,40 @@ function readClickHost(file = LOCAL) {
   return local && typeof local.clickHost === "string" && local.clickHost ? local.clickHost : null;
 }
 
+// How long the dialog asking to click waits for an answer (ADR-0006).
+const ASK_SECONDS = 120;
+
+// The running script as the dialog names it: tests/live/<name> for a project's check.
+function runName(script = process.argv[1] || "node") {
+  const location = checkLocation(script);
+  return location ? `tests/live/${location.name}` : path.basename(script);
+}
+
+// Asks the person at this Mac whether the run may click; true only for Allow. Don't Allow is
+// the cancel button, which osascript reports as error -128.
+async function askToClick(script) {
+  const text = `${script} wants to click in Live on this Mac. It moves the pointer until the check ends.`;
+  const dialog = [
+    "on run argv",
+    "  activate",
+    '  display dialog (item 1 of argv) with title "Live test harness" buttons {"Don\'t Allow", "Allow"} '
+      + `default button "Don't Allow" cancel button "Don't Allow" giving up after ${ASK_SECONDS}`,
+    "end run",
+  ].flatMap((line) => ["-e", line]);
+  let answer;
+  try {
+    answer = await tools.run("osascript", [...dialog, text]);
+  } catch (error) {
+    if (/\(-128\)/.test(error.message)) return false;
+    throw new DeviceUiError(`Could not ask to click: ${error.message}`, { cause: error });
+  }
+  return /button returned:Allow/.test(answer) && !/gave up:true/.test(answer);
+}
+
 const machine = {
   hostname: () => os.hostname().replace(/\.local$/, ""),
   clickHost: () => readClickHost(),
+  ask: () => askToClick(runName()),
   // A slept display has no windows to capture.
   wake: () => mac.wakeDisplay(),
   // The display first: activate() returns at once if Live is already in front, even asleep.
@@ -211,6 +244,7 @@ class DeviceUi {
     if (!control.info) throw new DeviceUiError(`${name} has no annotation_name for the Info View to confirm. Not clicked`);
     const [ux, uy] = controlPoint(control, item);
 
+    await this.permit();
     await this.system.focus();
     const at = await this.locate();
     const [x, y] = [at.x + ux, at.y + uy];
@@ -223,6 +257,17 @@ class DeviceUi {
     }
     await this.system.focus();
     await this.system.click(at.window.id, x, y);
+  }
+
+  // Before the first hover: on the click host at once, on any other machine after the person
+  // at it allows the run's clicks (ADR-0006). The answer holds for the rest of the run.
+  async permit() {
+    if (this.system.allowed) return;
+    const host = this.system.hostname();
+    if (host !== this.system.clickHost() && !(await this.system.ask())) {
+      throw new DeviceUiError(`Clicks in Live on ${host} weren't allowed (ADR-0006). Not clicked`);
+    }
+    this.system.allowed = true;
   }
 
   // The lines of text shown inside a rectangle of the panel, [x, y, w, h] in device units.
@@ -239,16 +284,10 @@ class DeviceUi {
 }
 
 async function openDeviceUi(live, { track, device, build }, system = machine) {
-  const host = system.hostname();
-  const clickHost = system.clickHost();
-  if (!clickHost || host !== clickHost) {
-    throw new DeviceUiError('device-ui clicks only on the machine named as "clickHost" in harness/local.json '
-      + `(ADR-0005): ${clickHost ? `that is ${clickHost}` : "none is set"}, and this is ${host}`);
-  }
   const names = await live.query("/live/track/get/devices/name", track);
   const title = names[device + 1];
   if (!title) throw new DeviceUiError(`Track ${track} has no device ${device}`);
   return new DeviceUi(live, { track, device, title, controls: readControls(fs.readFileSync(build)) }, system);
 }
 
-module.exports = { DeviceUiError, openDeviceUi, captureWindow, liveWindows, readControls, controlPoint, findTitle, infoTitle, readClickHost };
+module.exports = { DeviceUiError, openDeviceUi, captureWindow, liveWindows, readControls, controlPoint, findTitle, infoTitle, readClickHost, runName };
