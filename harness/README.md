@@ -8,7 +8,13 @@ Node 18 or later. See [ADR-0001](../docs/adr/0001-fork-abletonosc.md) for the de
 - `live.js`: the client. `connect()` binds UDP 11001, so only one client can run at a
   time. Requests are sent one at a time and wait for their reply; a message on
   `/live/error` fails the request in flight. Setters and methods send no reply: call
-  `sync()` to wait until Live has handled them. `deleteTracks(names, from)` deletes tracks;
+  `sync()` to wait until Live has handled them. Any address in
+  [osc-api.md](../docs/osc-api.md) works through `query(address, ...args)` (resolves with
+  the reply's arguments) and `send(address, ...args)`, or `get(object, property, ...indices)`
+  and `set(...)` for `/live/<object>/get|set/<property>`: `live.set("view",
+  "selected_track", 1)` selects track 1. `on(address, fn)` calls `fn(args)` for every message
+  on that address, such as the replies a `/live/.../start_listen/...` sends; `off(address)`
+  stops it. `deleteTracks(names, from)` deletes tracks;
   `dialog()` resolves with Live's open dialog, or null. `trackData(...properties)` reads
   properties of every track in one reply (null for one that doesn't apply to a track); `placeClip(track, notes, beats)` puts a clip of
   notes on a MIDI track in the Arrangement from beat 0.
@@ -85,8 +91,8 @@ Node 18 or later. See [ADR-0001](../docs/adr/0001-fork-abletonosc.md) for the de
   (keeps the instance and its state), `createAudioTrack(name)` and
   `arrangementAudioFiles(track)`.
 - `macos.js`: what the LOM can't do, through Live's menus with AppleScript: save, save as,
-  open a set (behind other windows, stopping the transport first, and answering "Save changes?" and "This action
-  will stop audio?"), Key Map and MIDI Map Mode, and the name of the step Edit > Undo would
+  open a set (`openSetAndWait(live, file)`: behind other windows, stopping the transport first, answering "Save changes?" and "This action
+  will stop audio?", and resolving once the set has loaded), Key Map and MIDI Map Mode, and the name of the step Edit > Undo would
   undo (`undoName`). `tempFolder(prefix)` makes a folder in `<system temp>/ableton-harness/`, where every
   set the harness saves goes; `relaunch.js` and `quit.js` empty it.
 - `device-ui.js`: presses a device's controls with real mouse events (ADR-0004), and
@@ -128,7 +134,9 @@ Node 18 or later. See [ADR-0001](../docs/adr/0001-fork-abletonosc.md) for the de
   first track after it starts loads the plug-ins of the user's default track, which held
   Live for over 2 s, long enough for a check's next get to time out. Holds UDP 11001 throughout. With `--plugin <name>` Live starts instead on a set
   holding only the Audio Unit effect named `name` on track 0, every parameter listed
-  (`buildPluginSet`, checked with `checkPluginLoaded`); the set is built before Live is quit, so a plug-in that
+  (`buildPluginSet`, checked with `checkPluginLoaded`), and its last line names the component
+  and when its code was built (`builtAt`), since Live plays the build it loaded until it
+  relaunches; the set is built before Live is quit, so a plug-in that
   can't be found or read leaves Live running as it was. Any other option is refused, and so is `--suite` with `--app`.
 - `quit.js [--kill]`: quits Live and leaves it quit, for when the user asks for that. It
   stops Live as `relaunch.js` does (same answers, same kill after 10 s, `--kill` kills at

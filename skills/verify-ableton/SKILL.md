@@ -1,6 +1,6 @@
 ---
 name: verify-ableton
-description: Verify a project that runs in Ableton Live, in the running Live, through the AbletonOSC test harness. Use when a change to such a project needs proof in Live, instead of asking the user to test by hand, and before calling a Live change fixed.
+description: Drive Ableton Live through the AbletonOSC test harness (~/dev/ableton-live-test-harness), for any project that runs in Live (Max for Live device, plug-in, MIDI Tool, Remote Script). Load it before anything in Live - starting or relaunching it, loading a build, adding a builds folder to Places, running a project's checks, pressing a device's controls, capturing Live or a device's panel (screenshots for a manual too), working on the remote Mac - and to prove a change in Live instead of asking the user to test by hand, before calling a Live change fixed.
 ---
 
 # Verify an Ableton project in Live
@@ -32,11 +32,16 @@ Other agent sessions may be driving Live. Only one client can bind UDP 11001.
 
 ## Start and quit Live
 
-To start Live, or relaunch it (to make it rescan plug-ins, say), on either machine, run
+Start each piece of work in Live with a relaunch, on the harness's empty set, unless
+`doctor.js` says the open set was opened by the harness or the user calls it disposable: a
+check changes the set it runs in. Ask whether Live is free first.
+
+To start Live, or relaunch it, on either machine, run
 `node ~/dev/ableton-live-test-harness/harness/relaunch.js` (on the remote through `remote.sh`),
 never an `open`, quit or kill of your own. It discards unsaved changes and recordings. Use
 `--suite` only for a task that needs Suite, and `--plugin <name>` after every build for a
-plug-in's checks. Where the Beta isn't installed, pass `--app <path>`. Its options and what it answers are in `harness/README.md`. If it stops at
+plug-in's checks: Live keeps playing the plug-in build it loaded until it relaunches. Its last line names the component it loaded and when that
+was built: check it is your build. Where the Beta isn't installed, pass `--app <path>`. Its options and what it answers are in `harness/README.md`. If it stops at
 a dialog it doesn't know, it prints the message: ask the user. If the permission system
 denies it, don't start Live another way: tell the user, who can start Live or allow the command.
 
@@ -58,7 +63,8 @@ Live dialog is open, and no track is armed, and reports the bit depth Live recor
 (`info records at 24-bit` or `32-bit float`) and the sample rate it runs at. It warns when
 the Remote Script's files changed since Live started (run `harness/cli.js reload`; a changed
 `manager.py` needs a relaunch) and when Automation Arm is on. It also names the running Live
-app and its version, the tracks and the open set's file. On "UDP 11001 is in use", another client is
+app and its version, the tracks and the open set's file, with a warning when the harness
+didn't open that set. On "UDP 11001 is in use", another client is
 running: find out who before going on. On "AbletonOSC does not answer", ask the user to
 select it as a Control Surface. On "System Events can't name its app", the terminal app
 lacks Accessibility or Automation permission ("What Live needs" in `harness/README.md`): ask
@@ -76,6 +82,10 @@ node ~/dev/<project>/tests/live/<check>.js --tempo 97   # set the song's tempo f
 ```
 
 Checks on `harness/device-checks.js` take both flags without any code of their own.
+
+For anything else in Live, look before writing code of your own: `harness/README.md` has
+the client (opening a saved set, listening for changes, raw OSC), and `docs/osc-api.md`
+every address AbletonOSC answers (selecting a track, say).
 
 If the project has no `tests/live/` yet, or the change needs a case it doesn't have,
 propose the case first; once agreed, write it following
@@ -98,9 +108,19 @@ then take `const since = Date.now()` before the action and `await live.waitForHo
 presses a device's controls with real mouse events, reads the text its panel shows and
 captures the panel, on the unmodified build. A Max device's controls come from its build; any
 other device's or plug-in's are points measured in Live (ADR-0007; Auto Filter's knobs are
-built in). Use it for a control that isn't a parameter, or when the click itself needs
-proving; everything else stays on OSC. Take the evidence from Live, not from the press
+built in). Use it for a control that isn't a parameter, when the click itself needs
+proving, or for a picture of a device's panel (`ui.capture`, for a manual too); everything
+else stays on OSC. Don't write a capture or click script of your own: `device-ui.js`
+exports what one needs. Take the evidence from Live, not from the press
 returning. `harness/README.md` has the API and what it needs.
+
+## Places
+
+Live loads a project's builds from its Places. Add a builds folder with
+`node ~/dev/ableton-live-test-harness/harness/add-place.js <folder>`, with Live quit (on
+the remote through `remote.sh`, below), never by editing `Library.cfg` by hand: two entries with one
+`Id` make Live reject the whole file. A check that can't find its build says what to
+fix.
 
 ## Live's window
 
@@ -161,5 +181,7 @@ any command there from this Mac:
 ```
 
 It copies the working copies of the harness and `~/dev/<repo>` to the remote first, replacing what's there, then runs the
-command in `~/dev/<repo>` there; its exit status is the command's. The project's builds folder
+command in `~/dev/<repo>` there; its exit status is the command's. A build made on the
+remote (a plug-in's, say) goes outside `~/dev/<repo>`, which the next run replaces; delete
+it when the work is done. The project's builds folder
 must be in the remote's Places (see "Running on a second Mac" in `harness/README.md`).
