@@ -114,6 +114,17 @@ test("a script outside tests/live saves nothing", (t) => {
   assert.deepEqual(logs(repo), []);
 });
 
+test("an inline script saves nothing and prints no error", (t) => {
+  const { repo } = repoWith(t, "tests/live/check.js", "");
+  for (const args of [[], ["tests/live/check.js"], ["Probe A.amxd"]]) {
+    const result = spawnSync(process.execPath, ["-e", `${started}console.log("inline");`, ...args],
+      { cwd: repo, encoding: "utf8" });
+    assert.equal(result.stdout, "inline\n");
+    assert.equal(result.stderr, "");
+  }
+  assert.deepEqual(logs(repo), []);
+});
+
 test("connect starts the log", (t) => {
   const { repo, script } = repoWith(t, "tests/live/check.js",
     `require(${JSON.stringify(LIVE)}).connect({ replyPort: 0 }).then((live) => {

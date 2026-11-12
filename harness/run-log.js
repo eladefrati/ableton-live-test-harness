@@ -7,8 +7,8 @@
 // file with no exit line is a run that was killed.
 //
 // connect() starts it, since every check goes through connect(). Harness tools connect too
-// but test nothing, so only a script inside a tests/live/ folder is logged. A log that can't
-// be written never fails the check.
+// but test nothing, so only a script inside a tests/live/ folder is logged; so is no inline
+// script (`node -e`), which has no file. A log that can't be written never fails the check.
 
 const fs = require("node:fs");
 const os = require("node:os");
@@ -80,7 +80,10 @@ function startRunLog() {
   if (started) return;
   started = true;
   try {
-    const script = fs.realpathSync(process.argv[1]);
+    // The entry module, not process.argv[1]: under `node -e` that is the first argument or
+    // undefined, and require.main is undefined.
+    if (!require.main) return;
+    const script = fs.realpathSync(require.main.filename);
     const location = checkLocation(script);
     if (!location) return;
     const { repo, name } = location;
