@@ -79,6 +79,11 @@ unexpected.
 - Live cuts a title too long for its device short with an ellipsis: a folded AUDelay's title
   bar reads "AUD..."; unfolded, the device is wider and it reads "AUDelay" (remote Mac,
   2026-11-11).
+- A plug-in's title bar has two more buttons before its title than a Max or Live device's:
+  Unfold Device Parameters and the one that opens the plug-in's window, 32 points in all. Over
+  AUDelay's controls the Info View reads "Device Activator", "Unfold Device Parameters" and
+  "Assignable X-Y Control", and a click on the activator turns Device On off (remote Mac,
+  2026-11-11). Only Live's main window is clicked: the plug-in's own window isn't reached.
 - While the remote Mac's display sleeps, `screencapture -l` fails with "could not create image from
   window", and the session reports the screen locked until the display wakes.
 - A Live started while the display slept never redrew its window: with the LOM at 2 tracks,

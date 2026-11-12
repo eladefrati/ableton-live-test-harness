@@ -37,6 +37,11 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 // Live's 100% zoom (measured on the remote Mac, 2026-11-08). A line's own left edge won't
 // do: icons in the title bar are read as characters.
 const TITLE_TO_PANEL = { x: -17, y: 14 };
+// A plug-in's title bar has two more buttons before its title (Unfold Device Parameters and
+// the plug-in window's), so its title starts this much further right, in points (measured on
+// the remote Mac, 2026-11-11).
+const PLUGIN_TITLE_SHIFT = 32;
+const isPlugin = (className) => /PluginDevice$/.test(className); // AuPluginDevice, PluginDevice
 // The Info View's title is on the same row as the device titles, left of them. The Info View
 // and the browser's lists are left of this; the device titles right of it.
 const INFO_VIEW_RIGHT = 240; // points from the window's left edge
@@ -301,8 +306,8 @@ async function captureWindow(file, { window: id } = {}, system = machine) {
 }
 
 class DeviceUi {
-  constructor(live, { track, device, title, controls, width }, system) {
-    Object.assign(this, { live, track, device, title, controls, width, system });
+  constructor(live, { track, device, title, controls, width, plugin = false }, system) {
+    Object.assign(this, { live, track, device, title, controls, width, plugin, system });
   }
 
   // Where the panel is now. Every press looks again: selecting a device can scroll the view.
@@ -317,7 +322,7 @@ class DeviceUi {
     const title = findTitle(lines, this.title, INFO_VIEW_RIGHT * scale);
     return {
       window, scale, title,
-      x: window.x + title.x / scale + TITLE_TO_PANEL.x,
+      x: window.x + title.x / scale + TITLE_TO_PANEL.x - (this.plugin ? PLUGIN_TITLE_SHIFT : 0),
       y: window.y + title.y / scale + TITLE_TO_PANEL.y,
     };
   }
@@ -393,15 +398,20 @@ async function openDeviceUi(live, { track, device, build, controls, width }, sys
   if (build) {
     const amxd = fs.readFileSync(build);
     panel = { controls: readControls(amxd), width: readPanelWidth(amxd) };
-  } else if (controls) {
-    panel = { controls: pointControls(controls), width: null };
   } else {
     const [, , className] = await live.query("/live/device/get/class_name", track, device);
-    const measured = MEASURED_DEVICES[className];
-    if (!measured) throw new DeviceUiError(`The harness has no measured points for ${title} (${className}): give openDeviceUi a build or controls`);
-    panel = { controls: pointControls(measured.controls), width: measured.width };
+    if (controls) {
+      panel = { controls: pointControls(controls), width: null };
+    } else {
+      const measured = MEASURED_DEVICES[className];
+      if (!measured) throw new DeviceUiError(`The harness has no measured points for ${title} (${className}): give openDeviceUi a build or controls`);
+      panel = { controls: pointControls(measured.controls), width: measured.width };
+    }
+    panel.plugin = isPlugin(className);
   }
-  return new DeviceUi(live, { track, device, title, controls: panel.controls, width: width ?? panel.width }, system);
+  return new DeviceUi(live, {
+    track, device, title, controls: panel.controls, width: width ?? panel.width, plugin: panel.plugin,
+  }, system);
 }
 
 module.exports = {

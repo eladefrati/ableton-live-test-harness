@@ -293,6 +293,15 @@ test("a press on a device given as points clicks the point from the panel's corn
   assert.deepEqual(clicks(system), [["click", 7, PANEL.x + 50, PANEL.y + 36]]);
 });
 
+test("a plug-in's panel corner is left of its title by the two extra title-bar buttons", async () => {
+  for (const className of ["AuPluginDevice", "PluginDevice"]) {
+    const system = fakeMachine({ info: "Knob" });
+    const ui = await openDeviceUi(fakeLive(className), { track: 1, device: 1, controls: { Knob: { x: 50, y: 36, info: "Knob" } } }, system);
+    await ui.press("Knob");
+    assert.deepEqual(clicks(system), [["click", 7, PANEL.x - 32 + 50, PANEL.y + 36]]);
+  }
+});
+
 test("a point with no Info View title is never clicked", async () => {
   const system = fakeMachine({ info: "Knob" });
   const ui = await openDeviceUi(fakeLive(), { track: 1, device: 1, controls: { Knob: { x: 50, y: 36 } } }, system);
