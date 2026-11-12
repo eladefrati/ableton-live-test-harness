@@ -26,3 +26,10 @@ Open work, not scheduled. An item leaves this list when it is done or dropped.
   unchanged with no error (`harness/live-notes.md`), and `send` waits for nothing. Add a
   `selectTrack()` to `live.js` that sets the track, reads `get/selected_track` back and
   throws on a mismatch.
+- **Clicks in a plug-in's own window.** `device-ui.js` clicks only in Live's main window: it
+  finds the device by its title there, and the helper refuses a point where another window is
+  on top. Finding the plug-in's window by its title (`liveWindows`) and measuring points from
+  its corner is small. The open question is the check before a click: the plug-in's window
+  shows its own interface, and whether Live's Info View names anything inside it is untested.
+  Without it, a click there needs another confirmation (such as text read next to the control),
+  a change to ADR-0004's decision 3 that needs its own ADR.
