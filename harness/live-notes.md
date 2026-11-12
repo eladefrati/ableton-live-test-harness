@@ -240,6 +240,11 @@ unexpected.
   entries with one `Id` make Live reject the whole file as corrupt, and AbletonOSC then
   doesn't answer (2026-11-08). Live renumbers the `Id`s between launches, so an `Id` can't
   be kept. `add-place.js` makes the edit.
+- A build copied into a Places folder while Live runs is listed within seconds: 2.2 s by
+  `cp` and by `remote.sh`'s rsync, 4.3 s with the display asleep (remote Mac, 2026-11-11).
+  One earlier run (2026-11-11), on a Live started before `relaunch.js` kept the display
+  on, didn't find a new build until a relaunch; whether that Live started while the display
+  slept (see "Menus and windows") isn't known.
 - Live logs every Max console message to `~/Library/Preferences/Ableton/Live <version>/Log.txt`
   (the version without a Beta's build, e.g. `Live 12.4.25b1`), appended to at each launch
   after an `info: Started: Live <version>` line, as
