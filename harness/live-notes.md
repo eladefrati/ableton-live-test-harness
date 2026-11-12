@@ -67,6 +67,12 @@ unexpected.
   the device titles, and it changes when the pointer moves.
 - While the remote Mac's display sleeps, `screencapture -l` fails with "could not create image from
   window", and the session reports the screen locked until the display wakes.
+- A Live started while the display slept never redrew its window: with the LOM at 2 tracks,
+  captures of the window and of the whole screen showed the 1 track it opened with, and
+  waking the display, bringing Live to the front and resizing its window changed nothing.
+  Started with the display on, the same steps drew every change. `relaunch.js` keeps the
+  display on until Live is up (`keepDisplayOn` in `macos.js`); a Live started otherwise
+  while the display slept needs a relaunch (remote Mac, Live 12.4.25b1, 2026-11-11).
 
 ## Tracks and devices
 

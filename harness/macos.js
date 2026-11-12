@@ -9,7 +9,7 @@
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
-const { execFile } = require("node:child_process");
+const { execFile, spawn } = require("node:child_process");
 const tools = require("./tools.js");
 
 class MacError extends Error {}
@@ -56,6 +56,26 @@ async function wakeDisplay({ timeoutMs = 3000 } = {}) {
   } catch {
     throw new MacError(`No app is frontmost ${timeoutMs} ms after declaring user activity; Live can't be brought to the front`);
   }
+}
+
+// Wakes the display and keeps it on until stop() is called, or until this process exits. A
+// Live started while the display slept never redrew its window: captures, on the screen as
+// well as of the window, kept showing the set as it opened, and neither waking the display
+// nor bringing Live to the front nor resizing its window changed that (2026-11-11). `wake`
+// and `hold` are replaceable for tests.
+const holdDisplay = () => spawn("caffeinate", ["-d", "-w", String(process.pid)], { stdio: "ignore" });
+async function keepDisplayOn({ wake = wakeDisplay, hold: start = holdDisplay } = {}) {
+  const hold = start();
+  const stop = () => {
+    if (hold.exitCode === null && hold.signalCode === null) hold.kill();
+  };
+  try {
+    await wake();
+  } catch (error) {
+    stop();
+    throw error;
+  }
+  return { stop, pid: hold.pid };
 }
 
 // Brings Live to the front and waits until it is there; throws if it doesn't come. System
@@ -390,7 +410,7 @@ async function liveStartTime(pid) {
 }
 
 module.exports = {
-  MacError, osascript, activate, wakeDisplay, isFrontmost, menuItems, clickMenu, isChecked, undoName,
+  MacError, osascript, activate, wakeDisplay, keepDisplayOn, isFrontmost, menuItems, clickMenu, isChecked, undoName,
   setToggle, setKeyMapMode, setMidiMapMode, liveApp, saveSet, saveSetAs, openInBackground, openSet,
   openSetAndWait, windowTitle, sameFile, SAVE_CHANGES, TEMP_FILES, STOP_AUDIO, HARNESS_TEMP, inHarnessTemp, tempFolder,
   emptyHarnessTemp, livePids, liveStartTime,

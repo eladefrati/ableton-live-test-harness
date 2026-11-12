@@ -41,7 +41,7 @@ const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 const { connect } = require("./live.js");
-const { osascript, liveApp, livePids, liveStartTime, sameFile, openInBackground, SAVE_CHANGES, TEMP_FILES, tempFolder, emptyHarnessTemp } = require("./macos.js");
+const { osascript, liveApp, livePids, liveStartTime, sameFile, openInBackground, keepDisplayOn, SAVE_CHANGES, TEMP_FILES, tempFolder, emptyHarnessTemp } = require("./macos.js");
 const { preferencesFolder } = require("./settings.js");
 const { buildPluginSet, checkPluginLoaded, writeSet } = require("./plugin.js");
 
@@ -297,9 +297,20 @@ async function main(argv) {
     else say("info Live is not running");
     discardRecovery(await preferencesFolder(app), say);
     const file = freshSet(say, plugin);
-    const began = Date.now();
-    await start(app, file);
-    const ms = await waitUp(live, began, file);
+    // The display stays on until Live is up: a Live started while it slept never redraws its
+    // window (keepDisplayOn). Checks that don't read the screen still run without it.
+    const display = await keepDisplayOn().catch((error) => {
+      say(`warn the display didn't wake (${error.message}): this Live may never redraw its window`);
+      return null;
+    });
+    let ms;
+    try {
+      const began = Date.now();
+      await start(app, file);
+      ms = await waitUp(live, began, file);
+    } finally {
+      if (display) display.stop();
+    }
     const warming = Date.now();
     await warmUp(live);
     say(`info created and deleted an audio and a MIDI track, so Live has loaded the default tracks' devices `
