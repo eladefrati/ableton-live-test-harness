@@ -65,6 +65,13 @@ unexpected.
   transparent `live.tab` above a `v8ui` with `ignoreclick`, both the Info View and the click
   reach the tab (on the remote Mac, 2026-11-08). The Info View's title is on the same row as
   the device titles, and it changes when the pointer moves.
+- Over a knob of one of Live's own devices the Info View names the parameter, not always as
+  the LOM does: Auto Filter's Frequency knob reads "Filter Frequency", and its Rate knob
+  "LFO Frequency" while the LFO's rate is in Hz. A click on a knob, with no drag, leaves its
+  value alone; on Auto Filter's LFO or envelope knobs it switches the display's strip to
+  that section (remote Mac, Live 12.4.25b1, 2026-11-11).
+- The browser and the Info View can show a device's name in the same window as its title
+  bar, left of 240 points; `device-ui.js` looks for titles right of that.
 - While the remote Mac's display sleeps, `screencapture -l` fails with "could not create image from
   window", and the session reports the screen locked until the display wakes.
 - A Live started while the display slept never redrew its window: with the LOM at 2 tracks,

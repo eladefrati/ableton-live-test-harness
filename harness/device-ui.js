@@ -1,7 +1,9 @@
 "use strict";
 
-// Presses a Max for Live device's controls with real mouse events, for controls the LOM
-// can't reach and to prove that a click lands on one (ADR-0004). On the machine
+// Presses a device's controls with real mouse events, for controls the LOM can't reach and to
+// prove that a click lands on one (ADR-0004), and captures the device's panel. A Max for Live
+// device's controls come from its build; any other device's or plug-in's from points measured
+// in Live (ADR-0007). On the machine
 // harness/local.json names as its "clickHost" (ADR-0005); on any other, a run's first press
 // asks the person at it with a dialog and clicks only after Allow (ADR-0006).
 //
@@ -9,6 +11,12 @@
 //   await ui.press("Button");
 //   await ui.press("Tab", "B");            // one item of a live.tab
 //   await ui.text([0, 0, 200, 100]);       // the text shown in part of the panel, device units
+//   await ui.capture("/path/to/device.png"); // the device, title bar and frame included
+//
+//   // any device or plug-in, at points measured from the panel's corner, in points:
+//   await openDeviceUi(live, { track, device, controls: { Knob: { x: 50, y: 36, info: "Knob" } }, width: 300 });
+//   // a device whose points the harness has measured (MEASURED_DEVICES), Auto Filter's knobs:
+//   await openDeviceUi(live, { track, device });
 //
 // A press clicks only after the checks in ADR-0004 pass, and throws DeviceUiError otherwise.
 // It says nothing about what the click did: the check reads that from Live.
@@ -29,25 +37,55 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 // Live's 100% zoom (measured on the remote Mac, 2026-11-08). A line's own left edge won't
 // do: icons in the title bar are read as characters.
 const TITLE_TO_PANEL = { x: -17, y: 14 };
-// The Info View's title is on the same row as the device titles, left of them.
+// The Info View's title is on the same row as the device titles, left of them. The Info View
+// and the browser's lists are left of this; the device titles right of it.
 const INFO_VIEW_RIGHT = 240; // points from the window's left edge
 const ROW_TOLERANCE = 4; // points
 // Long enough for Live to show the control under the pointer in the Info View.
 const INFO_VIEW_SETTLE_MS = 350;
+// A device's frame around its panel, in points at 100% zoom: left of and above the panel's
+// corner (the title bar), right of the panel, and the whole height (measured on the remote
+// Mac, 2026-11-11).
+const FRAME = { left: 5, top: 20, right: 17, height: 192 };
+
+// Devices measured in Live, by class name (/live/device/get/class_name): each control's
+// centre in points from the panel's corner, with its Info View title, and the panel's width.
+// Live 12.4.25b1 at 100% zoom, on the remote Mac, 2026-11-11.
+const MEASURED_DEVICES = {
+  // Auto Filter's knobs, by parameter name
+  AutoFilter2: {
+    width: 428,
+    controls: {
+      Frequency: { x: 50.5, y: 33.5, info: "Filter Frequency" },
+      Resonance: { x: 50.5, y: 142.5, info: "Filter Resonance" },
+      "LFO Amount": { x: 109, y: 141.5, info: "LFO Amount" },
+      // The Rate knob, while the LFO's rate is in Hz; in other modes the Info View names
+      // another parameter and a press is refused.
+      "LFO Freq": { x: 170, y: 141.5, info: "LFO Frequency" },
+      "Env Amount": { x: 337, y: 141.5, info: "Envelope Amount" },
+      Drive: { x: 409.5, y: 29.5, info: "Drive" },
+      "Dry/Wet": { x: 409.5, y: 141.5, info: "Dry/Wet" },
+    },
+  },
+};
 
 // Text recognition reads 0 as O and 1 as I or l.
 const normalized = (text) => text.toUpperCase().replace(/O/g, "0").replace(/[IL]/g, "1");
 
-// The patcher's controls by parameter long name (or scripting name), from an .amxd's bytes
-// (amxd.js); a frozen device's patcher isn't JSON.
-function readControls(amxd) {
+// The patcher from an .amxd's bytes (amxd.js); a frozen device's patcher isn't JSON.
+function readPatcher(amxd) {
   const patch = patcherChunk(amxd);
   if (!patch) throw new DeviceUiError("The .amxd has no patcher chunk");
   if (patch[0] !== 0x7b) throw new DeviceUiError("The .amxd's patcher isn't plain JSON (a frozen device?)");
-  const { patcher } = JSON.parse(patch.toString("utf8").replace(/\0+$/, ""));
+  return JSON.parse(patch.toString("utf8").replace(/\0+$/, "")).patcher;
+}
+
+const presented = (patcher) => patcher.boxes.map(({ box }) => box).filter((box) => box.presentation && box.presentation_rect);
+
+// The patcher's controls by parameter long name (or scripting name), from an .amxd's bytes.
+function readControls(amxd) {
   const controls = new Map();
-  for (const { box } of patcher.boxes) {
-    if (!box.presentation || !box.presentation_rect) continue;
+  for (const box of presented(readPatcher(amxd))) {
     const valueof = box.saved_attribute_attributes?.valueof ?? {};
     const name = valueof.parameter_longname ?? box.varname;
     if (!name) continue;
@@ -61,6 +99,20 @@ function readControls(amxd) {
     });
   }
   return controls;
+}
+
+// The panel's width in points: the right edge of its rightmost object in presentation.
+function readPanelWidth(amxd) {
+  return Math.max(0, ...presented(readPatcher(amxd)).map((box) => box.presentation_rect[0] + box.presentation_rect[2]));
+}
+
+// Controls given as points, { name: { x, y, info } } with x and y each control's centre in
+// points from the panel's corner, in the form readControls returns.
+function pointControls(points) {
+  return new Map(Object.entries(points).map(([name, { x, y, info }]) => {
+    if (!Number.isFinite(x) || !Number.isFinite(y)) throw new DeviceUiError(`${name} needs x and y in points`);
+    return [name, { name, x, y, w: 0, h: 0, info: info ?? null, items: null, rows: 1, spacing: 0 }];
+  }));
 }
 
 // The point to press, in device units.
@@ -81,13 +133,16 @@ function controlPoint(control, item) {
 }
 
 // Where the device's title is in the recognized lines: its first word's left edge and the
-// line's top, in pixels. Exactly one must match, or the wrong device could be pressed.
-function findTitle(lines, title) {
+// line's top, in pixels. Text starting left of `fromX` (pixels) is skipped: the Info View and
+// the browser, which can show the same name. Exactly one must match, or the wrong device could
+// be pressed.
+function findTitle(lines, title, fromX = 0) {
   const wanted = title.split(" ").map(normalized);
   const found = [];
   for (const line of lines) {
     const words = line.words.map((word) => normalized(word.text));
     for (let start = 0; start + wanted.length <= words.length; start++) {
+      if (line.words[start].x < fromX) continue;
       if (wanted.every((word, i) => words[start + i] === word)) found.push({ x: line.words[start].x, y: line.y });
     }
   }
@@ -193,6 +248,17 @@ const machine = {
       fs.rmSync(folder, { recursive: true, force: true });
     }
   },
+  // Crops a capture of the window to [x, y, w, h], in pixels.
+  async captureCrop(windowId, [x, y, w, h], file) {
+    const folder = mac.tempFolder("device-ui-");
+    try {
+      const image = path.join(folder, "window.png");
+      await machine.capture(windowId, image);
+      await exec("sips", ["-c", h, w, "--cropOffset", y, x, image, "--out", file]);
+    } finally {
+      fs.rmSync(folder, { recursive: true, force: true });
+    }
+  },
   hover: (windowId, x, y) => helper("hover", windowId, x, y),
   click: (windowId, x, y) => helper("click", windowId, x, y),
 };
@@ -217,8 +283,8 @@ async function captureWindow(file, { window: id } = {}, system = machine) {
 }
 
 class DeviceUi {
-  constructor(live, { track, device, title, controls }, system) {
-    Object.assign(this, { live, track, device, title, controls, system });
+  constructor(live, { track, device, title, controls, width }, system) {
+    Object.assign(this, { live, track, device, title, controls, width, system });
   }
 
   // Where the panel is now. Every press looks again: selecting a device can scroll the view.
@@ -230,7 +296,7 @@ class DeviceUi {
     const window = await this.system.window();
     const { width, lines } = await this.system.read(window.id);
     const scale = width / window.w; // pixels per point
-    const title = findTitle(lines, this.title);
+    const title = findTitle(lines, this.title, INFO_VIEW_RIGHT * scale);
     return {
       window, scale, title,
       x: window.x + title.x / scale + TITLE_TO_PANEL.x,
@@ -240,8 +306,8 @@ class DeviceUi {
 
   async press(name, item) {
     const control = this.controls.get(name);
-    if (!control) throw new DeviceUiError(`The build has no control named ${name}`);
-    if (!control.info) throw new DeviceUiError(`${name} has no annotation_name for the Info View to confirm. Not clicked`);
+    if (!control) throw new DeviceUiError(`${this.title} has no control named ${name}`);
+    if (!control.info) throw new DeviceUiError(`${name} has no Info View title to confirm (annotation_name, or info for a point). Not clicked`);
     const [ux, uy] = controlPoint(control, item);
 
     await this.permit();
@@ -281,13 +347,46 @@ class DeviceUi {
     })).filter(({ x, y }) => x >= rx && x <= rx + rw && y >= ry && y <= ry + rh);
     return inside.sort((a, b) => a.y - b.y || a.x - b.x).map((line) => line.text);
   }
+
+  // Saves a picture of the device, its title bar and frame included, to `file` (PNG). Like
+  // ui.text, it rests on the device being selected and its title unique on screen.
+  async capture(file) {
+    if (!this.width) throw new DeviceUiError(`The width of ${this.title}'s panel isn't known: give openDeviceUi a width`);
+    const at = await this.locate();
+    const rect = [
+      at.x - at.window.x - FRAME.left,
+      at.y - at.window.y - FRAME.top,
+      this.width + FRAME.left + FRAME.right,
+      FRAME.height,
+    ].map((points) => String(Math.round(points * at.scale)));
+    await this.system.captureCrop(at.window.id, rect, file);
+  }
 }
 
-async function openDeviceUi(live, { track, device, build }, system = machine) {
+// A device's controls come from `build`, a Max for Live device's .amxd; from `controls`, points
+// measured on any device or plug-in (pointControls); or, with neither, from MEASURED_DEVICES.
+// `width` is the panel's width in points, for capture: read from a build, measured for a
+// device in MEASURED_DEVICES, and given with `controls`.
+async function openDeviceUi(live, { track, device, build, controls, width }, system = machine) {
   const names = await live.query("/live/track/get/devices/name", track);
   const title = names[device + 1];
   if (!title) throw new DeviceUiError(`Track ${track} has no device ${device}`);
-  return new DeviceUi(live, { track, device, title, controls: readControls(fs.readFileSync(build)) }, system);
+  let panel;
+  if (build) {
+    const amxd = fs.readFileSync(build);
+    panel = { controls: readControls(amxd), width: readPanelWidth(amxd) };
+  } else if (controls) {
+    panel = { controls: pointControls(controls), width: null };
+  } else {
+    const [, , className] = await live.query("/live/device/get/class_name", track, device);
+    const measured = MEASURED_DEVICES[className];
+    if (!measured) throw new DeviceUiError(`The harness has no measured points for ${title} (${className}): give openDeviceUi a build or controls`);
+    panel = { controls: pointControls(measured.controls), width: measured.width };
+  }
+  return new DeviceUi(live, { track, device, title, controls: panel.controls, width: width ?? panel.width }, system);
 }
 
-module.exports = { DeviceUiError, openDeviceUi, captureWindow, liveWindows, readControls, controlPoint, findTitle, infoTitle, readClickHost, runName };
+module.exports = {
+  DeviceUiError, openDeviceUi, captureWindow, liveWindows, readControls, readPanelWidth, pointControls, controlPoint,
+  findTitle, infoTitle, readClickHost, runName, MEASURED_DEVICES,
+};

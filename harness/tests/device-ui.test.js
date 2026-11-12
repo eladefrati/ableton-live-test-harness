@@ -5,7 +5,10 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
-const { DeviceUiError, openDeviceUi, readControls, controlPoint, findTitle, infoTitle, readClickHost, runName } = require("../device-ui.js");
+const {
+  DeviceUiError, openDeviceUi, readControls, readPanelWidth, pointControls, controlPoint, findTitle, infoTitle, readClickHost, runName,
+  MEASURED_DEVICES,
+} = require("../device-ui.js");
 
 const chunk = (tag, payload) => {
   const size = Buffer.alloc(4);
@@ -58,26 +61,31 @@ function fakeMachine({ info = "Button", titles = [line(`> ${TITLE}`, 1800, 1400)
     focus: async () => { calls.push("focus"); onFocus(calls); },
     window: async () => WINDOW,
     read: async () => ({ width: 2880, lines: [line(info, 26, 1400), ...titles, line("text", 2000, 1560)] }),
+    captureCrop: async (id, rect, file) => { calls.push(["crop", id, rect, file]); },
     hover: async (id, x, y) => { calls.push(["hover", id, x, y]); },
     click: async (id, x, y) => { calls.push(["click", id, x, y]); },
   };
 }
 
+const fakeLive = (className = "MxDeviceAudioEffect") => ({
+  send: () => {},
+  sync: async () => {},
+  query: async (address) => (address === "/live/device/get/class_name" ? [1, 1, className] : [1, "Drum Rack", TITLE]),
+});
+
 async function open(system) {
   const folder = fs.mkdtempSync(path.join(os.tmpdir(), "device-ui-test-"));
   const build = path.join(folder, "Device.amxd");
   fs.writeFileSync(build, amxd());
-  const live = {
-    send: () => {},
-    sync: async () => {},
-    query: async () => [1, "Drum Rack", TITLE],
-  };
   try {
-    return await openDeviceUi(live, { track: 1, device: 1, build }, system);
+    return await openDeviceUi(fakeLive(), { track: 1, device: 1, build }, system);
   } finally {
     fs.rmSync(folder, { recursive: true, force: true });
   }
 }
+
+// The panel's corner in the fake window, in points, from the title at 1830 px, 1400 px.
+const PANEL = { x: 1830 / 2 - 17, y: 25 + 1400 / 2 + 14 };
 
 const clicks = (system) => system.calls.filter((call) => call[0] === "click");
 
@@ -113,6 +121,12 @@ test("controlPoint refuses a missing item, an item on a button and a layout it c
 test("findTitle uses the first word's edge, past icons read as characters, and allows misread digits", () => {
   assert.deepEqual(findTitle([line(`> ${TITLE} V`, 1800, 1400)], TITLE), { x: 1830, y: 1400 });
   assert.deepEqual(findTitle([line("Dev1ce 2O3O.11.08.I", 100, 50)], TITLE), { x: 100, y: 50 });
+});
+
+test("findTitle skips a match left of the given edge, as the browser's or the Info View's", () => {
+  const lines = [line(TITLE, 26, 1400), line(TITLE, 260, 400), line(`> ${TITLE}`, 1800, 1400)];
+  assert.deepEqual(findTitle(lines, TITLE, 480), { x: 1830, y: 1400 });
+  assert.throws(() => findTitle(lines, TITLE), /3 times/);
 });
 
 test("findTitle refuses a title that is missing or on screen twice", () => {
@@ -246,4 +260,59 @@ test("captureWindow captures Live's main window, or one of Live's windows by id,
   assert.equal((await captureWindow("/tmp/panel.png", { window: 9 }, system)).title, "Save");
   await assert.rejects(captureWindow("/tmp/other.png", { window: 4 }, system), /Live has no window 4 on screen/);
   assert.deepEqual(captured, [[7, "/tmp/main.png"], [9, "/tmp/panel.png"]]);
+});
+
+test("readPanelWidth is the right edge of the rightmost object in presentation", () => {
+  assert.equal(readPanelWidth(amxd()), 260);
+});
+
+test("pointControls takes each point as a control's centre, and refuses one without x and y", () => {
+  const controls = pointControls({ Knob: { x: 50, y: 36, info: "Knob" } });
+  assert.deepEqual(controlPoint(controls.get("Knob")), [50, 36]);
+  assert.equal(controls.get("Knob").info, "Knob");
+  assert.throws(() => pointControls({ Knob: { x: 50 } }), /needs x and y/);
+});
+
+test("a press on a device given as points clicks the point from the panel's corner", async () => {
+  const system = fakeMachine({ info: "Knob" });
+  const ui = await openDeviceUi(fakeLive(), { track: 1, device: 1, controls: { Knob: { x: 50, y: 36, info: "Knob" } } }, system);
+  await ui.press("Knob");
+  assert.deepEqual(clicks(system), [["click", 7, PANEL.x + 50, PANEL.y + 36]]);
+});
+
+test("a point with no Info View title is never clicked", async () => {
+  const system = fakeMachine({ info: "Knob" });
+  const ui = await openDeviceUi(fakeLive(), { track: 1, device: 1, controls: { Knob: { x: 50, y: 36 } } }, system);
+  await assert.rejects(ui.press("Knob"), /no Info View title/);
+  assert.equal(system.calls.length, 0);
+});
+
+test("with neither build nor controls, a measured device's points come from its class", async () => {
+  const system = fakeMachine({ info: "Filter Frequency" });
+  const ui = await openDeviceUi(fakeLive("AutoFilter2"), { track: 1, device: 1 }, system);
+  await ui.press("Frequency");
+  const { x, y } = MEASURED_DEVICES.AutoFilter2.controls.Frequency;
+  assert.deepEqual(clicks(system), [["click", 7, PANEL.x + x, PANEL.y + y]]);
+  assert.equal(ui.width, MEASURED_DEVICES.AutoFilter2.width);
+});
+
+test("with neither build nor controls, a device the harness hasn't measured is refused", async () => {
+  await assert.rejects(openDeviceUi(fakeLive("Compressor2"), { track: 1, device: 1 }, fakeMachine()), /no measured points for .* \(Compressor2\)/);
+});
+
+test("capture crops the window to the device's frame, in pixels, its width from the build", async () => {
+  const system = fakeMachine();
+  const ui = await open(system);
+  await ui.capture("/out/device.png");
+  const rect = [PANEL.x - 5, PANEL.y - 25 - 20, 260 + 22, 192].map((points) => String(Math.round(points * 2)));
+  assert.deepEqual(system.calls, [["crop", 7, rect, "/out/device.png"]]);
+});
+
+test("capture uses the width given, and refuses a device whose width isn't known", async () => {
+  const system = fakeMachine();
+  const given = await openDeviceUi(fakeLive(), { track: 1, device: 1, controls: {}, width: 300 }, system);
+  await given.capture("/out/device.png");
+  assert.equal(system.calls[0][2][2], String((300 + 22) * 2));
+  const unknown = await openDeviceUi(fakeLive(), { track: 1, device: 1, controls: {} }, system);
+  await assert.rejects(unknown.capture("/out/device.png"), /give openDeviceUi a width/);
 });
