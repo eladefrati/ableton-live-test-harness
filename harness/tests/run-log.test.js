@@ -6,7 +6,7 @@ const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 const { spawnSync, execFileSync } = require("node:child_process");
-const { checkLocation } = require("../run-log.js");
+const { checkLocation, machineLabel } = require("../run-log.js");
 
 const RUN_LOG = path.join(__dirname, "..", "run-log.js");
 const LIVE = path.join(__dirname, "..", "live.js");
@@ -43,6 +43,21 @@ test("checkLocation finds the repo and the name inside tests/live", () => {
   assert.equal(checkLocation("/a/repo/harness/tests/live.test.js"), null);
 });
 
+test("machineLabel names the remote Mac remote and any other machine local", (t) => {
+  const folder = fs.mkdtempSync(path.join(os.tmpdir(), "run-log-local-"));
+  t.after(() => fs.rmSync(folder, { recursive: true, force: true }));
+  const file = path.join(folder, "local.json");
+  fs.writeFileSync(file, JSON.stringify({ remote: "user@second-mac" }));
+  assert.equal(machineLabel("second-mac", file), "remote");
+  assert.equal(machineLabel("Second-Mac.local", file), "remote");
+  assert.equal(machineLabel("first-mac.local", file), "local");
+  fs.writeFileSync(file, JSON.stringify({ remote: "second-mac.example.net" }));
+  assert.equal(machineLabel("second-mac", file), "remote");
+  fs.writeFileSync(file, "{}");
+  assert.equal(machineLabel("second-mac", file), "local");
+  assert.equal(machineLabel("second-mac", path.join(folder, "missing.json")), "local");
+});
+
 test("a run saves its header, its output and its exit code, and still prints", (t) => {
   const { repo, script } = repoWith(t, "tests/live/sub/check.js",
     `${started}console.log("PASS one");\nconsole.error("FAIL two");\nprocess.exitCode = 1;\n`);
@@ -54,7 +69,7 @@ test("a run saves its header, its output and its exit code, and still prints", (
   assert.equal(saved.length, 1);
   assert.match(saved[0].name, /^\d{4}-\d\d-\d\dT\d\d-\d\d-\d\d-\d{3}-sub-check\.txt$/);
   const commit = execFileSync("git", ["-C", repo, "rev-parse", "--short", "HEAD"], { encoding: "utf8" }).trim();
-  assert.match(saved[0].text, /^script: tests\/live\/sub\/check\.js\nargs: --tempo 97\nmachine: .+\nstarted: .+\n/);
+  assert.match(saved[0].text, /^script: tests\/live\/sub\/check\.js\nargs: --tempo 97\nmachine: (local|remote)\nstarted: .+\n/);
   assert.ok(saved[0].text.includes(`commit: ${commit}\nuncommitted: no\n\nPASS one\nFAIL two\n\nexit: 1\n`), saved[0].text);
 });
 

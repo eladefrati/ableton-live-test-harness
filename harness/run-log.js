@@ -17,6 +17,7 @@ const { execFileSync } = require("node:child_process");
 const { logStamp } = require("./log.js");
 
 const LOGS = path.join("tests", "live", "logs");
+const LOCAL = path.join(__dirname, "local.json");
 
 let started = false;
 
@@ -36,6 +37,19 @@ function git(repo, ...args) {
   }
 }
 
+// The machine as "remote" on the Mac harness/local.json names as "remote", "local" anywhere
+// else: the log goes into a project's repo, which must not carry machine names.
+function machineLabel(hostname = os.hostname(), file = LOCAL) {
+  let remote = null;
+  try {
+    remote = JSON.parse(fs.readFileSync(file, "utf8")).remote;
+  } catch {
+    // No file or not JSON: no remote is known.
+  }
+  const host = (name) => String(name).split("@").pop().split(".")[0].toLowerCase();
+  return typeof remote === "string" && remote && host(remote) === host(hostname) ? "remote" : "local";
+}
+
 function header(repo, name, now) {
   // The logs themselves don't count: an earlier run's log is not a change to what is tested.
   const changes = git(repo, "status", "--porcelain", "--", ".", `:(exclude)${LOGS}`);
@@ -43,7 +57,7 @@ function header(repo, name, now) {
   return [
     `script: tests/live/${name}`,
     `args: ${process.argv.slice(2).join(" ")}`,
-    `machine: ${os.hostname()}`,
+    `machine: ${machineLabel()}`,
     `started: ${logStamp(now)}`,
     `commit: ${git(repo, "rev-parse", "--short", "HEAD") || "unknown"}`,
     `uncommitted: ${uncommitted}`,
@@ -94,4 +108,4 @@ function startRunLog() {
   }
 }
 
-module.exports = { startRunLog, checkLocation };
+module.exports = { startRunLog, checkLocation, machineLabel };
