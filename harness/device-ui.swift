@@ -20,16 +20,17 @@
 //                                     in points from its top left, if the editor is <w> x <h>
 //   device-ui drag <window> <x> <y> <dx> <dy>
 //   device-ui drag-editor <title> <x> <y> <w> <h> <dx> <dy>
-//                                     as click and click-editor, but moves the pointer by
-//                                     <dx>, <dy> points (right, down) with the button down
-//                                     (ADR-0010)
+//                                     as click and click-editor, but with the button down
+//                                     moves the pointer by <dx>, <dy> whole points (right,
+//                                     down) in one move, and releases the button where the
+//                                     pointer then is (ADR-0010)
 //
 // hover, click and drag refuse, posting nothing, unless the screen is unlocked and <window> is
 // the topmost window at the point, which a click and a drag check again after their hover,
 // before the button goes down; the editor's commands also unless the point is inside the
-// editor and the editor is the size given; a drag also unless it moves at least 1 point on
-// its longer axis, at most MAX_DRAG on either, and ends on a screen. Exits 1 with the reason
-// on stderr if anything fails.
+// editor and the editor is the size given; a drag also unless it moves whole points, at least
+// 1 on its longer axis and at most MAX_DRAG on either, and ends on a screen. Exits 1 with the
+// reason on stderr if anything fails.
 
 import ApplicationServices
 import Foundation
@@ -277,41 +278,39 @@ func post(_ type: CGEventType, _ point: CGPoint) { mouseEvent(type, point).post(
 // The longest drag either way, in points (ADR-0010).
 let MAX_DRAG = 400.0
 
-// Refuses a drag from `point` by `delta`, before any event is posted, unless it moves at least
-// 1 point on its longer axis, at most MAX_DRAG on either, and ends on a screen.
+// Refuses a drag from `point` by `delta`, before any event is posted, unless it moves whole
+// points, at least 1 on its longer axis and at most MAX_DRAG on either, and ends on a screen.
+// Whole points, because a knob of one of Live's devices reads positions in whole points: what
+// a fraction of a point turned would depend on the fraction the press point happens to have.
 func requireDrag(_ point: CGPoint, _ delta: CGVector) {
-    guard abs(delta.dx) <= MAX_DRAG, abs(delta.dy) <= MAX_DRAG, max(abs(delta.dx), abs(delta.dy)) >= 1
-    else { fail("A drag moves at least 1 point on its longer axis and at most \(Int(MAX_DRAG)) on either, not \(delta.dx), \(delta.dy)") }
+    guard delta.dx == delta.dx.rounded(), delta.dy == delta.dy.rounded(),
+          abs(delta.dx) <= MAX_DRAG, abs(delta.dy) <= MAX_DRAG, max(abs(delta.dx), abs(delta.dy)) >= 1
+    else { fail("A drag moves whole points, at least 1 on its longer axis and at most \(Int(MAX_DRAG)) on either, not \(delta.dx), \(delta.dy)") }
     let end = CGPoint(x: point.x + delta.dx, y: point.y + delta.dy)
     var count: UInt32 = 0
     guard CGGetDisplaysWithPoint(end, 0, nil, &count) == .success, count > 0 else { fail("A drag to \(end) ends off screen") }
 }
 
-// Button down at `point`, steps of at most one point either way along `delta`, button up at
-// its end. Each drag event carries its movement too, for controls that read how far the mouse
-// moved: whole points, which add up to the distance. Every event is made before the button
-// goes down, so nothing here can fail and leave it held.
+// Button down at `point`, one drag event at the end of `delta`, button up where the pointer
+// then is. One event, not a path of steps: for every drag event, a knob of one of Live's
+// devices adds how far that event is from the press point and moves the pointer back there,
+// so a path measured from the press point is counted again at each step (live-notes.md). A
+// control that reads where the pointer is ends at the same value either way. The event
+// carries the whole distance in its delta fields too, for controls that read how far the
+// mouse moved. Every event is made before the button goes down, so nothing here can fail and
+// leave it held.
 func drag(_ point: CGPoint, by delta: CGVector) {
-    let steps = Int(max(abs(delta.dx), abs(delta.dy)).rounded(.up))
-    var carried = (dx: Int64(0), dy: Int64(0))
-    let moves = (0..<steps).map { step -> CGEvent in
-        let t = Double(step + 1) / Double(steps)
-        let event = mouseEvent(.leftMouseDragged, CGPoint(x: point.x + delta.dx * t, y: point.y + delta.dy * t))
-        let moved = (dx: Int64((delta.dx * t).rounded()), dy: Int64((delta.dy * t).rounded()))
-        event.setIntegerValueField(.mouseEventDeltaX, value: moved.dx - carried.dx)
-        event.setIntegerValueField(.mouseEventDeltaY, value: moved.dy - carried.dy)
-        carried = moved
-        return event
-    }
-    let down = mouseEvent(.leftMouseDown, point)
-    let up = mouseEvent(.leftMouseUp, CGPoint(x: point.x + delta.dx, y: point.y + delta.dy))
+    let end = CGPoint(x: point.x + delta.dx, y: point.y + delta.dy)
+    let (down, move, up) = (mouseEvent(.leftMouseDown, point), mouseEvent(.leftMouseDragged, end), mouseEvent(.leftMouseUp, end))
+    move.setIntegerValueField(.mouseEventDeltaX, value: Int64(delta.dx))
+    move.setIntegerValueField(.mouseEventDeltaY, value: Int64(delta.dy))
     down.post(tap: .cghidEventTap)
     usleep(70_000)
-    for move in moves {
-        move.post(tap: .cghidEventTap)
-        usleep(8_000)
-    }
+    move.post(tap: .cghidEventTap)
     usleep(50_000)
+    // Live has moved the pointer back to the press point by now; other controls left it at
+    // the end.
+    up.location = CGEvent(source: nil)?.location ?? end
     up.post(tap: .cghidEventTap)
     usleep(100_000)
 }

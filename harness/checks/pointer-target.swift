@@ -1,15 +1,16 @@
 // A window that reports the mouse events it receives, for pointer-guards.js: a floating panel
 // that takes clicks without taking the front.
 //
-//   pointer-target <x> <y> <w> <h> [--cover]   at that rectangle, in points from the screen's
-//                                              top left
-//   pointer-target --under <title>             at the rectangle of the window of that title,
-//                                              under it
+//   pointer-target <x> <y> <w> <h> [--cover] [--return]
+//                                     at that rectangle, in points from the screen's top left
+//   pointer-target --under <title>    at the rectangle of the window of that title, under it
 //
 // Prints {"window", "x", "y", "w", "h"} once the panel is on screen, then one line per button
 // event a window of its receives: {"type": "down" | "drag" | "up", "window", "x", "y", "dx",
 // "dy"}, the event's position in points from the screen's top left and its delta fields. With
-// --cover it shows a second window over the panel when the pointer first moves in it.
+// --cover it shows a second window over the panel when the pointer first moves in it. With
+// --return it moves the pointer back to where the button went down at every drag event, as a
+// knob of one of Live's devices does.
 //
 // SIGTERM ends it, and so does the end of the process that started it. If the left button is
 // held then, it posts the button up first and prints {"released": <whether that released it>}.
@@ -29,9 +30,17 @@ func printJSON(_ value: [String: Any]) {
 
 final class Pad: NSView {
     var onFirstMove: (() -> Void)?
+    var returnsPointer = false
+    var pressed = CGPoint.zero
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
-    override func mouseDown(with event: NSEvent) { report("down", event) }
-    override func mouseDragged(with event: NSEvent) { report("drag", event) }
+    override func mouseDown(with event: NSEvent) {
+        pressed = event.cgEvent?.location ?? .zero
+        report("down", event)
+    }
+    override func mouseDragged(with event: NSEvent) {
+        report("drag", event)
+        if returnsPointer { CGWarpMouseCursorPosition(pressed) }
+    }
     override func mouseUp(with event: NSEvent) { report("up", event) }
     override func mouseMoved(with event: NSEvent) {
         onFirstMove?()
@@ -86,18 +95,24 @@ app.setActivationPolicy(.accessory)
 NSEvent.isMouseCoalescingEnabled = false
 
 var options = Array(CommandLine.arguments.dropFirst())
-let cover = options.contains("--cover")
-options.removeAll { $0 == "--cover" }
+func flag(_ name: String) -> Bool {
+    guard let index = options.firstIndex(of: name) else { return false }
+    options.remove(at: index)
+    return true
+}
+let (cover, returnsPointer) = (flag("--cover"), flag("--return"))
 let rect: CGRect
 if options.count == 2, options[0] == "--under" {
     rect = windowTitled(options[1])
 } else {
     let numbers = options.compactMap { Double($0) }
-    guard options.count == 4, numbers.count == 4 else { fail("usage: pointer-target <x> <y> <w> <h> [--cover] | --under <title>") }
+    guard options.count == 4, numbers.count == 4
+    else { fail("usage: pointer-target <x> <y> <w> <h> [--cover] [--return] | --under <title>") }
     rect = CGRect(x: numbers[0], y: numbers[1], width: numbers[2], height: numbers[3])
 }
 
 let (panel, pad) = showPanel(rect)
+pad.returnsPointer = returnsPointer
 var over: Panel?
 if cover {
     pad.addTrackingArea(NSTrackingArea(rect: .zero, options: [.mouseMoved, .activeAlways, .inVisibleRect], owner: pad))

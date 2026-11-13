@@ -110,7 +110,9 @@ Node 18 or later. See [ADR-0001](../docs/adr/0001-fork-abletonosc.md) for the de
   on stdin not at all.
   `openDeviceUi(live, {track, device, build})` takes the controls from the
   `.amxd`; `ui.press(name)` or `ui.press(tabName, item)` clicks, `ui.drag(name, {up, right})`
-  turns a control by dragging it that many points with the button down (ADR-0010),
+  turns a control by dragging it that many whole points with the button down, in one move
+  (ADR-0010; a fraction of a point throws `DeviceUiError`; Auto Filter's knobs turn one of
+  their 126 steps per point up, `live-notes.md`),
   `ui.choose(name, item)` opens the menu a control opens (a chooser) and clicks the one row
   that reads `item`, closing the menu with Escape if none or two do or anything else fails once the menu's control was clicked (ADR-0011), and `ui.text([x, y, w, h])`
   resolves with the lines shown in that part of the panel, in device units. A press looks
@@ -234,7 +236,9 @@ Node 18 or later. See [ADR-0001](../docs/adr/0001-fork-abletonosc.md) for the de
   (`checks/pointer-target.swift`, which prints the button events it receives), runs the helper
   against it, and compares the helper's exit status and error and the events the window
   received: a click reaches the window; a window that comes over the point during a click's
-  hover gets no click; a point under harness-computer-use's pill is refused. It takes the
+  hover gets no click; a point under harness-computer-use's pill is refused; a drag is one
+  button-down at the point, one drag event at its end with the whole distance in its delta
+  fields, and one button-up, where the pointer then is. It takes the
   pointer, so it runs only on the click host and refuses on any other machine, posting
   nothing. A case that leaves the button held releases it and fails.
 

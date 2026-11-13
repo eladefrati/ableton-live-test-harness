@@ -22,6 +22,9 @@ const RECT = [400, 200, 400, 300];
 const EVENT_WAIT_MS = 300;
 
 const click = (window, x, y) => ["click", window, x, y];
+// A drag 30 points right and 20 up, and the one drag event it posts.
+const drag = (window, x, y) => ["drag", window, x, y, 30, -20];
+const DRAGGED = { type: "drag", dx: 30, dy: -20 };
 
 // Each case: the target's options, whether harness-computer-use's overlay runs, and the
 // helper's command, given the target's window and its centre. Then what must come of it: the
@@ -51,6 +54,20 @@ const CASES = [
     status: 1,
     stderr: /^The point is under harness-computer-use's pill$/,
     events: () => [],
+  },
+  {
+    name: "a drag's events: one down at the point, one drag at the end with the whole distance, one up",
+    target: RECT,
+    command: drag,
+    status: 0,
+    events: (x, y) => [{ type: "down", x, y }, { ...DRAGGED, x: x + 30, y: y - 20 }, { type: "up", x: x + 30, y: y - 20 }],
+  },
+  {
+    name: "a drag's button comes up where the pointer is once the control has moved it back",
+    target: [...RECT, "--return"],
+    command: drag,
+    status: 0,
+    events: (x, y) => [{ type: "down", x, y }, { ...DRAGGED, x: x + 30, y: y - 20 }, { type: "up", x, y }],
   },
 ];
 

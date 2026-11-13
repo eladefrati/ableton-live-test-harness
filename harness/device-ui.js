@@ -10,7 +10,7 @@
 //   const ui = await openDeviceUi(live, { track, device, build: "/path/to/Device.amxd" });
 //   await ui.press("Button");
 //   await ui.press("Tab", "B");            // one item of a live.tab
-//   await ui.drag("Knob", { up: 40 });     // turns a control: points with the button down (ADR-0010)
+//   await ui.drag("Knob", { up: 40 });     // turns a control: whole points with the button down (ADR-0010)
 //   await ui.choose("Menu", "Item");       // an item of the menu a control opens (ADR-0011)
 //   await ui.text([0, 0, 200, 100]);       // the text shown in part of the panel, device units
 //   await ui.capture("/path/to/device.png"); // the device, title bar and frame included
@@ -435,12 +435,13 @@ function rowsReading(lines, item, tolerance) {
 // The longest drag either way, in points (ADR-0010); device-ui.swift holds the same limit.
 const MAX_DRAG = 400;
 
-// { up, right } in points as the helper's [dx, dy] (right, down), refused before anything
-// moves when it is under 1 point on its longer axis or over MAX_DRAG on either.
+// { up, right } in whole points as the helper's [dx, dy] (right, down), refused before
+// anything moves when it has a fraction of a point, is under 1 point on its longer axis or
+// over MAX_DRAG on either.
 function dragDistance({ up = 0, right = 0 } = {}) {
-  const ok = (n) => Number.isFinite(n) && Math.abs(n) <= MAX_DRAG;
+  const ok = (n) => Number.isInteger(n) && Math.abs(n) <= MAX_DRAG;
   if (!ok(up) || !ok(right) || Math.max(Math.abs(up), Math.abs(right)) < 1) {
-    throw new DeviceUiError(`A drag needs { up, right } in points, at least 1 on the longer axis and at most ${MAX_DRAG} on either. Not dragged`);
+    throw new DeviceUiError(`A drag needs { up, right } in whole points, at least 1 on the longer axis and at most ${MAX_DRAG} on either. Not dragged`);
   }
   return [right, -up];
 }
@@ -491,8 +492,8 @@ class DeviceUi {
     await this.system.click(window, x, y);
   }
 
-  // Drags a control by { up, right } points with the button down, after the same checks as a
-  // press (ADR-0010): a knob turns with up, a horizontal slider with right.
+  // Drags a control by { up, right } whole points with the button down, after the same checks
+  // as a press (ADR-0010): a knob turns with up, a horizontal slider with right.
   async drag(name, distance) {
     const [dx, dy] = dragDistance(distance);
     const { window, x, y } = await this.aim(name);
@@ -651,8 +652,8 @@ class PluginWindow {
     await this.system.clickEditor(this.title, x, y, this.size);
   }
 
-  // Drags a control by { up, right } points with the button down (ADR-0010). The helper checks
-  // the start as for a click.
+  // Drags a control by { up, right } whole points with the button down (ADR-0010). The helper
+  // checks the start as for a click.
   async drag(name, distance) {
     const [dx, dy] = dragDistance(distance);
     const [x, y] = await this.aim(name);

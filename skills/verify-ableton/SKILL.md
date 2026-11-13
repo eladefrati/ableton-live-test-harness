@@ -106,8 +106,9 @@ then take `const since = Date.now()` before the action and `await live.waitForHo
 `harness/device-ui.js`
 (`docs/adr/0004-press-device-controls-with-real-mouse-events.md`)
 presses a device's controls with real mouse events, picks an item from a chooser's menu
-(ADR-0011), drags them to turn them (ADR-0010,
-mainly for a plug-in's editor: Live's own devices are set over OSC), reads the text its panel
+(ADR-0011), drags them to turn them by whole points (ADR-0010,
+mainly for a plug-in's editor: Live's own devices are set over OSC, and Auto Filter's knobs
+turn one of their 126 steps per point up), reads the text its panel
 shows and captures the panel, on the unmodified build. A Max device's controls come from its build; any
 other device's or plug-in's are points measured in Live (ADR-0007; Auto Filter's knobs are
 built in). Use it for a control that isn't a parameter, when the click itself needs
