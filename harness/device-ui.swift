@@ -225,8 +225,25 @@ func isOverlay(_ window: [String: Any]) -> Bool {
         && (window[kCGWindowOwnerName as String] as? String ?? "").hasPrefix("computer-use-overlay")
 }
 
+// While a notification banner shows, from any app, Notification Center holds a transparent
+// window over the whole screen. Rather than guess whether the point is under the banner, the
+// guard waits for that window to go.
+let NOTIFICATION_WAIT_SECONDS = 10.0
+
+func isNotificationCover(_ window: [String: Any]) -> Bool {
+    (window[kCGWindowOwnerName as String] as? String) == "Notification Center"
+        && bounds(window) == CGDisplayBounds(CGMainDisplayID())
+}
+
 func requireOnTop(_ id: Int, _ point: CGPoint) {
-    guard let top = clickableWindows().first(where: { bounds($0).contains(point) }) else { fail("No window at the point") }
+    let deadline = Date().addingTimeInterval(NOTIFICATION_WAIT_SECONDS)
+    var top = clickableWindows().first(where: { bounds($0).contains(point) })
+    while let cover = top, isNotificationCover(cover), Date() < deadline {
+        usleep(250_000)
+        top = clickableWindows().first(where: { bounds($0).contains(point) })
+    }
+    guard let top else { fail("No window at the point") }
+    if isNotificationCover(top) { fail("A notification has covered the screen for \(Int(NOTIFICATION_WAIT_SECONDS)) s") }
     if number(top) != id {
         fail("The window at the point is \(top[kCGWindowOwnerName as String] ?? "?") \(number(top)), not \(id)")
     }

@@ -112,6 +112,11 @@ unexpected.
   The one exception is harness-computer-use's purple border (ADR-0009), at the screen-saver
   layer (1000) over every app, which lets clicks through. macOS reports its program's name cut
   short to 32 characters, so the guard matches the start of it with the border's title.
+- While a notification banner shows, from any app, Notification Center holds a transparent
+  window the size of the screen at layer 21, gone about 4 s after the banner appeared; the
+  click guard read it as covering the point and refused (main Mac, macOS 26, 2026-11-13). The
+  guard now waits up to 10 s for it to go before it checks the point, and refuses after that.
+  harness-computer-use's own notification at the end of a run brings it up too.
 - While the remote Mac's display sleeps, `screencapture -l` fails with "could not create image from
   window", and the session reports the screen locked until the display wakes.
 - A Live started while the display slept never redrew its window: with the LOM at 2 tracks,
