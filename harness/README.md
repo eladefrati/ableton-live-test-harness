@@ -108,7 +108,8 @@ Node 18 or later. See [ADR-0001](../docs/adr/0001-fork-abletonosc.md) for the de
   notification name a check in `tests/live/` as
   `tests/live/<check>.js`, another script by its file, and code run with `node -e` not at all.
   `openDeviceUi(live, {track, device, build})` takes the controls from the
-  `.amxd`; `ui.press(name)` or `ui.press(tabName, item)` clicks, and `ui.text([x, y, w, h])`
+  `.amxd`; `ui.press(name)` or `ui.press(tabName, item)` clicks, `ui.drag(name, {up, right})`
+  turns a control by dragging it that many points with the button down (ADR-0010), and `ui.text([x, y, w, h])`
   resolves with the lines shown in that part of the panel, in device units. A press looks
   for the panel again, brings Live to the front, and throws `DeviceUiError` without clicking
   unless the screen is unlocked, Live's main window is on top at the point and the Info View
@@ -129,7 +130,8 @@ Node 18 or later. See [ADR-0001](../docs/adr/0001-fork-abletonosc.md) for the de
   A plug-in's own window, where its editor opens (ADR-0008):
   `openPluginWindow(live, {track, device, size, controls})` selects the device and opens the
   window if it isn't open (through Accessibility, no pointer), and resolves with an object
-  whose `press(name)` clicks a control, `capture(file)` saves a PNG of the editor without
+  whose `press(name)` clicks a control, `drag(name, {up, right})` turns one (ADR-0010; mainly
+  what dragging is for, as Live's own devices are set over OSC), `capture(file)` saves a PNG of the editor without
   Live's title bar, and `close()` closes the window. `size` is the editor's `[w, h]` and
   `controls` is `{name: {x, y}}`, each control's centre, both in points from the editor's top
   left. Live shows the window only while it is in front with the display on, so `press` and
