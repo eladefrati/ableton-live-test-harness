@@ -126,6 +126,9 @@ unexpected.
   The one exception is harness-computer-use's purple border (ADR-0009), at the screen-saver
   layer (1000) over every app, which lets clicks through. macOS reports its program's name cut
   short to 32 characters, so the guard matches the start of it with the border's title.
+  A click's hover takes about 240 ms, and a window shown over the point in that time took the
+  click, so every click and drag checks again after its hover, before the button goes down
+  (remote Mac, 2026-11-13).
 - While a notification banner shows, from any app, Notification Center holds a transparent
   window the size of the screen at layer 21, gone about 4 s after the banner appeared; the
   click guard read it as covering the point and refused (main Mac, macOS 26, 2026-11-13). The

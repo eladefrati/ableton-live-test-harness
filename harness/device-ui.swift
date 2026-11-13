@@ -25,7 +25,8 @@
 //                                     (ADR-0010)
 //
 // hover, click and drag refuse, posting nothing, unless the screen is unlocked and <window> is
-// the topmost window at the point; the editor's commands also unless the point is inside the
+// the topmost window at the point, which a click and a drag check again after their hover,
+// before the button goes down; the editor's commands also unless the point is inside the
 // editor and the editor is the size given; a drag also unless it is at most MAX_DRAG points
 // either way and ends on a screen. Exits 1 with the reason on stderr if anything fails.
 
@@ -324,8 +325,8 @@ func editorPoint(_ title: String, _ x: Double, _ y: Double, _ size: CGSize) -> (
     return (id, CGPoint(x: editor.minX + x, y: editor.minY + y))
 }
 
-// To the point, checked on top before and after the hover: Live hides a plug-in's window
-// when it leaves the front.
+// To the point, checked on top before and after the hover: a window can come over the point
+// while the pointer travels, and Live hides a plug-in's window when it leaves the front.
 func aim(_ id: Int, _ point: CGPoint) {
     requireOnTop(id, point)
     hover(point)
@@ -369,8 +370,7 @@ case "hover":
 case "click":
     let (id, point) = pointer()
     requireUnlocked()
-    requireOnTop(id, point)
-    hover(point)
+    aim(id, point)
     press(point)
 case "plugin-window":
     guard arguments.count == 4, ["state", "open", "close"].contains(arguments[2])
