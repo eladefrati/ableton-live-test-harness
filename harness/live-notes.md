@@ -70,6 +70,11 @@ unexpected.
   "LFO Frequency" while the LFO's rate is in Hz. A click on a knob, with no drag, leaves its
   value alone; on Auto Filter's LFO or envelope knobs it switches the display's strip to
   that section (remote Mac, Live 12.4.25b1, 2026-11-11).
+- A chooser in a device's panel (Auto Filter's LFO Wave) opens its menu as a window of its
+  own over Live's, at window layer 101 (88 x 122 points), its rows read by text recognition
+  with each icon as a character or two ("w Wander"). The Info View names the chooser ("LFO
+  Waveform"), not the rows. Over Auto Filter's filter display, its frequency dot included, the
+  Info View reads only "Device" (remote Mac, Live 12.4.25b1, 2026-11-13).
 - After Escape closed a menu, the Info View stayed blank while the pointer moved within the
   control that had opened it (3 points); moved onto it from 15 points away, it named it again.
   `device-ui.swift`'s hover starts from there (remote Mac, Live 12.4.25b1, 2026-11-13).

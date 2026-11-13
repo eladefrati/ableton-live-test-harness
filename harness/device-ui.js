@@ -11,6 +11,7 @@
 //   await ui.press("Button");
 //   await ui.press("Tab", "B");            // one item of a live.tab
 //   await ui.drag("Knob", { up: 40 });     // turns a control: points with the button down (ADR-0010)
+//   await ui.choose("Menu", "Item");       // an item of the menu a control opens (ADR-0011)
 //   await ui.text([0, 0, 200, 100]);       // the text shown in part of the panel, device units
 //   await ui.capture("/path/to/device.png"); // the device, title bar and frame included
 //
@@ -330,6 +331,8 @@ const machine = {
   clickEditor: (title, x, y, [w, h]) => helper("click-editor", title, x, y, w, h),
   dragEditor: (title, x, y, [w, h], dx, dy) => helper("drag-editor", title, x, y, w, h, dx, dy),
   frontmost: () => mac.frontmostApp(),
+  // Escape to Live, which closes an open menu.
+  escape: () => mac.typeInLive("key code 53"),
   giveBack: (id) => mac.giveBackFront(id),
   // Crops a capture of the window, `width` points wide, to [x, y, w, h] in points.
   async captureRect(windowId, width, rect, file) {
@@ -361,6 +364,9 @@ async function permit(system) {
   }
   system.allowed = true;
 }
+
+// How long a menu takes to open after its click.
+const MENU_WAIT_MS = 2000;
 
 // The longest drag either way, in points (ADR-0010); device-ui.swift holds the same limit.
 const MAX_DRAG = 400;
@@ -435,6 +441,36 @@ class DeviceUi {
     const { window, x, y } = await this.aim(name);
     requireNotStopped(this.system);
     await this.system.drag(window, x, y, dx, dy);
+  }
+
+  // Opens the menu `name` and clicks its item `item`, confirmed by its text (ADR-0011): the
+  // menu's own window is read, and exactly one row must read `item`, or the menu is closed with
+  // Escape and nothing more is clicked.
+  async choose(name, item) {
+    const { window, x, y } = await this.aim(name);
+    requireNotStopped(this.system);
+    const before = new Set((await this.system.windows()).map((w) => w.id));
+    await this.system.click(window, x, y);
+    let menu;
+    for (const deadline = Date.now() + MENU_WAIT_MS; !menu; await sleep(150)) {
+      menu = (await this.system.windows()).find((w) => !before.has(w.id) && w.layer > 0);
+      if (!menu && Date.now() > deadline) throw new DeviceUiError(`No menu opened over ${name}. Not chosen`);
+    }
+    const { width, lines } = await this.system.read(menu.id);
+    const scale = width / menu.w;
+    // A row's icon is read as characters before its text.
+    const wanted = normalized(item);
+    const rows = lines.filter((line) => {
+      const text = normalized(line.text);
+      return text === wanted || text.endsWith(` ${wanted}`);
+    });
+    if (rows.length !== 1) {
+      await this.system.escape();
+      throw new DeviceUiError(`The menu over ${name} has ${rows.length} items reading "${item}" (it reads: ${lines.map((l) => l.text).join(", ")}). Not chosen`);
+    }
+    const row = rows[0];
+    requireNotStopped(this.system);
+    await this.system.click(menu.id, menu.x + menu.w / 2, menu.y + (row.y + row.h / 2) / scale);
   }
 
   // Puts the pointer on a control once the Info View names it, with Live in front, and

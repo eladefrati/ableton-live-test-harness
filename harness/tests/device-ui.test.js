@@ -543,3 +543,45 @@ test("after Stop on the pill, no drag", async () => {
   await assert.rejects(window.drag("Button", { up: 10 }), /stopped from its pill/);
   assert.equal(system.calls.filter((call) => call[0] === "drag").length, 1);
 });
+
+// A device whose menu control opens a window of its own, as a Live chooser does.
+function menuMachine(rows, { opens = true } = {}) {
+  const system = fakeMachine({ info: "Menu" });
+  const menu = { id: 9, title: "", layer: 101, x: 600, y: 900, w: 88, h: 122 };
+  let open = false;
+  Object.assign(system, {
+    windows: async () => (open ? [menu, { ...WINDOW, layer: 0 }] : [{ ...WINDOW, layer: 0 }]),
+    click: async (id, x, y) => { system.calls.push(["click", id, x, y]); if (id === 7 && opens) open = true; },
+    escape: async () => { system.calls.push("escape"); },
+  });
+  const read = system.read;
+  system.read = async (id) => (id === 9 ? { width: 176, lines: rows } : read(id));
+  return system;
+}
+
+const row = (text, y) => ({ text, x: 4, y, w: 160, h: 24, words: [] });
+const MENU_ROWS = [row("N Sine", 4), row("Saw", 34), row("MM Wander", 184), row("S & H", 214)];
+
+test("choose opens the menu after the Info View check and clicks the row reading the item", async () => {
+  const system = menuMachine(MENU_ROWS);
+  const ui = await openDeviceUi(fakeLive(), { track: 1, device: 1, controls: { Menu: { x: 10, y: 10, info: "Menu" } } }, system);
+  await ui.choose("Menu", "Wander");
+  assert.deepEqual(clicks(system).at(-1), ["click", 9, 600 + 88 / 2, 900 + (184 + 12) / 2]);
+  assert.equal(clicks(system).length, 2);
+});
+
+test("choose closes the menu and clicks nothing more when no row, or two, read the item", async () => {
+  for (const rows of [MENU_ROWS, [...MENU_ROWS, row("Wander", 244)]]) {
+    const system = menuMachine(rows);
+    const ui = await openDeviceUi(fakeLive(), { track: 1, device: 1, controls: { Menu: { x: 10, y: 10, info: "Menu" } } }, system);
+    await assert.rejects(ui.choose("Menu", rows === MENU_ROWS ? "Triangle" : "Wander"), /Not chosen/);
+    assert.equal(clicks(system).length, 1);
+    assert.equal(system.calls.at(-1), "escape");
+  }
+});
+
+test("choose refuses when no menu opens", async () => {
+  const system = menuMachine(MENU_ROWS, { opens: false });
+  const ui = await openDeviceUi(fakeLive(), { track: 1, device: 1, controls: { Menu: { x: 10, y: 10, info: "Menu" } } }, system);
+  await assert.rejects(ui.choose("Menu", "Wander"), /No menu opened/);
+});
