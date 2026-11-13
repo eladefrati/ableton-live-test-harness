@@ -136,7 +136,8 @@ unexpected.
   harness-computer-use's own notification at the end of a run brings it up too.
 - harness-computer-use's pill is a window of its own (title "harness-computer-use pill"), a
   non-activating panel that takes a click on its Stop without taking the front. Unlike the
-  glow, the click guard doesn't skip it: a point under the pill is refused.
+  glow, the click guard doesn't skip it: a point under the pill is refused, with an error
+  that names the pill.
 - While the remote Mac's display sleeps, `screencapture -l` fails with "could not create image from
   window", and the session reports the screen locked until the display wakes.
 - A Live started while the display slept never redrew its window: with the LOM at 2 tracks,

@@ -232,6 +232,12 @@ func isOverlay(_ window: [String: Any]) -> Bool {
         && (window[kCGWindowOwnerName as String] as? String ?? "").hasPrefix("computer-use-overlay")
 }
 
+// harness-computer-use's pill (ADR-0009), which takes clicks, so the guard doesn't skip it.
+func isPill(_ window: [String: Any]) -> Bool {
+    (window[kCGWindowName as String] as? String) == "harness-computer-use pill"
+        && (window[kCGWindowOwnerName as String] as? String ?? "").hasPrefix("computer-use-overlay")
+}
+
 // While a notification banner shows, from any app, Notification Center holds a transparent
 // window over the whole screen. Rather than guess whether the point is under the banner, the
 // guard waits for that window to go.
@@ -251,6 +257,7 @@ func requireOnTop(_ id: Int, _ point: CGPoint) {
     }
     guard let top else { fail("No window at the point") }
     if isNotificationCover(top) { fail("A notification has covered the screen for \(Int(NOTIFICATION_WAIT_SECONDS)) s") }
+    if isPill(top) { fail("The point is under harness-computer-use's pill") }
     if number(top) != id {
         fail("The window at the point is \(top[kCGWindowOwnerName as String] ?? "?") \(number(top)), not \(id)")
     }
