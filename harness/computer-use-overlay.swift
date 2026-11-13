@@ -18,8 +18,11 @@ let LIGHT_PURPLE = NSColor(srgbRed: 0.78, green: 0.66, blue: 1, alpha: 1)
 // The glow fades from the screen's edge over this many points, from this opacity at the edge.
 let GLOW_WIDTH = 140.0
 let GLOW_EDGE_ALPHA = 0.55
-// The pill naming the run sits this far above the bottom of the screen's usable area.
-let PILL_MARGIN = 28.0
+// The pill naming the run sits this far below the menu bar, at the top centre: over Live's
+// transport and the set's name, which the harness drives over OSC and doesn't click. It ends
+// 44 points below the menu bar, above the editor of a plug-in window Live opened 60 points
+// from the screen's top, whose editor starts at 79.
+let PILL_MARGIN = 6.0
 
 func fail(_ message: String) -> Never {
     FileHandle.standardError.write(Data((message + "\n").utf8))
@@ -119,9 +122,8 @@ func pill(on screen: NSScreen) -> NSPanel {
     stop.layer?.cornerRadius = 12
     let (height, pad, dot, gap) = (38.0, 16.0, 8.0, 10.0)
     let width = pad + dot + gap + text.frame.width + 14 + stop.frame.width + 7
-    let usable = screen.visibleFrame.minY - screen.frame.minY
     let panel = PillPanel(contentRect: NSRect(x: screen.frame.minX + (screen.frame.width - width) / 2,
-                                              y: screen.frame.minY + usable + PILL_MARGIN, width: width, height: height),
+                                              y: screen.visibleFrame.maxY - PILL_MARGIN - height, width: width, height: height),
                           styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
     panel.title = PILL_TITLE
     panel.isOpaque = false
