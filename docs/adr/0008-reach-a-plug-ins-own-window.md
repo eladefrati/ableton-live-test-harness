@@ -26,7 +26,7 @@ nothing at all).
    with an Accessibility action, only when its value is not already the state wanted. No pointer
    moves. Exactly one device of that name must be shown, or it refuses.
 2. **Find it by its title,** `<device>/<track>`, as exactly one of Live's windows; the editor is
-   the window's Accessibility group named for the device, Live's title bar excluded.
+   the window's one Accessibility group, Live's title bar excluded.
 3. **Wake the display and bring Live to the front** before capturing or clicking, since the
    window is on screen only then. A capture gives the front back to the app that had it.
 4. **Click at points measured in the editor,** in points from its top left, given with the
