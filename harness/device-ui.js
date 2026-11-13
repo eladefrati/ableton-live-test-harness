@@ -707,5 +707,5 @@ async function openPluginWindow(live, { track, device, size, controls = {} }, sy
 
 module.exports = {
   DeviceUiError, openDeviceUi, openPluginWindow, captureWindow, liveWindows, readControls, readPanelWidth, pointControls, controlPoint,
-  findTitle, infoTitle, readClickHost, runName, runScript, MEASURED_DEVICES,
+  findTitle, infoTitle, readClickHost, runName, runScript, MEASURED_DEVICES, machine, POINTER_CALLS,
 };

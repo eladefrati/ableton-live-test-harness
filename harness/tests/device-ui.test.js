@@ -7,7 +7,7 @@ const os = require("node:os");
 const path = require("node:path");
 const {
   DeviceUiError, openDeviceUi, readControls, readPanelWidth, pointControls, controlPoint, findTitle, infoTitle, readClickHost, runName, runScript,
-  MEASURED_DEVICES,
+  MEASURED_DEVICES, machine, POINTER_CALLS,
 } = require("../device-ui.js");
 
 const chunk = (tag, payload) => {
@@ -256,6 +256,16 @@ test("Stop between a press's hover and its click stops the click", async () => {
   const ui = await open(system);
   await assert.rejects(ui.press("Button"), /stopped from its pill/);
   assert.equal(clicks(system).length, 0);
+});
+
+// The machine's calls that never move the pointer or press its button, so need no permit.
+const OTHER_CALLS = [
+  "hostname", "clickHost", "ask", "showComputerUse", "wake", "focus", "window", "windows", "capture", "read", "captureCrop",
+  "pluginWindow", "editor", "frontmost", "escape", "liveInFront", "typeEscape", "giveBack", "captureRect",
+];
+
+test("every call of the machine is either one that takes the pointer, which passes permit, or listed as one that never does", () => {
+  assert.deepEqual(Object.keys(machine).sort(), [...POINTER_CALLS, ...OTHER_CALLS].sort());
 });
 
 test("the click host shows no border, and a border that fails to show doesn't stop the clicks", async () => {
