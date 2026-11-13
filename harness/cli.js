@@ -23,8 +23,9 @@
 //                                         needs no OSC either
 //   node harness/cli.js plugin-window <track> <device> <png>
 //                                         opens the plug-in's own window if it isn't open and
-//                                         saves a picture of its editor (ADR-0008); brings Live
-//                                         to the front while it captures
+//                                         saves a picture of its editor (ADR-0008), printing the
+//                                         editor's size in points; brings Live to the front
+//                                         while it captures
 //
 // Arguments: "12" is an int, "12.0" a float, true/false booleans, anything else a string.
 
@@ -78,8 +79,8 @@ async function run(argv) {
         const [track, device] = args.slice(0, 2).map(Number);
         if (!Number.isInteger(track) || !Number.isInteger(device) || !args[2]) throw new Error(USAGE);
         const window = await openPluginWindow(live, { track, device });
-        await window.capture(args[2]);
-        return { file: args[2], window: window.title };
+        const editor = await window.capture(args[2]);
+        return { file: args[2], window: window.title, editor };
       }
       default: throw new Error(USAGE);
     }

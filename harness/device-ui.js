@@ -27,7 +27,8 @@
 //   const editor = await openPluginWindow(live, { track, device, size: [400, 120],
 //     controls: { Button: { x: 100, y: 40 } } });
 //   await editor.press("Button");
-//   await editor.capture("/path/to/editor.png");   // the editor, without Live's title bar
+//   await editor.capture("/path/to/editor.png");   // the editor, without Live's title bar;
+//                                                  // resolves with its size: { w, h }
 //   await editor.close();
 
 const fs = require("node:fs");
@@ -493,7 +494,8 @@ class PluginWindow {
   }
 
   // Saves a picture of the editor, without Live's title bar, to `file` (PNG), then gives the
-  // front back to the app that had it.
+  // front back to the app that had it. Resolves with the editor's size in points, { w, h }:
+  // the size a press needs.
   async capture(file) {
     await this.system.wake();
     const before = await this.system.frontmost().catch(() => null);
@@ -501,6 +503,7 @@ class PluginWindow {
       const window = await this.locate();
       const { editor } = window;
       await this.system.captureRect(window.id, window.w, [editor.x - window.x, editor.y - window.y, editor.w, editor.h], file);
+      return { w: editor.w, h: editor.h };
     } finally {
       if (before) await this.system.giveBack(before).catch(() => {});
     }

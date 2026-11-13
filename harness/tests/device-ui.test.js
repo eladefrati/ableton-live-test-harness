@@ -423,10 +423,10 @@ test("no press without a size, on an unknown control, or when the person at anot
   assert.equal(clicks(system).length, 0);
 });
 
-test("capture crops to the editor, in points from the window's corner, and gives the front back", async () => {
+test("capture crops to the editor, in points from the window's corner, gives the front back and resolves with the size", async () => {
   const system = fakePluginMachine();
   const window = await openPluginWindow(pluginLive(), PLUGIN, system);
-  await window.capture("/out/editor.png");
+  assert.deepEqual(await window.capture("/out/editor.png"), { w: 400, h: 120 });
   assert.deepEqual(system.calls.slice(-2), [["capture", 11, 400, [0, 19, 400, 120], "/out/editor.png"], ["give back", "com.example.terminal"]]);
 });
 
