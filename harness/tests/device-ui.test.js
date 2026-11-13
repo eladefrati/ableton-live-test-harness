@@ -6,7 +6,7 @@ const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 const {
-  DeviceUiError, openDeviceUi, readControls, readPanelWidth, pointControls, controlPoint, findTitle, infoTitle, readClickHost, runName,
+  DeviceUiError, openDeviceUi, readControls, readPanelWidth, pointControls, controlPoint, findTitle, infoTitle, readClickHost, runName, runScript,
   MEASURED_DEVICES,
 } = require("../device-ui.js");
 
@@ -254,9 +254,18 @@ test("with no click host set, every machine asks", async () => {
   assert.equal(asked, 1);
 });
 
-test("runName names a project's check from tests/live, and any other script by its file", () => {
+test("runName names a project's check from tests/live, any other script by its file, and inline code not at all", () => {
   assert.equal(runName("/a/repo/tests/live/sub/check.js"), "tests/live/sub/check.js");
   assert.equal(runName("/a/repo/harness/cli.js"), "cli.js");
+  assert.equal(runName(null), null);
+});
+
+test("runScript is null for code given with -e or -p, whatever argument follows it", () => {
+  assert.equal(runScript([], ["node", "/a/check.js"]), "/a/check.js");
+  assert.equal(runScript(["-e"], ["node", "/tmp/all"]), null);
+  assert.equal(runScript(["--eval=1"], ["node"]), null);
+  assert.equal(runScript(["-p"], ["node", "x"]), null);
+  assert.equal(runScript(["--enable-source-maps"], ["node", "/a/check.js"]), "/a/check.js");
 });
 
 test("the click host is read from local.json; no file or no key is none", () => {

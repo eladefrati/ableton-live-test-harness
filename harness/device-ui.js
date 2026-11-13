@@ -230,8 +230,16 @@ function readClickHost(file = LOCAL) {
 // How long the dialog asking to click waits for an answer (ADR-0006).
 const ASK_SECONDS = 120;
 
-// The running script as the dialog names it: tests/live/<name> for a project's check.
-function runName(script = process.argv[1] || "node") {
+// The script node was started with, or null for code given inline (node -e or -p), where
+// process.argv[1] is the first argument passed to that code.
+function runScript(execArgv = process.execArgv, argv = process.argv) {
+  return execArgv.some((arg) => /^(-e|-p|--eval|--print)(=|$)/.test(arg)) ? null : argv[1] || null;
+}
+
+// The running script as harness-computer-use names it: tests/live/<name> for a project's
+// check, the file's name for another script, null for inline code.
+function runName(script = runScript()) {
+  if (!script) return null;
   const location = checkLocation(script);
   return location ? `tests/live/${location.name}` : path.basename(script);
 }
@@ -239,12 +247,12 @@ function runName(script = process.argv[1] || "node") {
 // Asks the person at this Mac whether the run may click; true only for Allow. Don't Allow is
 // the cancel button, which osascript reports as error -128.
 async function askToClick(script) {
-  const text = `${script} wants to click in Live on this Mac. It moves the pointer until the check ends, `
-    + "while a purple border shows around the screen.";
+  const text = `harness-computer-use wants to click in Live on this Mac${script ? ` for ${script}` : ""}. `
+    + "It moves the pointer until the run ends, while a purple glow shows around the screen.";
   const dialog = [
     "on run argv",
     "  activate",
-    '  display dialog (item 1 of argv) with title "Live test harness" buttons {"Don\'t Allow", "Allow"} '
+    '  display dialog (item 1 of argv) with title "harness-computer-use" buttons {"Don\'t Allow", "Allow"} '
       + `default button "Don't Allow" cancel button "Don't Allow" giving up after ${ASK_SECONDS}`,
     "end run",
   ].flatMap((line) => ["-e", line]);
@@ -264,7 +272,8 @@ async function askToClick(script) {
 const OVERLAY_SOURCE = path.join(__dirname, "computer-use-overlay.swift");
 async function showComputerUse() {
   const binary = await tools.helperBinary(OVERLAY_SOURCE);
-  const overlay = spawn(binary, [String(process.pid), runName()], { detached: true, stdio: "ignore" });
+  const run = runName();
+  const overlay = spawn(binary, [String(process.pid), ...(run ? [run] : [])], { detached: true, stdio: "ignore" });
   overlay.on("error", (error) => console.error(`warn harness-computer-use couldn't show its border: ${error.message}`));
   overlay.unref();
 }
@@ -549,5 +558,5 @@ async function openPluginWindow(live, { track, device, size, controls = {} }, sy
 
 module.exports = {
   DeviceUiError, openDeviceUi, openPluginWindow, captureWindow, liveWindows, readControls, readPanelWidth, pointControls, controlPoint,
-  findTitle, infoTitle, readClickHost, runName, MEASURED_DEVICES,
+  findTitle, infoTitle, readClickHost, runName, runScript, MEASURED_DEVICES,
 };
