@@ -17,10 +17,12 @@ at the Mac doesn't know when the mouse is theirs again.
 
 ## Decision
 
-1. **A purple border around every screen while a run holds the mouse,** with a label naming the
-   run, from Allow until the run's process ends, then a notification that the mouse is free. A
-   program of its own (`computer-use-overlay.swift`) draws it and watches the run's process, so
-   it goes also when the run crashes or is killed. The dialog says the border will show.
+1. **A purple border around every screen while a run holds the mouse,** a soft glow in from the
+   edges that slowly breathes, with a frosted pill at the bottom naming harness-computer-use and
+   the run, from Allow until the run's process ends, then a notification that the mouse is free.
+   A program of its own (`computer-use-overlay.swift`) draws it and watches the run's process,
+   so it goes also when the run crashes or is killed. The dialog and the notification are titled
+   harness-computer-use, and the dialog says the glow will show.
 2. **Only where the run asked.** The click host doesn't ask, and no one watches it.
 3. **The click guard skips the border.** Its windows cover the screen above every app and let
    every click through; the check that the window aimed at is topmost at the point (ADR-0004,

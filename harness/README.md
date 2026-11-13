@@ -101,8 +101,10 @@ Node 18 or later. See [ADR-0001](../docs/adr/0001-fork-abletonosc.md) for the de
   On the machine `local.json` names as `clickHost` it clicks at once; on any other, a run's
   first press shows a dialog, and the run clicks only after Allow; Don't Allow or no answer
   in 2 minutes throws `DeviceUiError` (ADR-0006). From Allow until the run's process ends, a
-  purple border around the screen, labelled with the run, shows that the run may take the
-  pointer; a notification says when it has ended (`computer-use-overlay.swift`, ADR-0009).
+  breathing purple glow in from the screen's edges, with a pill naming the run, shows that the
+  run may take the pointer; a notification says when it has ended (`computer-use-overlay.swift`,
+  ADR-0009). The dialog, the pill and the notification name a check in `tests/live/` as
+  `tests/live/<check>.js`, another script by its file, and code run with `node -e` not at all.
   `openDeviceUi(live, {track, device, build})` takes the controls from the
   `.amxd`; `ui.press(name)` or `ui.press(tabName, item)` clicks, and `ui.text([x, y, w, h])`
   resolves with the lines shown in that part of the panel, in device units. A press looks
