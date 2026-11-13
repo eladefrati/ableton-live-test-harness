@@ -27,9 +27,9 @@
 // hover, click and drag refuse, posting nothing, unless the screen is unlocked and <window> is
 // the topmost window at the point, which a click and a drag check again after their hover,
 // before the button goes down; the editor's commands also unless the point is inside the
-// editor and the editor is the size given; a drag also unless it moves at least 1 point, at
-// most MAX_DRAG either way, and ends on a screen. Exits 1 with the reason on stderr if
-// anything fails.
+// editor and the editor is the size given; a drag also unless it moves at least 1 point on
+// its longer axis, at most MAX_DRAG on either, and ends on a screen. Exits 1 with the reason
+// on stderr if anything fails.
 
 import ApplicationServices
 import Foundation
@@ -278,10 +278,10 @@ func post(_ type: CGEventType, _ point: CGPoint) { mouseEvent(type, point).post(
 let MAX_DRAG = 400.0
 
 // Refuses a drag from `point` by `delta`, before any event is posted, unless it moves at least
-// 1 point, at most MAX_DRAG either way, and ends on a screen.
+// 1 point on its longer axis, at most MAX_DRAG on either, and ends on a screen.
 func requireDrag(_ point: CGPoint, _ delta: CGVector) {
     guard abs(delta.dx) <= MAX_DRAG, abs(delta.dy) <= MAX_DRAG, max(abs(delta.dx), abs(delta.dy)) >= 1
-    else { fail("A drag moves between 1 and \(Int(MAX_DRAG)) points either way, not \(delta.dx), \(delta.dy)") }
+    else { fail("A drag moves at least 1 point on its longer axis and at most \(Int(MAX_DRAG)) on either, not \(delta.dx), \(delta.dy)") }
     let end = CGPoint(x: point.x + delta.dx, y: point.y + delta.dy)
     var count: UInt32 = 0
     guard CGGetDisplaysWithPoint(end, 0, nil, &count) == .success, count > 0 else { fail("A drag to \(end) ends off screen") }

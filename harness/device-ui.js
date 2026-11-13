@@ -407,11 +407,11 @@ function rowReads(text, item) {
 const MAX_DRAG = 400;
 
 // { up, right } in points as the helper's [dx, dy] (right, down), refused before anything
-// moves when it is under 1 point or too long.
+// moves when it is under 1 point on its longer axis or over MAX_DRAG on either.
 function dragDistance({ up = 0, right = 0 } = {}) {
   const ok = (n) => Number.isFinite(n) && Math.abs(n) <= MAX_DRAG;
   if (!ok(up) || !ok(right) || Math.max(Math.abs(up), Math.abs(right)) < 1) {
-    throw new DeviceUiError(`A drag needs { up, right } in points, at least 1 one way and at most ${MAX_DRAG} either way. Not dragged`);
+    throw new DeviceUiError(`A drag needs { up, right } in points, at least 1 on the longer axis and at most ${MAX_DRAG} on either. Not dragged`);
   }
   return [right, -up];
 }

@@ -523,7 +523,7 @@ test("a drag that is under 1 point or too long is refused before the pointer mov
   const ui = await open(system);
   for (const distance of [{}, { up: 0, right: 0 }, { up: 401 }, { right: -500 }, { up: Number.NaN },
     { up: 0.4 }, { right: -0.9 }, { up: -1e-15 }, { up: 0.5, right: 0.5 }]) {
-    await assert.rejects(ui.drag("Button", distance), /Not dragged/);
+    await assert.rejects(ui.drag("Button", distance), /at least 1 on the longer axis and at most 400 on either\. Not dragged/);
   }
   assert.equal(system.calls.length, 0);
 });
@@ -669,6 +669,6 @@ const hasDeveloperTools = (() => {
 test("the helper refuses a drag under 1 point", { skip: !hasDeveloperTools && "no developer tools", timeout: 300000 }, async () => {
   const helper = await tools.helperBinary(path.join(__dirname, "..", "device-ui.swift"));
   for (const [dx, dy] of [[0, -1e-15], [0, -0.4], [0.9, 0], [0.5, -0.5]]) {
-    await assert.rejects(tools.run(helper, ["drag", -1, 100, 100, dx, dy]), /between 1 and 400 points/);
+    await assert.rejects(tools.run(helper, ["drag", -1, 100, 100, dx, dy]), /at least 1 point on its longer axis and at most 400 on either/);
   }
 });
