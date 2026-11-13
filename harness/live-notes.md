@@ -100,7 +100,8 @@ unexpected.
   the click, and again after the hover.
 - A click on a JUCE plug-in's editor goes in at once, with Live's main window the key one:
   one click on a generic editor's toggle turned its parameter on, a second off, read back
-  over the LOM. Accessibility showed the generic editor's slider and toggle without their
+  over the LOM; on the main Mac, clicks on three keys of a custom editor's segmented control
+  each set its choice parameter to the key clicked. Accessibility showed the generic editor's slider and toggle without their
   labels, so it can't confirm the control under the pointer as the Info View does in the
   device view (ADR-0008); a plug-in's own components name themselves only if the plug-in
   gives them names (not tried).

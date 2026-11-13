@@ -131,6 +131,12 @@ Node 18 or later. See [ADR-0001](../docs/adr/0001-fork-abletonosc.md) for the de
   `size`, the point inside it, and the plug-in's window on top at the point. There is no Info
   View to confirm the control: a moved point clicks another control of the plug-in, so take
   the evidence from Live. A press needs `size`; opening and capturing don't.
+  To measure a plug-in's points: `node harness/cli.js plugin-window <track> <device> <png>`
+  prints the editor's size (`editor: {w, h}`, the `size` to give) and saves the editor. Take
+  each control's centre from the plug-in's own layout code, whose coordinates are these
+  points when the editor isn't scaled, or from that picture: its pixels are points times the
+  display's scale, its width in pixels divided by `editor.w`. Then press each control once and
+  check that the parameter Live reads is the one meant, as a check does.
 - `doctor.js`: read-only check that Live is ready to be driven; run it first. What it
   checks and what to do about each line: the
   [`verify-ableton` skill](../skills/verify-ableton/SKILL.md).
@@ -300,6 +306,10 @@ must stay off there: waking doesn't reliably dismiss it.
 - For `device-ui.js` and `cli.js windows` and `capture`: Screen Recording for the terminal
   app, to capture Live's window; the two `cli.js` commands also need the Automation
   permission above.
+- For a plug-in's own window (`openPluginWindow`, `cli.js plugin-window`): Accessibility for
+  the terminal app too, and a Live that names its device view over Accessibility, as Live
+  12.4 does (seen in 12.4.25b1; earlier versions not tried). Without it the window isn't
+  opened, and the error says what it didn't find.
 - Live in front while `saveSetAs()` types into it: keystrokes go to the frontmost app. It
   brings Live forward itself, types nothing if Live doesn't come, and puts the app that was
   in front back afterwards. Don't type in another app meanwhile. Menu commands
