@@ -65,6 +65,7 @@ function fakeMachine({ info = "Button", titles = [line(`> ${TITLE}`, 1800, 1400)
     captureCrop: async (id, rect, file) => { calls.push(["crop", id, rect, file]); },
     hover: async (id, x, y) => { calls.push(["hover", id, x, y]); },
     click: async (id, x, y) => { calls.push(["click", id, x, y]); },
+    drag: async (id, x, y, dx, dy) => { calls.push(["drag", id, x, y, dx, dy]); },
   };
 }
 
@@ -435,6 +436,7 @@ function fakePluginMachine({ open = false, shown = [EDITOR] } = {}) {
       return next;
     },
     clickEditor: async (title, x, y, size) => { calls.push(["click", title, x, y, size]); },
+    dragEditor: async (title, x, y, size, dx, dy) => { calls.push(["drag", title, x, y, size, dx, dy]); },
     frontmost: async () => "com.example.terminal",
     giveBack: async (id) => { calls.push(["give back", id]); },
     captureRect: async (id, width, rect, file) => { calls.push(["capture", id, width, rect, file]); },
@@ -498,4 +500,46 @@ test("close asks the helper to close the window", async () => {
   const window = await openPluginWindow(pluginLive(), PLUGIN, system);
   await window.close();
   assert.deepEqual(system.calls.at(-1), ["button", "close", "Plugin"]);
+});
+
+test("a drag goes from the control's point after the Info View check, up as negative dy", async () => {
+  const system = fakeMachine();
+  const ui = await open(system);
+  await ui.drag("Button", { up: 40 });
+  const point = [7, 0 + 1800 / 2 + 15 - 17 + 230, 25 + 1400 / 2 + 14 + 80];
+  assert.deepEqual(system.calls, ["focus", ["hover", ...point], "focus", ["drag", ...point, 0, -40]]);
+});
+
+test("no drag when the Info View names something else", async () => {
+  const system = fakeMachine({ info: "Something" });
+  const ui = await open(system);
+  await assert.rejects(ui.drag("Button", { up: 40 }), /Not clicked/);
+  assert.equal(system.calls.some((call) => call[0] === "drag"), false);
+});
+
+test("a drag that is no drag or too long is refused before the pointer moves", async () => {
+  const system = fakeMachine();
+  const ui = await open(system);
+  for (const distance of [{}, { up: 0, right: 0 }, { up: 401 }, { right: -500 }, { up: Number.NaN }]) {
+    await assert.rejects(ui.drag("Button", distance), /Not dragged/);
+  }
+  assert.equal(system.calls.length, 0);
+});
+
+test("a drag in a plug-in's editor goes to the helper with the point, the size and right, down", async () => {
+  const system = fakePluginMachine();
+  const window = await openPluginWindow(pluginLive(), PLUGIN, system);
+  await window.drag("Button", { right: -60, up: 10 });
+  assert.deepEqual(system.calls.at(-1), ["drag", "Plugin/1-MIDI", 100, 40, [400, 120], -60, -10]);
+});
+
+test("after Stop on the pill, no drag", async () => {
+  const system = fakePluginMachine();
+  let stop;
+  Object.assign(system, { hostname: () => "another-mac", ask: async () => true, showComputerUse: async (onStop) => { stop = onStop; } });
+  const window = await openPluginWindow(pluginLive(), PLUGIN, system);
+  await window.drag("Button", { up: 10 });
+  stop();
+  await assert.rejects(window.drag("Button", { up: 10 }), /stopped from its pill/);
+  assert.equal(system.calls.filter((call) => call[0] === "drag").length, 1);
 });

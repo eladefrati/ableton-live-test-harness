@@ -70,6 +70,11 @@ unexpected.
   "LFO Frequency" while the LFO's rate is in Hz. A click on a knob, with no drag, leaves its
   value alone; on Auto Filter's LFO or envelope knobs it switches the display's strip to
   that section (remote Mac, Live 12.4.25b1, 2026-11-11).
+- Posted drags turn controls like the mouse (ADR-0010): on Auto Filter's Frequency knob, 40
+  points down went from 10.0 kHz to 20.0 Hz and 40 up to 20.0 kHz, the ends of its range, so a
+  Live knob turns through its whole range in under 40 points; on a JUCE editor's horizontal
+  slider, 100 points left took it from 1.00 to 0.34 and a drag right back to its end (remote
+  Mac, Live 12.4.25b1, 2026-11-13).
 - While a Max device's Map button waits for a target, the Info View still names the knob
   under the pointer on a device on another track, and the click makes the mapping: Auto
   Filter's Frequency, Dry/Wet and Resonance, with `settleMs` 1000 (remote Mac, 2026-11-11).

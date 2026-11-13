@@ -10,6 +10,7 @@
 //   const ui = await openDeviceUi(live, { track, device, build: "/path/to/Device.amxd" });
 //   await ui.press("Button");
 //   await ui.press("Tab", "B");            // one item of a live.tab
+//   await ui.drag("Knob", { up: 40 });     // turns a control: points with the button down (ADR-0010)
 //   await ui.text([0, 0, 200, 100]);       // the text shown in part of the panel, device units
 //   await ui.capture("/path/to/device.png"); // the device, title bar and frame included
 //
@@ -27,6 +28,7 @@
 //   const editor = await openPluginWindow(live, { track, device, size: [400, 120],
 //     controls: { Button: { x: 100, y: 40 } } });
 //   await editor.press("Button");
+//   await editor.drag("Button", { right: -60 });   // a horizontal slider; { up: 40 } a knob
 //   await editor.capture("/path/to/editor.png");   // the editor, without Live's title bar;
 //                                                  // resolves with its size: { w, h }
 //   await editor.close();
@@ -320,11 +322,13 @@ const machine = {
   },
   hover: (windowId, x, y) => helper("hover", windowId, x, y),
   click: (windowId, x, y) => helper("click", windowId, x, y),
+  drag: (windowId, x, y, dx, dy) => helper("drag", windowId, x, y, dx, dy),
   // A plug-in's window (ADR-0008): its button's state, opened or closed; where it and its
   // editor are; a click in the editor.
   pluginWindow: async (action, device) => JSON.parse(await helper("plugin-window", action, device)).open,
   editor: async (title) => JSON.parse(await helper("plugin-editor", title)),
   clickEditor: (title, x, y, [w, h]) => helper("click-editor", title, x, y, w, h),
+  dragEditor: (title, x, y, [w, h], dx, dy) => helper("drag-editor", title, x, y, w, h, dx, dy),
   frontmost: () => mac.frontmostApp(),
   giveBack: (id) => mac.giveBackFront(id),
   // Crops a capture of the window, `width` points wide, to [x, y, w, h] in points.
@@ -356,6 +360,19 @@ async function permit(system) {
     await system.showComputerUse(stop).catch((error) => console.error(`warn harness-computer-use couldn't show its border: ${error.message}`));
   }
   system.allowed = true;
+}
+
+// The longest drag either way, in points (ADR-0010); device-ui.swift holds the same limit.
+const MAX_DRAG = 400;
+
+// { up, right } in points as the helper's [dx, dy] (right, down), refused before anything
+// moves when it is no drag or too long.
+function dragDistance({ up = 0, right = 0 } = {}) {
+  const ok = (n) => Number.isFinite(n) && Math.abs(n) <= MAX_DRAG;
+  if (!ok(up) || !ok(right) || (up === 0 && right === 0)) {
+    throw new DeviceUiError(`A drag needs { up, right } in points, at most ${MAX_DRAG} either way and not both 0. Not dragged`);
+  }
+  return [right, -up];
 }
 
 // After Stop on the pill (ADR-0009), every press of the run throws, before its hover and again
@@ -406,6 +423,23 @@ class DeviceUi {
   }
 
   async press(name, item) {
+    const { window, x, y } = await this.aim(name, item);
+    requireNotStopped(this.system);
+    await this.system.click(window, x, y);
+  }
+
+  // Drags a control by { up, right } points with the button down, after the same checks as a
+  // press (ADR-0010): a knob turns with up, a horizontal slider with right.
+  async drag(name, distance) {
+    const [dx, dy] = dragDistance(distance);
+    const { window, x, y } = await this.aim(name);
+    requireNotStopped(this.system);
+    await this.system.drag(window, x, y, dx, dy);
+  }
+
+  // Puts the pointer on a control once the Info View names it, with Live in front, and
+  // resolves with the window and the point, for the click or the drag that follows.
+  async aim(name, item) {
     const control = this.controls.get(name);
     if (!control) throw new DeviceUiError(`${this.title} has no control named ${name}`);
     if (!control.info) throw new DeviceUiError(`${name} has no Info View title to confirm (annotation_name, or info for a point). Not clicked`);
@@ -424,8 +458,7 @@ class DeviceUi {
       throw new DeviceUiError(`The Info View reads "${shown}" over ${name}, expected "${control.info}" (is it visible?). Not clicked`);
     }
     await this.system.focus();
-    requireNotStopped(this.system);
-    await this.system.click(at.window.id, x, y);
+    return { window: at.window.id, x, y };
   }
 
   // The lines of text shown inside a rectangle of the panel, [x, y, w, h] in device units.
@@ -523,14 +556,28 @@ class PluginWindow {
   // Clicks a control. The helper clicks only if the editor is this.size, the point inside it
   // and the window topmost there, checked just before the click.
   async press(name) {
+    const [x, y] = await this.aim(name);
+    await this.system.clickEditor(this.title, x, y, this.size);
+  }
+
+  // Drags a control by { up, right } points with the button down (ADR-0010). The helper checks
+  // the start as for a click.
+  async drag(name, distance) {
+    const [dx, dy] = dragDistance(distance);
+    const [x, y] = await this.aim(name);
+    await this.system.dragEditor(this.title, x, y, this.size, dx, dy);
+  }
+
+  // The control's point in the editor, once the run may click and Live is in front.
+  async aim(name) {
     const control = this.controls.get(name);
     if (!control) throw new DeviceUiError(`${this.title} has no control named ${name}`);
     if (!this.size) throw new DeviceUiError(`The size of ${this.name}'s editor isn't known: give openPluginWindow a size. Not clicked`);
-    const [x, y] = controlPoint(control);
+    const point = controlPoint(control);
     await permit(this.system);
     await this.locate();
     requireNotStopped(this.system);
-    await this.system.clickEditor(this.title, x, y, this.size);
+    return point;
   }
 
   // Saves a picture of the editor, without Live's title bar, to `file` (PNG), then gives the

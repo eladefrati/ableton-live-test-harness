@@ -18,10 +18,16 @@
 //   device-ui click-editor <title> <x> <y> <w> <h>
 //                                     clicks the point <x> <y> of the plug-in window's editor,
 //                                     in points from its top left, if the editor is <w> x <h>
+//   device-ui drag <window> <x> <y> <dx> <dy>
+//   device-ui drag-editor <title> <x> <y> <w> <h> <dx> <dy>
+//                                     as click and click-editor, but moves the pointer by
+//                                     <dx>, <dy> points (right, down) with the button down
+//                                     (ADR-0010)
 //
-// hover and click refuse, posting nothing, unless the screen is unlocked and <window> is the
-// topmost window at the point; click-editor also unless the point is inside the editor and
-// the editor is the size given. Exits 1 with the reason on stderr if anything fails.
+// hover, click and drag refuse, posting nothing, unless the screen is unlocked and <window> is
+// the topmost window at the point; the editor's commands also unless the point is inside the
+// editor and the editor is the size given; a drag also unless it is at most MAX_DRAG points
+// either way and ends on a screen. Exits 1 with the reason on stderr if anything fails.
 
 import ApplicationServices
 import Foundation
@@ -257,6 +263,44 @@ func post(_ type: CGEventType, _ point: CGPoint) {
     event.post(tap: .cghidEventTap)
 }
 
+// The longest drag either way, in points (ADR-0010).
+let MAX_DRAG = 400.0
+
+// The end of a drag from `point`, or a failure, before any event is posted.
+func dragEnd(_ point: CGPoint, _ delta: CGVector) -> CGPoint {
+    guard abs(delta.dx) <= MAX_DRAG, abs(delta.dy) <= MAX_DRAG, delta.dx != 0 || delta.dy != 0
+    else { fail("A drag moves between 1 and \(Int(MAX_DRAG)) points either way, not \(delta.dx), \(delta.dy)") }
+    let end = CGPoint(x: point.x + delta.dx, y: point.y + delta.dy)
+    var count: UInt32 = 0
+    guard CGGetDisplaysWithPoint(end, 0, nil, &count) == .success, count > 0 else { fail("A drag to \(end) ends off screen") }
+    return end
+}
+
+// Button down at `point`, one-point steps to `end`, button up there. Each drag event carries
+// its movement too, for controls that read how far the mouse moved.
+func drag(_ point: CGPoint, to end: CGPoint) {
+    post(.leftMouseDown, point)
+    usleep(70_000)
+    let steps = Int(max(abs(end.x - point.x), abs(end.y - point.y)).rounded(.up))
+    var last = point
+    for step in 1...steps {
+        let t = Double(step) / Double(steps)
+        let next = CGPoint(x: point.x + (end.x - point.x) * t, y: point.y + (end.y - point.y) * t)
+        guard let event = CGEvent(mouseEventSource: CGEventSource(stateID: .hidSystemState), mouseType: .leftMouseDragged,
+                                  mouseCursorPosition: next, mouseButton: .left)
+        else { fail("Cannot create a mouse event") }
+        event.setIntegerValueField(.mouseEventClickState, value: 1)
+        event.setIntegerValueField(.mouseEventDeltaX, value: Int64((next.x - last.x).rounded()))
+        event.setIntegerValueField(.mouseEventDeltaY, value: Int64((next.y - last.y).rounded()))
+        event.post(tap: .cghidEventTap)
+        last = next
+        usleep(8_000)
+    }
+    usleep(50_000)
+    post(.leftMouseUp, end)
+    usleep(100_000)
+}
+
 func press(_ point: CGPoint) {
     post(.leftMouseDown, point)
     usleep(70_000)
@@ -267,7 +311,9 @@ func press(_ point: CGPoint) {
 // Within this of a size counts as that size: Accessibility reports whole points.
 let SIZE_TOLERANCE = 0.5
 
-func clickEditor(_ title: String, _ x: Double, _ y: Double, _ size: CGSize) {
+// The plug-in window's id and the screen point of <x> <y> in its editor, if the editor is
+// `size` and the point inside it.
+func editorPoint(_ title: String, _ x: Double, _ y: Double, _ size: CGSize) -> (Int, CGPoint) {
     let (id, _, editor) = pluginEditor(title)
     if abs(editor.width - size.width) > SIZE_TOLERANCE || abs(editor.height - size.height) > SIZE_TOLERANCE {
         fail("The editor of \(title) is \(editor.width) x \(editor.height) points, not \(size.width) x \(size.height)")
@@ -275,12 +321,15 @@ func clickEditor(_ title: String, _ x: Double, _ y: Double, _ size: CGSize) {
     guard x > 0, y > 0, x < editor.width, y < editor.height else {
         fail("\(x), \(y) isn't inside the editor of \(title), \(editor.width) x \(editor.height) points")
     }
-    let point = CGPoint(x: editor.minX + x, y: editor.minY + y)
+    return (id, CGPoint(x: editor.minX + x, y: editor.minY + y))
+}
+
+// To the point, checked on top before and after the hover: Live hides a plug-in's window
+// when it leaves the front.
+func aim(_ id: Int, _ point: CGPoint) {
     requireOnTop(id, point)
     hover(point)
-    // Again after the hover: Live hides the window when it leaves the front.
     requireOnTop(id, point)
-    press(point)
 }
 
 // Two moves, because the Info View updates when the pointer moves, not when it arrives.
@@ -328,13 +377,32 @@ case "plugin-window":
 case "plugin-editor":
     guard arguments.count == 3 else { fail("usage: device-ui plugin-editor <title>") }
     printEditor(arguments[2])
-case "click-editor":
-    guard arguments.count == 7, let x = Double(arguments[3]), let y = Double(arguments[4]),
-          let w = Double(arguments[5]), let h = Double(arguments[6])
-    else { fail("usage: device-ui click-editor <title> <x> <y> <w> <h>") }
+case "click-editor", "drag-editor":
+    let numbers = arguments.dropFirst(3).compactMap { Double($0) }
+    let dragging = arguments[1] == "drag-editor"
+    guard arguments.count == (dragging ? 9 : 7), numbers.count == arguments.count - 3
+    else { fail("usage: device-ui click-editor <title> <x> <y> <w> <h> | drag-editor <title> <x> <y> <w> <h> <dx> <dy>") }
     requireUnlocked()
-    clickEditor(arguments[2], x, y, CGSize(width: w, height: h))
+    let (id, point) = editorPoint(arguments[2], numbers[0], numbers[1], CGSize(width: numbers[2], height: numbers[3]))
+    if dragging {
+        let end = dragEnd(point, CGVector(dx: numbers[4], dy: numbers[5]))
+        aim(id, point)
+        drag(point, to: end)
+    } else {
+        aim(id, point)
+        press(point)
+    }
+case "drag":
+    guard arguments.count == 7, let id = Int(arguments[2]), let x = Double(arguments[3]), let y = Double(arguments[4]),
+          let dx = Double(arguments[5]), let dy = Double(arguments[6])
+    else { fail("usage: device-ui drag <window> <x> <y> <dx> <dy>") }
+    let point = CGPoint(x: x, y: y)
+    let end = dragEnd(point, CGVector(dx: dx, dy: dy))
+    requireUnlocked()
+    aim(id, point)
+    drag(point, to: end)
 default:
     fail("usage: device-ui window | windows | text <png> | crop <png> <x> <y> <w> <h> <out> | hover <window> <x> <y> | click <window> <x> <y> | "
-        + "plugin-window state|open|close <device> | plugin-editor <title> | click-editor <title> <x> <y> <w> <h>")
+        + "plugin-window state|open|close <device> | plugin-editor <title> | click-editor <title> <x> <y> <w> <h> | "
+        + "drag <window> <x> <y> <dx> <dy> | drag-editor <title> <x> <y> <w> <h> <dx> <dy>")
 }
