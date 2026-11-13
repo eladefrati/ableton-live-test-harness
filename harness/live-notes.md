@@ -149,6 +149,16 @@ unexpected.
   non-activating panel that takes a click on its Stop without taking the front. Unlike the
   glow, the click guard doesn't skip it: a point under the pill is refused, with an error
   that names the pill.
+- A mouse event posted as the last thing a program does is lost: a button-up posted just
+  before exit left the button held in 3 of 3 runs, and with 100 ms between the post and the
+  exit it came up in 2 of 2. `device-ui.swift` waits 100 ms after a click's or a drag's
+  button-up (remote Mac, macOS 26, 2026-11-13).
+- The window server doesn't list a window an app has just ordered front until the app's run
+  loop has run: it was listed neither at once nor 30 ms later in 8 of 8 starts, and was by
+  the run loop's first timer, 50 to 70 ms after the loop started. A click posted in between
+  was refused with Live's window, the one under it, named as the window at the point.
+  `checks/pointer-target.swift` reports its window once it is listed (remote Mac, macOS 26,
+  2026-11-13).
 - After Stop on the pill, `choose` closes a menu it had opened only while Live is still in
   front, and doesn't bring Live there: a stopped run takes nothing more from the person, the
   front included. Escape typed with Live in front, and no activation, closed a chooser's menu

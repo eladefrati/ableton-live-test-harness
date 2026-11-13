@@ -229,6 +229,14 @@ Node 18 or later. See [ADR-0001](../docs/adr/0001-fork-abletonosc.md) for the de
   Places; `devices/make-example-transpose.js` regenerates the device.
 - `checks/save-reopen.js`: checks the save and reopen path. It replaces the open set with
   a new one saved in a temp folder; the file the set was opened from is untouched.
+- `checks/pointer-guards.js`: checks what `device-ui.swift` posts and what it refuses, with
+  real mouse events and no Live. Each case shows a window of its own
+  (`checks/pointer-target.swift`, which prints the button events it receives), runs the helper
+  against it, and compares the helper's exit status and error and the events the window
+  received: a click reaches the window; a window that comes over the point during a click's
+  hover gets no click; a point under harness-computer-use's pill is refused. It takes the
+  pointer, so it runs only on the click host and refuses on any other machine, posting
+  nothing. A case that leaves the button held releases it and fails.
 
 Project checks live in each project's repo, in `tests/live/`, and use this folder as a
 library by path. Checks of a MIDI device run on `device-checks.js`; checks of audio or a
@@ -244,6 +252,7 @@ node harness/checks/example-device-check.js  # a template for a project's check
 node harness/checks/example-transpose-check.js  # the same on device-checks.js (needs harness/devices in Places)
 node harness/checks/plugin-record.js      # the plug-in path, on AUDelay (replaces a set the harness opened)
 node harness/checks/plugin-set.js <name>  # a plug-in's built set against Live's own (replaces a set the harness opened)
+node harness/checks/pointer-guards.js     # what the click helper posts and refuses (Live not needed; on the click host only)
 node ~/dev/<repo>/tests/live/<check>.js              # a project's checks
 node ~/dev/<repo>/tests/live/<check>.js --keep       # leave its test tracks
 node ~/dev/<repo>/tests/live/<check>.js --tempo 97   # at another tempo (left so)

@@ -9,7 +9,11 @@ module needs an import in `abletonosc/__init__.py`, an entry in `HANDLERS` and a
 
 Before a commit that changes anything other than Markdown files, run
 `node --test harness/tests/*.test.js` (Live not needed, but a logged-in session is) and, with Live open,
-`node harness/checks/record-roundtrip.js`. A commit that changes how Live behaves
+`node harness/checks/record-roundtrip.js`. Before a commit that changes
+`harness/device-ui.swift` or `harness/computer-use-overlay.swift`, also run
+`node harness/checks/pointer-guards.js` on the click host (Live not needed): the unit tests
+run the helper's callers on fakes, so only this check sees what the helper posts and refuses.
+A commit that changes how Live behaves
 under the harness, or what the harness refuses, adds it to `harness/live-notes.md` in the same commit: the next reader reads that file, not
 code comments or commit messages.
 
