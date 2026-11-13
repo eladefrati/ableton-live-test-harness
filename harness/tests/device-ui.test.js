@@ -586,3 +586,16 @@ test("choose refuses when no menu opens", async () => {
   const ui = await openDeviceUi(fakeLive(), { track: 1, device: 1, controls: { Menu: { x: 10, y: 10, info: "Menu" } } }, system);
   await assert.rejects(ui.choose("Menu", "Wander"), /No menu opened/);
 });
+
+const openMenu = (system) => openDeviceUi(fakeLive(), { track: 1, device: 1, controls: { Menu: { x: 10, y: 10, info: "Menu" } } }, system);
+
+test("choose skips a row's icon, one word of one or two characters, and no other text before the item", async () => {
+  const refused = menuMachine(MENU_ROWS);
+  await assert.rejects((await openMenu(refused)).choose("Menu", "H"), /0 items reading "H"/);
+  assert.equal(clicks(refused).length, 1);
+  for (const [item, y] of [["Sine", 4], ["Wander", 184], ["S & H", 214]]) {
+    const system = menuMachine(MENU_ROWS);
+    await (await openMenu(system)).choose("Menu", item);
+    assert.equal(clicks(system).at(-1)[3], 900 + (y + 12) / 2);
+  }
+});

@@ -368,6 +368,17 @@ async function permit(system) {
 // How long a menu takes to open after its click.
 const MENU_WAIT_MS = 2000;
 
+// The longest word text recognition reads a menu row's icon as, in characters ("w Wander").
+const ICON_MAX = 2;
+
+// Whether a menu's row reads the item: as its whole text, or as its text after the row's icon.
+// Any other text before the item is another item ("S & H" doesn't read "H").
+function rowReads(text, item) {
+  const [row, wanted] = [normalized(text), normalized(item)];
+  const space = row.indexOf(" ");
+  return row === wanted || (space > 0 && space <= ICON_MAX && row.slice(space + 1) === wanted);
+}
+
 // The longest drag either way, in points (ADR-0010); device-ui.swift holds the same limit.
 const MAX_DRAG = 400;
 
@@ -458,12 +469,7 @@ class DeviceUi {
     }
     const { width, lines } = await this.system.read(menu.id);
     const scale = width / menu.w;
-    // A row's icon is read as characters before its text.
-    const wanted = normalized(item);
-    const rows = lines.filter((line) => {
-      const text = normalized(line.text);
-      return text === wanted || text.endsWith(` ${wanted}`);
-    });
+    const rows = lines.filter((line) => rowReads(line.text, item));
     if (rows.length !== 1) {
       await this.system.escape();
       throw new DeviceUiError(`The menu over ${name} has ${rows.length} items reading "${item}" (it reads: ${lines.map((l) => l.text).join(", ")}). Not chosen`);
