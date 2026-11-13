@@ -332,9 +332,11 @@ func aim(_ id: Int, _ point: CGPoint) {
     requireOnTop(id, point)
 }
 
-// Two moves, because the Info View updates when the pointer moves, not when it arrives.
+// Two moves, because the Info View updates when the pointer moves, not when it arrives. The
+// first is off the control: after Escape closed a menu, the Info View stayed blank while the
+// pointer moved within the control that opened it.
 func hover(_ point: CGPoint) {
-    post(.mouseMoved, CGPoint(x: point.x - 3, y: point.y - 1))
+    post(.mouseMoved, CGPoint(x: point.x - 15, y: point.y - 10))
     usleep(120_000)
     post(.mouseMoved, point)
     usleep(120_000)

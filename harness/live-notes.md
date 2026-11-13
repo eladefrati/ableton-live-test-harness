@@ -70,6 +70,9 @@ unexpected.
   "LFO Frequency" while the LFO's rate is in Hz. A click on a knob, with no drag, leaves its
   value alone; on Auto Filter's LFO or envelope knobs it switches the display's strip to
   that section (remote Mac, Live 12.4.25b1, 2026-11-11).
+- After Escape closed a menu, the Info View stayed blank while the pointer moved within the
+  control that had opened it (3 points); moved onto it from 15 points away, it named it again.
+  `device-ui.swift`'s hover starts from there (remote Mac, Live 12.4.25b1, 2026-11-13).
 - Posted drags turn controls like the mouse (ADR-0010): on Auto Filter's Frequency knob, 40
   points down went from 10.0 kHz to 20.0 Hz and 40 up to 20.0 kHz, the ends of its range, so a
   Live knob turns through its whole range in under 40 points; on a JUCE editor's horizontal
