@@ -209,12 +209,20 @@ func requireUnlocked() {
 
 // Every window on screen that can take a click, front to back: all layers, since a floating
 // window (a plug-in's, layer 3) or the menu bar covers Live's main window, but none from the
-// cursor's layer up, as the cursor is a window too and sits on the point after a hover.
+// cursor's layer up, as the cursor is a window too and sits on the point after a hover. Nor
+// harness-computer-use's own overlay (computer-use-overlay.swift, ADR-0009), which covers the
+// screen and lets every click through: its title, and its program's name, cut short as macOS
+// reports it.
 func clickableWindows() -> [[String: Any]] {
     let cursor = Int(CGWindowLevelForKey(.cursorWindow))
     let list = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID)
         as? [[String: Any]] ?? []
-    return list.filter { ($0[kCGWindowLayer as String] as? Int ?? cursor) < cursor }
+    return list.filter { ($0[kCGWindowLayer as String] as? Int ?? cursor) < cursor && !isOverlay($0) }
+}
+
+func isOverlay(_ window: [String: Any]) -> Bool {
+    (window[kCGWindowName as String] as? String) == "harness-computer-use overlay"
+        && (window[kCGWindowOwnerName as String] as? String ?? "").hasPrefix("computer-use-overlay")
 }
 
 func requireOnTop(_ id: Int, _ point: CGPoint) {

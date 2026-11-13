@@ -58,6 +58,7 @@ function fakeMachine({ info = "Button", titles = [line(`> ${TITLE}`, 1800, 1400)
     hostname: () => "click-mac",
     clickHost: () => "click-mac",
     wake: async () => {},
+    showComputerUse: async () => { calls.push("border"); },
     focus: async () => { calls.push("focus"); onFocus(calls); },
     window: async () => WINDOW,
     read: async () => ({ width: 2880, lines: [line(info, 26, 1400), ...titles, line("text", 2000, 1560)] }),
@@ -216,8 +217,25 @@ test("a press on another machine asks once, before the hover, and clicks after A
   await ui.press("Button");
   await ui.press("Button");
   assert.equal(system.calls.filter((call) => call === "ask").length, 1);
-  assert.equal(system.calls[0], "ask");
+  assert.deepEqual(system.calls.slice(0, 2), ["ask", "border"]);
+  assert.equal(system.calls.filter((call) => call === "border").length, 1);
   assert.equal(clicks(system).length, 2);
+});
+
+test("the click host shows no border, and a border that fails to show doesn't stop the clicks", async () => {
+  const host = fakeMachine();
+  await (await open(host)).press("Button");
+  assert.equal(host.calls.includes("border"), false);
+  const other = fakeMachine();
+  Object.assign(other, { hostname: () => "another-mac", ask: async () => true, showComputerUse: async () => { throw new Error("no window server"); } });
+  const warn = console.error;
+  console.error = () => {};
+  try {
+    await (await open(other)).press("Button");
+  } finally {
+    console.error = warn;
+  }
+  assert.equal(clicks(other).length, 1);
 });
 
 test("no hover or click when the person at another machine doesn't allow it", async () => {
@@ -359,6 +377,7 @@ function fakePluginMachine({ open = false, shown = [EDITOR] } = {}) {
     hostname: () => "click-mac",
     clickHost: () => "click-mac",
     wake: async () => {},
+    showComputerUse: async () => { calls.push("border"); },
     focus: async () => { calls.push("focus"); },
     pluginWindow: async (action, device) => {
       calls.push(["button", action, device]);

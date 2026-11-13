@@ -35,6 +35,7 @@ const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 const mac = require("./macos.js");
+const { spawn } = require("node:child_process");
 const tools = require("./tools.js");
 const { patcherChunk } = require("./amxd.js");
 const { checkLocation } = require("./run-log.js");
@@ -238,7 +239,8 @@ function runName(script = process.argv[1] || "node") {
 // Asks the person at this Mac whether the run may click; true only for Allow. Don't Allow is
 // the cancel button, which osascript reports as error -128.
 async function askToClick(script) {
-  const text = `${script} wants to click in Live on this Mac. It moves the pointer until the check ends.`;
+  const text = `${script} wants to click in Live on this Mac. It moves the pointer until the check ends, `
+    + "while a purple border shows around the screen.";
   const dialog = [
     "on run argv",
     "  activate",
@@ -256,10 +258,22 @@ async function askToClick(script) {
   return /button returned:Allow/.test(answer) && !/gave up:true/.test(answer);
 }
 
+// harness-computer-use's overlay (ADR-0009): a purple border around the screen until this
+// process ends, then a notification. It watches this process itself, so it goes also when the
+// run is killed.
+const OVERLAY_SOURCE = path.join(__dirname, "computer-use-overlay.swift");
+async function showComputerUse() {
+  const binary = await tools.helperBinary(OVERLAY_SOURCE);
+  const overlay = spawn(binary, [String(process.pid), runName()], { detached: true, stdio: "ignore" });
+  overlay.on("error", (error) => console.error(`warn harness-computer-use couldn't show its border: ${error.message}`));
+  overlay.unref();
+}
+
 const machine = {
   hostname: () => os.hostname().replace(/\.local$/, ""),
   clickHost: () => readClickHost(),
   ask: () => askToClick(runName()),
+  showComputerUse,
   // A slept display has no windows to capture.
   wake: () => mac.wakeDisplay(),
   // The display first: activate() returns at once if Live is already in front, even asleep.
@@ -317,12 +331,15 @@ const machine = {
 };
 
 // Before a run's first hover: on the click host at once, on any other machine after the
-// person at it allows the run's clicks (ADR-0006). The answer holds for the rest of the run.
+// person at it allows the run's clicks (ADR-0006). The answer holds for the rest of the run,
+// and while it does a purple border shows there (ADR-0009). The border only informs: a run
+// that can't show it still clicks, with a warning.
 async function permit(system) {
   if (system.allowed) return;
   const host = system.hostname();
-  if (host !== system.clickHost() && !(await system.ask())) {
-    throw new DeviceUiError(`Clicks in Live on ${host} weren't allowed (ADR-0006). Not clicked`);
+  if (host !== system.clickHost()) {
+    if (!(await system.ask())) throw new DeviceUiError(`Clicks in Live on ${host} weren't allowed (ADR-0006). Not clicked`);
+    await system.showComputerUse().catch((error) => console.error(`warn harness-computer-use couldn't show its border: ${error.message}`));
   }
   system.allowed = true;
 }
