@@ -13,11 +13,11 @@ import AppKit
 
 let OVERLAY_TITLE = "harness-computer-use overlay"
 let PILL_TITLE = "harness-computer-use pill"
-let PURPLE = NSColor(srgbRed: 0.58, green: 0.36, blue: 0.98, alpha: 1)
-let LIGHT_PURPLE = NSColor(srgbRed: 0.78, green: 0.64, blue: 1, alpha: 1)
+let PURPLE = NSColor(srgbRed: 0.62, green: 0.47, blue: 0.96, alpha: 1)
+let LIGHT_PURPLE = NSColor(srgbRed: 0.78, green: 0.66, blue: 1, alpha: 1)
 // The glow fades from the screen's edge over this many points, from this opacity at the edge.
 let GLOW_WIDTH = 140.0
-let GLOW_EDGE_ALPHA = 0.9
+let GLOW_EDGE_ALPHA = 0.55
 // The pill naming the run sits this far above the bottom of the screen's usable area.
 let PILL_MARGIN = 28.0
 
