@@ -1,15 +1,18 @@
 // Shows that harness-computer-use holds the mouse (ADR-0009): a breathing purple glow in from
 // the edges of every screen and a pill naming the run, until the process <pid> exits, then a
-// notification that the mouse is free again. The windows let every click through and never
-// take the front.
+// notification that the mouse is free again. The pill's Stop sends the run SIGUSR2, after
+// which it clicks no more, and takes all of this down at once. The glow lets every click
+// through; nothing here takes the front.
 //
 //   computer-use-overlay <pid> [<run>]
 //
-// device-ui.swift's click guard skips the windows titled OVERLAY_TITLE that this program owns.
+// device-ui.swift's click guard skips the glow's windows, titled OVERLAY_TITLE, that this
+// program owns. It doesn't skip the pill, which takes clicks.
 
 import AppKit
 
 let OVERLAY_TITLE = "harness-computer-use overlay"
+let PILL_TITLE = "harness-computer-use pill"
 let PURPLE = NSColor(srgbRed: 0.58, green: 0.36, blue: 0.98, alpha: 1)
 let LIGHT_PURPLE = NSColor(srgbRed: 0.78, green: 0.64, blue: 1, alpha: 1)
 // The glow fades from the screen's edge over this many points, from this opacity at the edge.
@@ -55,8 +58,38 @@ func breathe(_ layer: CALayer?, from: Double, to: Double, seconds: Double) {
     layer?.add(animation, forKey: "breathe")
 }
 
-// A dark frosted pill: a pulsing dot, then harness-computer-use and the run.
-func pill(on screen: NSScreen) -> NSView {
+// Ends the overlay with a notification saying why.
+@MainActor func finish(_ message: String) -> Never {
+    NSApp.windows.forEach { $0.orderOut(nil) }
+    let notify = Process()
+    notify.executableURL = URL(fileURLWithPath: "/usr/bin/osascript")
+    notify.arguments = ["-e", "on run argv", "-e",
+                        "display notification (item 1 of argv) with title \"harness-computer-use\"",
+                        "-e", "end run", message]
+    try? notify.run()
+    notify.waitUntilExit()
+    exit(0)
+}
+
+// Stop's target. It is called on the main thread, as AppKit calls every action.
+final class Stopper: NSObject {
+    let target: pid_t, name: String
+    init(target: pid_t, name: String) { (self.target, self.name) = (target, name) }
+    @objc func stop() {
+        kill(target, SIGUSR2)
+        MainActor.assumeIsolated { finish("Stopped: \(name.isEmpty ? "the run" : name) won't click again. The mouse is yours.") }
+    }
+}
+let stopper = Stopper(target: pid, name: run)
+
+// A panel that takes a click without taking the front from the app in front.
+final class PillPanel: NSPanel {
+    override var canBecomeKey: Bool { false }
+    override var canBecomeMain: Bool { false }
+}
+
+// A dark frosted pill: a pulsing dot, harness-computer-use and the run, and Stop.
+func pill(on screen: NSScreen) -> NSPanel {
     let text = NSTextField(labelWithAttributedString: {
         let line = NSMutableAttributedString(string: "harness-computer-use", attributes: [
             .font: NSFont.systemFont(ofSize: 13, weight: .semibold), .foregroundColor: NSColor.white])
@@ -67,10 +100,37 @@ func pill(on screen: NSScreen) -> NSView {
         return line
     }())
     text.sizeToFit()
-    let (height, pad, dot) = (34.0, 16.0, 8.0)
-    let width = pad + dot + 10 + text.frame.width + pad
+    // Drawn by hand, white on a faint capsule: AppKit greys a control in a window that never
+    // becomes key, as this one doesn't.
+    let stop = NSButton(title: "", target: stopper, action: #selector(Stopper.stop))
+    stop.isBordered = false
+    stop.image = NSImage(systemSymbolName: "stop.fill", accessibilityDescription: nil)?
+        .withSymbolConfiguration(NSImage.SymbolConfiguration(pointSize: 9, weight: .bold)
+            .applying(NSImage.SymbolConfiguration(paletteColors: [.white])))
+    stop.attributedTitle = NSAttributedString(string: " Stop", attributes: [
+        .font: NSFont.systemFont(ofSize: 12, weight: .semibold), .foregroundColor: NSColor.white])
+    stop.imagePosition = .imageLeading
+    stop.imageHugsTitle = true
+    stop.setAccessibilityLabel("Stop")
+    stop.sizeToFit()
+    stop.frame.size = NSSize(width: stop.frame.width + 20, height: 24)
+    stop.wantsLayer = true
+    stop.layer?.backgroundColor = NSColor.white.withAlphaComponent(0.14).cgColor
+    stop.layer?.cornerRadius = 12
+    let (height, pad, dot, gap) = (38.0, 16.0, 8.0, 10.0)
+    let width = pad + dot + gap + text.frame.width + 14 + stop.frame.width + 7
     let usable = screen.visibleFrame.minY - screen.frame.minY
-    let view = NSView(frame: NSRect(x: (screen.frame.width - width) / 2, y: usable + PILL_MARGIN, width: width, height: height))
+    let panel = PillPanel(contentRect: NSRect(x: screen.frame.minX + (screen.frame.width - width) / 2,
+                                              y: screen.frame.minY + usable + PILL_MARGIN, width: width, height: height),
+                          styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
+    panel.title = PILL_TITLE
+    panel.isOpaque = false
+    panel.backgroundColor = .clear
+    panel.hasShadow = true
+    panel.level = NSWindow.Level(rawValue: NSWindow.Level.screenSaver.rawValue + 1)
+    panel.collectionBehavior = [.canJoinAllSpaces, .stationary, .fullScreenAuxiliary, .ignoresCycle]
+    panel.hidesOnDeactivate = false
+    let view = NSView(frame: NSRect(origin: .zero, size: panel.frame.size))
     // The frosted background is a sibling under the dot and the text, not their parent: the
     // frosted view tints what it holds, which turned the dot grey.
     let frost = NSVisualEffectView(frame: view.bounds)
@@ -94,16 +154,19 @@ func pill(on screen: NSScreen) -> NSView {
     light.layer?.shadowOffset = .zero
     breathe(light.layer, from: 1, to: 0.45, seconds: 0.9)
     view.addSubview(light)
-    text.setFrameOrigin(NSPoint(x: pad + dot + 10, y: (height - text.frame.height) / 2))
+    text.setFrameOrigin(NSPoint(x: pad + dot + gap, y: (height - text.frame.height) / 2))
     view.addSubview(text)
-    return view
+    stop.setFrameOrigin(NSPoint(x: width - 7 - stop.frame.width, y: (height - stop.frame.height) / 2))
+    view.addSubview(stop)
+    panel.contentView = view
+    return panel
 }
 
 let app = NSApplication.shared
 app.setActivationPolicy(.accessory)
 
-// One window per screen, above everything but the cursor, on every Space.
-var windows: [NSWindow] = []
+// One glow window per screen, above everything but the cursor, on every Space; the pill above
+// the glow on the main screen.
 for screen in NSScreen.screens {
     let window = NSWindow(contentRect: screen.frame, styleMask: .borderless, backing: .buffered, defer: false)
     window.title = OVERLAY_TITLE
@@ -113,28 +176,17 @@ for screen in NSScreen.screens {
     window.ignoresMouseEvents = true
     window.level = .screenSaver
     window.collectionBehavior = [.canJoinAllSpaces, .stationary, .fullScreenAuxiliary, .ignoresCycle]
-    let content = NSView(frame: NSRect(origin: .zero, size: screen.frame.size))
-    let glow = Glow(frame: content.bounds)
+    let glow = Glow(frame: NSRect(origin: .zero, size: screen.frame.size))
     glow.wantsLayer = true
     breathe(glow.layer, from: 1, to: 0.55, seconds: 2.2)
-    content.addSubview(glow)
-    if screen == NSScreen.main { content.addSubview(pill(on: screen)) }
-    window.contentView = content
+    window.contentView = glow
     window.orderFrontRegardless()
-    windows.append(window)
+    if screen == NSScreen.main { pill(on: screen).orderFrontRegardless() }
 }
 
 // The run that holds the mouse is gone once signal 0 to it fails.
 Timer.scheduledTimer(withTimeInterval: 0.25, repeats: true) { _ in
     guard kill(pid, 0) != 0 else { return }
-    windows.forEach { $0.orderOut(nil) }
-    let notify = Process()
-    notify.executableURL = URL(fileURLWithPath: "/usr/bin/osascript")
-    notify.arguments = ["-e", "on run argv", "-e",
-                        "display notification (item 1 of argv) with title \"harness-computer-use\"",
-                        "-e", "end run", "\(run.isEmpty ? "The run" : run) has ended: the mouse is yours again."]
-    try? notify.run()
-    notify.waitUntilExit()
-    exit(0)
+    MainActor.assumeIsolated { finish("\(run.isEmpty ? "The run" : run) has ended: the mouse is yours again.") }
 }
 app.run()

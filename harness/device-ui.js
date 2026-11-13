@@ -270,7 +270,10 @@ async function askToClick(script) {
 // process ends, then a notification. It watches this process itself, so it goes also when the
 // run is killed.
 const OVERLAY_SOURCE = path.join(__dirname, "computer-use-overlay.swift");
-async function showComputerUse() {
+// The pill's Stop sends this process SIGUSR2; `onStop` is called then. The handler goes in
+// before the overlay starts, since SIGUSR2's default is to end the process.
+async function showComputerUse(onStop) {
+  process.on("SIGUSR2", onStop);
   const binary = await tools.helperBinary(OVERLAY_SOURCE);
   const run = runName();
   const overlay = spawn(binary, [String(process.pid), ...(run ? [run] : [])], { detached: true, stdio: "ignore" });
@@ -344,13 +347,21 @@ const machine = {
 // and while it does a purple border shows there (ADR-0009). The border only informs: a run
 // that can't show it still clicks, with a warning.
 async function permit(system) {
+  requireNotStopped(system);
   if (system.allowed) return;
   const host = system.hostname();
   if (host !== system.clickHost()) {
     if (!(await system.ask())) throw new DeviceUiError(`Clicks in Live on ${host} weren't allowed (ADR-0006). Not clicked`);
-    await system.showComputerUse().catch((error) => console.error(`warn harness-computer-use couldn't show its border: ${error.message}`));
+    const stop = () => { system.stopped = true; };
+    await system.showComputerUse(stop).catch((error) => console.error(`warn harness-computer-use couldn't show its border: ${error.message}`));
   }
   system.allowed = true;
+}
+
+// After Stop on the pill (ADR-0009), every press of the run throws, before its hover and again
+// before its click. The run goes on, so a check fails at its next press and still cleans up.
+function requireNotStopped(system) {
+  if (system.stopped) throw new DeviceUiError("harness-computer-use was stopped from its pill: this run clicks no more. Not clicked");
 }
 
 // Live's windows on screen, front to back: [{ id, title, layer, x, y, w, h }] in points. A
@@ -404,6 +415,7 @@ class DeviceUi {
     await this.system.focus();
     const at = await this.locate();
     const [x, y] = [at.x + ux, at.y + uy];
+    requireNotStopped(this.system);
     await this.system.hover(at.window.id, x, y);
     await sleep(this.system.settleMs ?? INFO_VIEW_SETTLE_MS);
     const { lines } = await this.system.read(at.window.id);
@@ -412,6 +424,7 @@ class DeviceUi {
       throw new DeviceUiError(`The Info View reads "${shown}" over ${name}, expected "${control.info}" (is it visible?). Not clicked`);
     }
     await this.system.focus();
+    requireNotStopped(this.system);
     await this.system.click(at.window.id, x, y);
   }
 
@@ -516,6 +529,7 @@ class PluginWindow {
     const [x, y] = controlPoint(control);
     await permit(this.system);
     await this.locate();
+    requireNotStopped(this.system);
     await this.system.clickEditor(this.title, x, y, this.size);
   }
 

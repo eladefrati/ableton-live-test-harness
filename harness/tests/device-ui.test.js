@@ -222,6 +222,41 @@ test("a press on another machine asks once, before the hover, and clicks after A
   assert.equal(clicks(system).length, 2);
 });
 
+test("after Stop on the pill, no press of the run hovers or clicks again", async () => {
+  const system = fakeMachine();
+  let stop;
+  Object.assign(system, { hostname: () => "another-mac", ask: async () => true, showComputerUse: async (onStop) => { stop = onStop; } });
+  const ui = await open(system);
+  await ui.press("Button");
+  stop();
+  const before = system.calls.length;
+  await assert.rejects(ui.press("Button"), /stopped from its pill/);
+  assert.equal(system.calls.length, before);
+  assert.equal(clicks(system).length, 1);
+});
+
+test("after Stop on the pill, no press in a plug-in's window clicks", async () => {
+  const system = fakePluginMachine();
+  let stop;
+  Object.assign(system, { hostname: () => "another-mac", ask: async () => true, showComputerUse: async (onStop) => { stop = onStop; } });
+  const window = await openPluginWindow(pluginLive(), PLUGIN, system);
+  await window.press("Button");
+  stop();
+  await assert.rejects(window.press("Button"), /stopped from its pill/);
+  assert.equal(clicks(system).length, 1);
+});
+
+test("Stop between a press's hover and its click stops the click", async () => {
+  const system = fakeMachine();
+  let stop;
+  Object.assign(system, { hostname: () => "another-mac", ask: async () => true, showComputerUse: async (onStop) => { stop = onStop; } });
+  const hover = system.hover;
+  system.hover = async (...args) => { await hover(...args); stop(); };
+  const ui = await open(system);
+  await assert.rejects(ui.press("Button"), /stopped from its pill/);
+  assert.equal(clicks(system).length, 0);
+});
+
 test("the click host shows no border, and a border that fails to show doesn't stop the clicks", async () => {
   const host = fakeMachine();
   await (await open(host)).press("Button");
