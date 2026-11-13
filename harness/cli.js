@@ -13,19 +13,25 @@
 //                                         time (ms, or a date such as 2026-10-31T11:18), or
 //                                         since Live started; needs no OSC, so it runs
 //                                         beside a check
-//   node harness/cli.js windows           Live's windows on screen, front to back; a dialog or
-//                                         panel is one of them; needs no OSC either
+//   node harness/cli.js windows           Live's windows on screen, front to back, with their
+//                                         layer; a dialog, a panel or a plug-in's window (layer
+//                                         3, shown only with Live in front) is one of them;
+//                                         needs no OSC either
 //   node harness/cli.js capture <png> [--window <id>]
 //                                         a picture of Live's main window, or of the window
 //                                         with that id, taken with Live behind other windows;
 //                                         needs no OSC either
+//   node harness/cli.js plugin-window <track> <device> <png>
+//                                         opens the plug-in's own window if it isn't open and
+//                                         saves a picture of its editor (ADR-0008); brings Live
+//                                         to the front while it captures
 //
 // Arguments: "12" is an int, "12.0" a float, true/false booleans, anything else a string.
 
 const { connect } = require("./live.js");
 const { float } = require("./osc.js");
 const { maxMessages } = require("./log.js");
-const { captureWindow, liveWindows } = require("./device-ui.js");
+const { captureWindow, liveWindows, openPluginWindow } = require("./device-ui.js");
 
 function parseArg(text) {
   if (text === "true") return true;
@@ -36,7 +42,8 @@ function parseArg(text) {
 }
 
 const USAGE = "usage: cli.js ping | reload | query <address> [args] | send <address> [args] | "
-  + "notes <track> <clip> [--arrangement] | song-notes <track> | max-log [since] | windows | capture <png> [--window <id>]";
+  + "notes <track> <clip> [--arrangement] | song-notes <track> | max-log [since] | windows | capture <png> [--window <id>] | "
+  + "plugin-window <track> <device> <png>";
 
 async function run(argv) {
   const [command, ...rest] = argv;
@@ -67,6 +74,13 @@ async function run(argv) {
       case "notes":
         return await live.notes(Number(args[0]), Number(args[1]), { arrangement: flags.has("--arrangement") });
       case "song-notes": return await live.songNotes(Number(args[0]));
+      case "plugin-window": {
+        const [track, device] = args.slice(0, 2).map(Number);
+        if (!Number.isInteger(track) || !Number.isInteger(device) || !args[2]) throw new Error(USAGE);
+        const window = await openPluginWindow(live, { track, device });
+        await window.capture(args[2]);
+        return { file: args[2], window: window.title };
+      }
       default: throw new Error(USAGE);
     }
   } finally {

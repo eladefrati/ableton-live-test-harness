@@ -413,5 +413,5 @@ module.exports = {
   MacError, osascript, activate, wakeDisplay, keepDisplayOn, isFrontmost, menuItems, clickMenu, isChecked, undoName,
   setToggle, setKeyMapMode, setMidiMapMode, liveApp, saveSet, saveSetAs, openInBackground, openSet,
   openSetAndWait, windowTitle, sameFile, SAVE_CHANGES, TEMP_FILES, STOP_AUDIO, HARNESS_TEMP, inHarnessTemp, tempFolder,
-  emptyHarnessTemp, livePids, liveStartTime,
+  emptyHarnessTemp, livePids, liveStartTime, frontmostApp, giveBackFront,
 };

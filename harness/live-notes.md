@@ -83,7 +83,27 @@ unexpected.
   Unfold Device Parameters and the one that opens the plug-in's window, 32 points in all. Over
   AUDelay's controls the Info View reads "Device Activator", "Unfold Device Parameters" and
   "Assignable X-Y Control", and a click on the activator turns Device On off (remote Mac,
-  2026-11-11). Only Live's main window is clicked: the plug-in's own window isn't reached.
+  2026-11-11). The plug-in's own window is reached apart from the device view: below.
+- Live 12.4 names much of its main window over Accessibility, unlike its dialogs: the
+  Control Bar's controls, the browser's lists, and in Device Detail one group per device of
+  the selected track, titled with the device's name and holding its title-bar buttons, a
+  plug-in's "Show/Hide Plug-In Window" checkbox among them (value 1 while the window is
+  open). The checkbox takes AXPress, which opens and closes the window as a click does, with
+  Live in the background too (remote Mac, Live 12.4.25b1, 2026-11-13).
+- A plug-in's own window is titled `<device>/<track>` ("Plugin/1-MIDI"), floats at window
+  layer 3, and holds Live's 19-point title bar above the plug-in's editor, which
+  Accessibility shows as the window's one group, with the editor's frame. It is off screen,
+  though open, while Live is in the background and while the display sleeps; it returns
+  when Live comes to the front with the display on. A click posted while it was hidden went
+  to Live's main window under it, a row of the browser (remote Mac, Live 12.4.25b1,
+  2026-11-13): `device-ui.swift` checks the window is topmost at the point just before
+  the click, and again after the hover.
+- A click on a JUCE plug-in's editor goes in at once, with Live's main window the key one:
+  one click on a generic editor's toggle turned its parameter on, a second off, read back
+  over the LOM. Accessibility showed the generic editor's slider and toggle without their
+  labels, so it can't confirm the control under the pointer as the Info View does in the
+  device view (ADR-0008); a plug-in's own components name themselves only if the plug-in
+  gives them names (not tried).
 - A plug-in's own window floats over Live's main window, at window layer 3, where a check of
   the normal (layer 0) windows doesn't see it: a click aimed at the device view under it would
   go to the plug-in. `device-ui.swift` refuses a click unless the window aimed at is topmost

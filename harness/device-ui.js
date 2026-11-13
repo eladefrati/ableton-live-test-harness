@@ -20,6 +20,15 @@
 //
 // A press clicks only after the checks in ADR-0004 pass, and throws DeviceUiError otherwise.
 // It says nothing about what the click did: the check reads that from Live.
+//
+// A plug-in's own window, the one its editor opens in (ADR-0008), at points measured in the
+// editor from its top left, given with the editor's size in points:
+//
+//   const editor = await openPluginWindow(live, { track, device, size: [428, 125],
+//     controls: { "Test Tone": { x: 140, y: 60 } } });
+//   await editor.press("Test Tone");
+//   await editor.capture("/path/to/editor.png");   // the editor, without Live's title bar
+//   await editor.close();
 
 const fs = require("node:fs");
 const os = require("node:os");
@@ -284,10 +293,41 @@ const machine = {
   },
   hover: (windowId, x, y) => helper("hover", windowId, x, y),
   click: (windowId, x, y) => helper("click", windowId, x, y),
+  // A plug-in's window (ADR-0008): its button's state, opened or closed; where it and its
+  // editor are; a click in the editor.
+  pluginWindow: async (action, device) => JSON.parse(await helper("plugin-window", action, device)).open,
+  editor: async (title) => JSON.parse(await helper("plugin-editor", title)),
+  clickEditor: (title, x, y, [w, h]) => helper("click-editor", title, x, y, w, h),
+  frontmost: () => mac.frontmostApp(),
+  giveBack: (id) => mac.giveBackFront(id),
+  // Crops a capture of the window, `width` points wide, to [x, y, w, h] in points.
+  async captureRect(windowId, width, rect, file) {
+    const folder = mac.tempFolder("device-ui-");
+    try {
+      const image = path.join(folder, "window.png");
+      await machine.capture(windowId, image);
+      const pixels = Number(/pixelWidth: (\d+)/.exec(await exec("sips", ["-g", "pixelWidth", image]))?.[1]);
+      if (!pixels) throw new DeviceUiError(`Could not read the width of ${image}`);
+      await helper("crop", image, ...rect.map((points) => Math.round((points * pixels) / width)), file);
+    } finally {
+      fs.rmSync(folder, { recursive: true, force: true });
+    }
+  },
 };
 
-// Live's windows on screen, front to back: [{ id, title, x, y, w, h }] in points. A dialog
-// or a panel (the Save panel) is a window of its own.
+// Before a run's first hover: on the click host at once, on any other machine after the
+// person at it allows the run's clicks (ADR-0006). The answer holds for the rest of the run.
+async function permit(system) {
+  if (system.allowed) return;
+  const host = system.hostname();
+  if (host !== system.clickHost() && !(await system.ask())) {
+    throw new DeviceUiError(`Clicks in Live on ${host} weren't allowed (ADR-0006). Not clicked`);
+  }
+  system.allowed = true;
+}
+
+// Live's windows on screen, front to back: [{ id, title, layer, x, y, w, h }] in points. A
+// dialog, a panel (the Save panel) or a plug-in's window (layer 3) is a window of its own.
 async function liveWindows(system = machine) {
   await system.wake();
   return system.windows();
@@ -333,7 +373,7 @@ class DeviceUi {
     if (!control.info) throw new DeviceUiError(`${name} has no Info View title to confirm (annotation_name, or info for a point). Not clicked`);
     const [ux, uy] = controlPoint(control, item);
 
-    await this.permit();
+    await permit(this.system);
     await this.system.focus();
     const at = await this.locate();
     const [x, y] = [at.x + ux, at.y + uy];
@@ -346,17 +386,6 @@ class DeviceUi {
     }
     await this.system.focus();
     await this.system.click(at.window.id, x, y);
-  }
-
-  // Before the first hover: on the click host at once, on any other machine after the person
-  // at it allows the run's clicks (ADR-0006). The answer holds for the rest of the run.
-  async permit() {
-    if (this.system.allowed) return;
-    const host = this.system.hostname();
-    if (host !== this.system.clickHost() && !(await this.system.ask())) {
-      throw new DeviceUiError(`Clicks in Live on ${host} weren't allowed (ADR-0006). Not clicked`);
-    }
-    this.system.allowed = true;
   }
 
   // The lines of text shown inside a rectangle of the panel, [x, y, w, h] in device units.
@@ -414,7 +443,91 @@ async function openDeviceUi(live, { track, device, build, controls, width }, sys
   }, system);
 }
 
+// How long a plug-in's window takes to show once Live is in front.
+const EDITOR_WAIT_MS = 2000;
+
+// A plug-in's own window (ADR-0008). Live titles it "<device>/<track>" and shows it only
+// while Live is in front and the display is on.
+class PluginWindow {
+  constructor(live, { track, device, name, title, size, controls }, system) {
+    Object.assign(this, { live, track, device, name, title, size, controls, system });
+  }
+
+  // The Show/Hide Plug-In Window button is found among the selected track's devices.
+  async setOpen(open) {
+    await this.system.wake();
+    this.live.send("/live/view/set/selected_track", this.track);
+    this.live.send("/live/view/set/selected_device", this.track, this.device);
+    await this.live.sync();
+    if ((await this.system.pluginWindow(open ? "open" : "close", this.name)) !== open) {
+      throw new DeviceUiError(`${this.name}'s window didn't ${open ? "open" : "close"}`);
+    }
+  }
+
+  close() {
+    return this.setOpen(false);
+  }
+
+  // Brings Live to the front and waits for the window: { id, x, y, w, h, editor: { x, y, w, h } }.
+  async locate() {
+    await this.system.focus();
+    for (const deadline = Date.now() + EDITOR_WAIT_MS; ; await sleep(200)) {
+      try {
+        return await this.system.editor(this.title);
+      } catch (error) {
+        if (Date.now() > deadline || !/isn't on screen/.test(error.message)) throw error;
+      }
+    }
+  }
+
+  // Clicks a control. The helper clicks only if the editor is this.size, the point inside it
+  // and the window topmost there, checked just before the click.
+  async press(name) {
+    const control = this.controls.get(name);
+    if (!control) throw new DeviceUiError(`${this.title} has no control named ${name}`);
+    if (!this.size) throw new DeviceUiError(`The size of ${this.name}'s editor isn't known: give openPluginWindow a size. Not clicked`);
+    const [x, y] = controlPoint(control);
+    await permit(this.system);
+    await this.locate();
+    await this.system.clickEditor(this.title, x, y, this.size);
+  }
+
+  // Saves a picture of the editor, without Live's title bar, to `file` (PNG), then gives the
+  // front back to the app that had it.
+  async capture(file) {
+    await this.system.wake();
+    const before = await this.system.frontmost().catch(() => null);
+    try {
+      const window = await this.locate();
+      const { editor } = window;
+      await this.system.captureRect(window.id, window.w, [editor.x - window.x, editor.y - window.y, editor.w, editor.h], file);
+    } finally {
+      if (before) await this.system.giveBack(before).catch(() => {});
+    }
+  }
+}
+
+// Opens the window of the plug-in `device` on `track` (indices), if it isn't open. `size` is
+// the editor's [w, h] and `controls` its controls' points ({ name: { x, y } }, from the
+// editor's top left), both in points; a press needs both.
+async function openPluginWindow(live, { track, device, size, controls = {} }, system = machine) {
+  const names = await live.query("/live/track/get/devices/name", track);
+  const name = names[device + 1];
+  if (!name) throw new DeviceUiError(`Track ${track} has no device ${device}`);
+  const [, , className] = await live.query("/live/device/get/class_name", track, device);
+  if (!isPlugin(className)) throw new DeviceUiError(`${name} is not a plug-in (${className})`);
+  const [, trackName] = await live.query("/live/track/get/name", track);
+  if (size && !(size.length === 2 && size.every((n) => Number.isFinite(n) && n > 0))) {
+    throw new DeviceUiError(`size must be [w, h] in points, got ${JSON.stringify(size)}`);
+  }
+  const window = new PluginWindow(live, {
+    track, device, name, title: `${name}/${trackName}`, size, controls: pointControls(controls),
+  }, system);
+  await window.setOpen(true);
+  return window;
+}
+
 module.exports = {
-  DeviceUiError, openDeviceUi, captureWindow, liveWindows, readControls, readPanelWidth, pointControls, controlPoint,
+  DeviceUiError, openDeviceUi, openPluginWindow, captureWindow, liveWindows, readControls, readPanelWidth, pointControls, controlPoint,
   findTitle, infoTitle, readClickHost, runName, MEASURED_DEVICES,
 };

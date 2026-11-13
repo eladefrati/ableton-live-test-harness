@@ -338,3 +338,101 @@ test("capture uses the width given, and refuses a device whose width isn't known
   const unknown = await openDeviceUi(fakeLive(), { track: 1, device: 1, controls: {} }, system);
   await assert.rejects(unknown.capture("/out/device.png"), /give openDeviceUi a width/);
 });
+
+const pluginLive = (className = "AuPluginDevice") => ({
+  sent: [],
+  send(...message) { this.sent.push(message); },
+  sync: async () => {},
+  query: async (address) => ({
+    "/live/track/get/devices/name": [0, "Plugin"],
+    "/live/device/get/class_name": [0, 0, className],
+    "/live/track/get/name": [0, "1-MIDI"],
+  })[address],
+});
+
+const EDITOR = { id: 11, x: 40, y: 60, w: 428, h: 144, editor: { x: 40, y: 79, w: 428, h: 125 } };
+
+function fakePluginMachine({ open = false, shown = [EDITOR] } = {}) {
+  const calls = [];
+  const system = {
+    calls,
+    hostname: () => "click-mac",
+    clickHost: () => "click-mac",
+    wake: async () => {},
+    focus: async () => { calls.push("focus"); },
+    pluginWindow: async (action, device) => {
+      calls.push(["button", action, device]);
+      if (action !== "state") open = action === "open";
+      return open;
+    },
+    editor: async (title) => {
+      calls.push(["editor", title]);
+      const next = shown.length > 1 ? shown.shift() : shown[0];
+      if (!next) throw new DeviceUiError(`The plug-in window ${title} isn't on screen`);
+      return next;
+    },
+    clickEditor: async (title, x, y, size) => { calls.push(["click", title, x, y, size]); },
+    frontmost: async () => "com.example.terminal",
+    giveBack: async (id) => { calls.push(["give back", id]); },
+    captureRect: async (id, width, rect, file) => { calls.push(["capture", id, width, rect, file]); },
+  };
+  return system;
+}
+
+const { openPluginWindow } = require("../device-ui.js");
+const PLUGIN = { track: 0, device: 0, size: [428, 125], controls: { "Test Tone": { x: 140, y: 60 } } };
+
+test("openPluginWindow selects the device, opens its window and names it <device>/<track>", async () => {
+  const live = pluginLive();
+  const system = fakePluginMachine();
+  const window = await openPluginWindow(live, PLUGIN, system);
+  assert.equal(window.title, "Plugin/1-MIDI");
+  assert.deepEqual(live.sent, [["/live/view/set/selected_track", 0], ["/live/view/set/selected_device", 0, 0]]);
+  assert.deepEqual(system.calls, [["button", "open", "Plugin"]]);
+});
+
+test("openPluginWindow refuses a device that isn't a plug-in, a missing device and a bad size", async () => {
+  await assert.rejects(openPluginWindow(pluginLive("AutoFilter2"), PLUGIN, fakePluginMachine()), /not a plug-in \(AutoFilter2\)/);
+  await assert.rejects(openPluginWindow(pluginLive(), { ...PLUGIN, device: 3 }, fakePluginMachine()), /no device 3/);
+  await assert.rejects(openPluginWindow(pluginLive(), { ...PLUGIN, size: [428] }, fakePluginMachine()), /size must be/);
+});
+
+test("a press in the editor goes to the helper with the point from the editor's corner and the size", async () => {
+  const system = fakePluginMachine();
+  const window = await openPluginWindow(pluginLive(), PLUGIN, system);
+  await window.press("Test Tone");
+  assert.deepEqual(system.calls.slice(1), ["focus", ["editor", "Plugin/1-MIDI"], ["click", "Plugin/1-MIDI", 140, 60, [428, 125]]]);
+});
+
+test("a press waits for the window to show once Live is in front", async () => {
+  const system = fakePluginMachine({ shown: [null, EDITOR] });
+  const window = await openPluginWindow(pluginLive(), PLUGIN, system);
+  await window.press("Test Tone");
+  assert.equal(system.calls.filter((call) => call[0] === "editor").length, 2);
+  assert.equal(clicks(system).length, 1);
+});
+
+test("no press without a size, on an unknown control, or when the person at another machine says no", async () => {
+  const system = fakePluginMachine();
+  const sizeless = await openPluginWindow(pluginLive(), { ...PLUGIN, size: undefined }, system);
+  await assert.rejects(sizeless.press("Test Tone"), /give openPluginWindow a size/);
+  await assert.rejects(sizeless.press("Nope"), /no control named Nope/);
+  Object.assign(system, { hostname: () => "another-mac", ask: async () => false });
+  const window = await openPluginWindow(pluginLive(), PLUGIN, system);
+  await assert.rejects(window.press("Test Tone"), /weren't allowed/);
+  assert.equal(clicks(system).length, 0);
+});
+
+test("capture crops to the editor, in points from the window's corner, and gives the front back", async () => {
+  const system = fakePluginMachine();
+  const window = await openPluginWindow(pluginLive(), PLUGIN, system);
+  await window.capture("/out/editor.png");
+  assert.deepEqual(system.calls.slice(-2), [["capture", 11, 428, [0, 19, 428, 125], "/out/editor.png"], ["give back", "com.example.terminal"]]);
+});
+
+test("close asks the helper to close the window", async () => {
+  const system = fakePluginMachine();
+  const window = await openPluginWindow(pluginLive(), PLUGIN, system);
+  await window.close();
+  assert.deepEqual(system.calls.at(-1), ["button", "close", "Plugin"]);
+});
