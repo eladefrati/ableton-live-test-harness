@@ -29,6 +29,11 @@ at the Mac doesn't know when the mouse is theirs again.
    ADR-0008) leaves out windows with the border's title owned by its program, and nothing else.
 4. **It only informs.** A run that can't show it warns and clicks anyway: the person allowed the
    clicks, not the border.
+5. **Stop on the pill takes the mouse back.** It sends the run SIGUSR2 and takes the border
+   down; from then on every press of the run is refused, before its hover and again before its
+   click. The run isn't killed: a check fails at its next press and still runs its cleanup,
+   where a kill would leave its tracks in Live. The pill is a window of its own that takes
+   clicks, so the click guard refuses a point under it.
 
 ## Consequences
 

@@ -103,7 +103,9 @@ Node 18 or later. See [ADR-0001](../docs/adr/0001-fork-abletonosc.md) for the de
   in 2 minutes throws `DeviceUiError` (ADR-0006). From Allow until the run's process ends, a
   breathing purple glow in from the screen's edges, with a pill naming the run, shows that the
   run may take the pointer; a notification says when it has ended (`computer-use-overlay.swift`,
-  ADR-0009). The dialog, the pill and the notification name a check in `tests/live/` as
+  ADR-0009). Stop on the pill takes the mouse back: the run's later presses throw
+  `DeviceUiError`, so a check fails there and still cleans up. The dialog, the pill and the
+  notification name a check in `tests/live/` as
   `tests/live/<check>.js`, another script by its file, and code run with `node -e` not at all.
   `openDeviceUi(live, {track, device, build})` takes the controls from the
   `.amxd`; `ui.press(name)` or `ui.press(tabName, item)` clicks, and `ui.text([x, y, w, h])`
