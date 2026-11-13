@@ -109,7 +109,9 @@ Node 18 or later. See [ADR-0001](../docs/adr/0001-fork-abletonosc.md) for the de
   `tests/live/<check>.js`, another script by its file, and code run with `node -e` not at all.
   `openDeviceUi(live, {track, device, build})` takes the controls from the
   `.amxd`; `ui.press(name)` or `ui.press(tabName, item)` clicks, `ui.drag(name, {up, right})`
-  turns a control by dragging it that many points with the button down (ADR-0010), and `ui.text([x, y, w, h])`
+  turns a control by dragging it that many points with the button down (ADR-0010),
+  `ui.choose(name, item)` opens the menu a control opens (a chooser) and clicks the one row
+  that reads `item`, closing the menu with Escape if none or two do (ADR-0011), and `ui.text([x, y, w, h])`
   resolves with the lines shown in that part of the panel, in device units. A press looks
   for the panel again, brings Live to the front, and throws `DeviceUiError` without clicking
   unless the screen is unlocked, Live's main window is on top at the point and the Info View
