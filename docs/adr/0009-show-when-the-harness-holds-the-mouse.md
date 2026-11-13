@@ -18,7 +18,7 @@ at the Mac doesn't know when the mouse is theirs again.
 ## Decision
 
 1. **A purple border around every screen while a run holds the mouse,** a soft glow in from the
-   edges that slowly breathes, with a frosted pill at the bottom naming harness-computer-use and
+   edges that slowly breathes, with a frosted pill at the top naming harness-computer-use and
    the run, from Allow until the run's process ends, then a notification that the mouse is free.
    A program of its own (`computer-use-overlay.swift`) draws it and watches the run's process,
    so it goes also when the run crashes or is killed. The dialog and the notification are titled
