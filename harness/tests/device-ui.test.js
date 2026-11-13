@@ -350,7 +350,7 @@ const pluginLive = (className = "AuPluginDevice") => ({
   })[address],
 });
 
-const EDITOR = { id: 11, x: 40, y: 60, w: 428, h: 144, editor: { x: 40, y: 79, w: 428, h: 125 } };
+const EDITOR = { id: 11, x: 40, y: 60, w: 400, h: 139, editor: { x: 40, y: 79, w: 400, h: 120 } };
 
 function fakePluginMachine({ open = false, shown = [EDITOR] } = {}) {
   const calls = [];
@@ -380,7 +380,7 @@ function fakePluginMachine({ open = false, shown = [EDITOR] } = {}) {
 }
 
 const { openPluginWindow } = require("../device-ui.js");
-const PLUGIN = { track: 0, device: 0, size: [428, 125], controls: { "Test Tone": { x: 140, y: 60 } } };
+const PLUGIN = { track: 0, device: 0, size: [400, 120], controls: { Button: { x: 100, y: 40 } } };
 
 test("openPluginWindow selects the device, opens its window and names it <device>/<track>", async () => {
   const live = pluginLive();
@@ -394,20 +394,20 @@ test("openPluginWindow selects the device, opens its window and names it <device
 test("openPluginWindow refuses a device that isn't a plug-in, a missing device and a bad size", async () => {
   await assert.rejects(openPluginWindow(pluginLive("AutoFilter2"), PLUGIN, fakePluginMachine()), /not a plug-in \(AutoFilter2\)/);
   await assert.rejects(openPluginWindow(pluginLive(), { ...PLUGIN, device: 3 }, fakePluginMachine()), /no device 3/);
-  await assert.rejects(openPluginWindow(pluginLive(), { ...PLUGIN, size: [428] }, fakePluginMachine()), /size must be/);
+  await assert.rejects(openPluginWindow(pluginLive(), { ...PLUGIN, size: [400] }, fakePluginMachine()), /size must be/);
 });
 
 test("a press in the editor goes to the helper with the point from the editor's corner and the size", async () => {
   const system = fakePluginMachine();
   const window = await openPluginWindow(pluginLive(), PLUGIN, system);
-  await window.press("Test Tone");
-  assert.deepEqual(system.calls.slice(1), ["focus", ["editor", "Plugin/1-MIDI"], ["click", "Plugin/1-MIDI", 140, 60, [428, 125]]]);
+  await window.press("Button");
+  assert.deepEqual(system.calls.slice(1), ["focus", ["editor", "Plugin/1-MIDI"], ["click", "Plugin/1-MIDI", 100, 40, [400, 120]]]);
 });
 
 test("a press waits for the window to show once Live is in front", async () => {
   const system = fakePluginMachine({ shown: [null, EDITOR] });
   const window = await openPluginWindow(pluginLive(), PLUGIN, system);
-  await window.press("Test Tone");
+  await window.press("Button");
   assert.equal(system.calls.filter((call) => call[0] === "editor").length, 2);
   assert.equal(clicks(system).length, 1);
 });
@@ -415,11 +415,11 @@ test("a press waits for the window to show once Live is in front", async () => {
 test("no press without a size, on an unknown control, or when the person at another machine says no", async () => {
   const system = fakePluginMachine();
   const sizeless = await openPluginWindow(pluginLive(), { ...PLUGIN, size: undefined }, system);
-  await assert.rejects(sizeless.press("Test Tone"), /give openPluginWindow a size/);
+  await assert.rejects(sizeless.press("Button"), /give openPluginWindow a size/);
   await assert.rejects(sizeless.press("Nope"), /no control named Nope/);
   Object.assign(system, { hostname: () => "another-mac", ask: async () => false });
   const window = await openPluginWindow(pluginLive(), PLUGIN, system);
-  await assert.rejects(window.press("Test Tone"), /weren't allowed/);
+  await assert.rejects(window.press("Button"), /weren't allowed/);
   assert.equal(clicks(system).length, 0);
 });
 
@@ -427,7 +427,7 @@ test("capture crops to the editor, in points from the window's corner, and gives
   const system = fakePluginMachine();
   const window = await openPluginWindow(pluginLive(), PLUGIN, system);
   await window.capture("/out/editor.png");
-  assert.deepEqual(system.calls.slice(-2), [["capture", 11, 428, [0, 19, 428, 125], "/out/editor.png"], ["give back", "com.example.terminal"]]);
+  assert.deepEqual(system.calls.slice(-2), [["capture", 11, 400, [0, 19, 400, 120], "/out/editor.png"], ["give back", "com.example.terminal"]]);
 });
 
 test("close asks the helper to close the window", async () => {

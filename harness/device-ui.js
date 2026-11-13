@@ -24,9 +24,9 @@
 // A plug-in's own window, the one its editor opens in (ADR-0008), at points measured in the
 // editor from its top left, given with the editor's size in points:
 //
-//   const editor = await openPluginWindow(live, { track, device, size: [428, 125],
-//     controls: { "Test Tone": { x: 140, y: 60 } } });
-//   await editor.press("Test Tone");
+//   const editor = await openPluginWindow(live, { track, device, size: [400, 120],
+//     controls: { Button: { x: 100, y: 40 } } });
+//   await editor.press("Button");
 //   await editor.capture("/path/to/editor.png");   // the editor, without Live's title bar
 //   await editor.close();
 
