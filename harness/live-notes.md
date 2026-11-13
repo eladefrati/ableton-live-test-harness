@@ -84,6 +84,10 @@ unexpected.
   AUDelay's controls the Info View reads "Device Activator", "Unfold Device Parameters" and
   "Assignable X-Y Control", and a click on the activator turns Device On off (remote Mac,
   2026-11-11). Only Live's main window is clicked: the plug-in's own window isn't reached.
+- A plug-in's own window floats over Live's main window, at window layer 3, where a check of
+  the normal (layer 0) windows doesn't see it: a click aimed at the device view under it would
+  go to the plug-in. `device-ui.swift` refuses a click unless the window aimed at is topmost
+  among the windows of every layer below the cursor's (remote Mac, Live 12.4.25b1, 2026-11-13).
 - While the remote Mac's display sleeps, `screencapture -l` fails with "could not create image from
   window", and the session reports the screen locked until the display wakes.
 - A Live started while the display slept never redrew its window: with the LOM at 2 tracks,

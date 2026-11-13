@@ -91,8 +91,18 @@ func requireUnlocked() {
     fail("The screen is locked")
 }
 
+// Every window on screen that can take a click, front to back: all layers, since a floating
+// window (a plug-in's, layer 3) or the menu bar covers Live's main window, but none from the
+// cursor's layer up, as the cursor is a window too and sits on the point after a hover.
+func clickableWindows() -> [[String: Any]] {
+    let cursor = Int(CGWindowLevelForKey(.cursorWindow))
+    let list = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID)
+        as? [[String: Any]] ?? []
+    return list.filter { ($0[kCGWindowLayer as String] as? Int ?? cursor) < cursor }
+}
+
 func requireOnTop(_ id: Int, _ point: CGPoint) {
-    guard let top = windows().first(where: { bounds($0).contains(point) }) else { fail("No window at the point") }
+    guard let top = clickableWindows().first(where: { bounds($0).contains(point) }) else { fail("No window at the point") }
     if number(top) != id {
         fail("The window at the point is \(top[kCGWindowOwnerName as String] ?? "?") \(number(top)), not \(id)")
     }
