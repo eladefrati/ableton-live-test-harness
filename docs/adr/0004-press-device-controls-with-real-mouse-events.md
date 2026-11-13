@@ -1,12 +1,12 @@
 ---
 title: "ADR-0004: Press device controls with real mouse events"
-status: Accepted; decision 2 superseded by ADR-0005, then ADR-0006; decision 4 extended by ADR-0007
+status: Accepted; decision 2 superseded by ADR-0005, then ADR-0006; decision 4 extended by ADR-0007; decision 3 extended to plug-in windows by ADR-0008
 date: 2026-11-08
 ---
 
 # ADR-0004: Press device controls with real mouse events
 
-**Status:** Accepted; decision 2 superseded by ADR-0005, then ADR-0006; decision 4 extended by ADR-0007
+**Status:** Accepted; decision 2 superseded by ADR-0005, then ADR-0006; decision 4 extended by ADR-0007; decision 3 extended to plug-in windows by ADR-0008
 
 ## Context
 
