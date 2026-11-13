@@ -647,3 +647,13 @@ test("choose keeps its failure, with a warning, when Escape fails too", async ()
   }
   assert.match(warnings.join("\n"), /couldn't close the menu over Menu: System Events got an error/);
 });
+
+test("Stop between choose's Info View check and its opening click stops the click", async () => {
+  const system = menuMachine(MENU_ROWS);
+  let stop;
+  Object.assign(system, { hostname: () => "another-mac", ask: async () => true, showComputerUse: async (onStop) => { stop = onStop; } });
+  const windows = system.windows;
+  system.windows = async () => { stop(); return windows(); };
+  await assert.rejects((await openMenu(system)).choose("Menu", "Wander"), /stopped from its pill/);
+  assert.equal(clicks(system).length, 0);
+});

@@ -349,20 +349,44 @@ const machine = {
   },
 };
 
+// The system's calls that move the pointer or press its button.
+const POINTER_CALLS = ["hover", "click", "drag", "clickEditor", "dragEditor"];
+
+// Whether each system's run may use the pointer: { allowed, stopped }.
+const permissions = new WeakMap();
+
 // Before a run's first hover: on the click host at once, on any other machine after the
 // person at it allows the run's clicks (ADR-0006). The answer holds for the rest of the run,
 // and while it does a purple border shows there (ADR-0009). The border only informs: a run
-// that can't show it still clicks, with a warning.
+// that can't show it still clicks, with a warning. After Stop on the pill (ADR-0009) it
+// throws: the run goes on, so a check fails at its next press and still cleans up.
 async function permit(system) {
-  requireNotStopped(system);
-  if (system.allowed) return;
-  const host = system.hostname();
-  if (host !== system.clickHost()) {
-    if (!(await system.ask())) throw new DeviceUiError(`Clicks in Live on ${host} weren't allowed (ADR-0006). Not clicked`);
-    const stop = () => { system.stopped = true; };
-    await system.showComputerUse(stop).catch((error) => console.error(`warn harness-computer-use couldn't show its border: ${error.message}`));
+  let permission = permissions.get(system);
+  if (!permission) permissions.set(system, permission = { allowed: false, stopped: false });
+  if (!permission.allowed) {
+    const host = system.hostname();
+    if (host !== system.clickHost()) {
+      if (!(await system.ask())) throw new DeviceUiError(`Clicks in Live on ${host} weren't allowed (ADR-0006). Not clicked`);
+      const stop = () => { permission.stopped = true; };
+      await system.showComputerUse(stop).catch((error) => console.error(`warn harness-computer-use couldn't show its border: ${error.message}`));
+    }
+    permission.allowed = true;
   }
-  system.allowed = true;
+  if (permission.stopped) throw new DeviceUiError("harness-computer-use was stopped from its pill: this run clicks no more. Not clicked");
+}
+
+// The system as DeviceUi and PluginWindow hold it: each call that moves the pointer passes
+// permit first, so none can skip the dialog or Stop. `permit` asks ahead of such a call.
+function guarded(system) {
+  const guard = Object.create(system);
+  guard.permit = () => permit(system);
+  for (const call of POINTER_CALLS) {
+    guard[call] = async (...args) => {
+      await permit(system);
+      return system[call](...args);
+    };
+  }
+  return guard;
 }
 
 // How long a menu takes to open after its click.
@@ -390,12 +414,6 @@ function dragDistance({ up = 0, right = 0 } = {}) {
     throw new DeviceUiError(`A drag needs { up, right } in points, at most ${MAX_DRAG} either way and not both 0. Not dragged`);
   }
   return [right, -up];
-}
-
-// After Stop on the pill (ADR-0009), every press of the run throws, before its hover and again
-// before its click. The run goes on, so a check fails at its next press and still cleans up.
-function requireNotStopped(system) {
-  if (system.stopped) throw new DeviceUiError("harness-computer-use was stopped from its pill: this run clicks no more. Not clicked");
 }
 
 // Live's windows on screen, front to back: [{ id, title, layer, x, y, w, h }] in points. A
@@ -441,7 +459,6 @@ class DeviceUi {
 
   async press(name, item) {
     const { window, x, y } = await this.aim(name, item);
-    requireNotStopped(this.system);
     await this.system.click(window, x, y);
   }
 
@@ -450,7 +467,6 @@ class DeviceUi {
   async drag(name, distance) {
     const [dx, dy] = dragDistance(distance);
     const { window, x, y } = await this.aim(name);
-    requireNotStopped(this.system);
     await this.system.drag(window, x, y, dx, dy);
   }
 
@@ -460,7 +476,6 @@ class DeviceUi {
   async choose(name, item) {
     if (typeof item !== "string" || !item) throw new DeviceUiError(`Choosing from ${name} needs the item's text. Not clicked`);
     const { window, x, y } = await this.aim(name);
-    requireNotStopped(this.system);
     const before = new Set((await this.system.windows()).map((w) => w.id));
     await this.system.click(window, x, y);
     try {
@@ -476,7 +491,6 @@ class DeviceUi {
         throw new DeviceUiError(`The menu over ${name} has ${rows.length} items reading "${item}" (it reads: ${lines.map((l) => l.text).join(", ")}). Not chosen`);
       }
       const row = rows[0];
-      requireNotStopped(this.system);
       await this.system.click(menu.id, menu.x + menu.w / 2, menu.y + (row.y + row.h / 2) / scale);
     } catch (error) {
       // The failure thrown is the one that stopped the choice, not Escape's.
@@ -493,11 +507,10 @@ class DeviceUi {
     if (!control.info) throw new DeviceUiError(`${name} has no Info View title to confirm (annotation_name, or info for a point). Not clicked`);
     const [ux, uy] = controlPoint(control, item);
 
-    await permit(this.system);
+    await this.system.permit();
     await this.system.focus();
     const at = await this.locate();
     const [x, y] = [at.x + ux, at.y + uy];
-    requireNotStopped(this.system);
     await this.system.hover(at.window.id, x, y);
     await sleep(this.system.settleMs ?? INFO_VIEW_SETTLE_MS);
     const { lines } = await this.system.read(at.window.id);
@@ -561,7 +574,7 @@ async function openDeviceUi(live, { track, device, build, controls, width }, sys
   }
   return new DeviceUi(live, {
     track, device, title, controls: panel.controls, width: width ?? panel.width, plugin: panel.plugin,
-  }, system);
+  }, guarded(system));
 }
 
 // How long a plug-in's window takes to show once Live is in front.
@@ -622,9 +635,8 @@ class PluginWindow {
     if (!control) throw new DeviceUiError(`${this.title} has no control named ${name}`);
     if (!this.size) throw new DeviceUiError(`The size of ${this.name}'s editor isn't known: give openPluginWindow a size. Not clicked`);
     const point = controlPoint(control);
-    await permit(this.system);
+    await this.system.permit();
     await this.locate();
-    requireNotStopped(this.system);
     return point;
   }
 
@@ -660,7 +672,7 @@ async function openPluginWindow(live, { track, device, size, controls = {} }, sy
   }
   const window = new PluginWindow(live, {
     track, device, name, title: `${name}/${trackName}`, size, controls: pointControls(controls),
-  }, system);
+  }, guarded(system));
   await window.setOpen(true);
   return window;
 }
