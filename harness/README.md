@@ -96,10 +96,13 @@ Node 18 or later. See [ADR-0001](../docs/adr/0001-fork-abletonosc.md) for the de
   undo (`undoName`). `tempFolder(prefix)` makes a folder in `<system temp>/ableton-harness/`, where every
   set the harness saves goes; `relaunch.js` and `quit.js` empty it.
 - `device-ui.js`: presses a device's controls with real mouse events (ADR-0004), and
-  captures its panel; does the same in a plug-in's own window (ADR-0008).
+  captures its panel; does the same in a plug-in's own window (ADR-0008). Its clicks, with
+  the asking and the border below, are **harness-computer-use**.
   On the machine `local.json` names as `clickHost` it clicks at once; on any other, a run's
   first press shows a dialog, and the run clicks only after Allow; Don't Allow or no answer
-  in 2 minutes throws `DeviceUiError` (ADR-0006).
+  in 2 minutes throws `DeviceUiError` (ADR-0006). From Allow until the run's process ends, a
+  purple border around the screen, labelled with the run, shows that the run may take the
+  pointer; a notification says when it has ended (`computer-use-overlay.swift`, ADR-0009).
   `openDeviceUi(live, {track, device, build})` takes the controls from the
   `.amxd`; `ui.press(name)` or `ui.press(tabName, item)` clicks, and `ui.text([x, y, w, h])`
   resolves with the lines shown in that part of the panel, in device units. A press looks

@@ -1,6 +1,6 @@
 ---
 name: verify-ableton
-description: Drive Ableton Live through the AbletonOSC test harness (~/dev/ableton-live-test-harness), for any project that runs in Live (Max for Live device, plug-in, MIDI Tool, Remote Script). Load it before anything in Live - starting or relaunching it, loading a build, adding a builds folder to Places, running a project's checks, pressing a device's controls, capturing Live or a device's panel (screenshots for a manual too), working on the remote Mac - and to prove a change in Live instead of asking the user to test by hand, before calling a Live change fixed.
+description: Drive Ableton Live through the AbletonOSC test harness (~/dev/ableton-live-test-harness), for any project that runs in Live (Max for Live device, plug-in, MIDI Tool, Remote Script). Load it before anything in Live - starting or relaunching it, loading a build, adding a builds folder to Places, running a project's checks, pressing a device's controls or clicking in Live (harness-computer-use), capturing Live or a device's panel (screenshots for a manual too), working on the remote Mac - and to prove a change in Live instead of asking the user to test by hand, before calling a Live change fixed.
 ---
 
 # Verify an Ableton project in Live
@@ -128,7 +128,10 @@ Click inside Live only through `harness/device-ui.js`, which clicks only after L
 View names the control, or, in a plug-in's own window, only inside the editor at the size
 its points were measured at (ADR-0008). On the click host (`clickHost` in `harness/local.json`) it clicks at
 once; on any other machine the run's first press shows the user a dialog and waits up to 2
-minutes for Allow (ADR-0006), so tell the user before such a run. Bring
+minutes for Allow (ADR-0006), so tell the user before such a run. From Allow until the run
+ends, a purple border around their screen shows the run may take the pointer (ADR-0009).
+These clicks, the asking and the border are harness-computer-use: a request by that name
+means this section. Bring
 Live to the front only when a step needs it: keystrokes through System Events go to the frontmost app. To see Live, capture
 its window in the background, which works with Live behind other windows:
 `node ~/dev/ableton-live-test-harness/harness/cli.js capture <png>`. That shows Live's
