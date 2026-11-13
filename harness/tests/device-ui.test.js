@@ -306,8 +306,10 @@ test("runName names a project's check from tests/live, any other script by its f
   assert.equal(runName(null), null);
 });
 
-test("runScript is null for code given with -e or -p, whatever argument follows it", () => {
+test("runScript is null for code given with -e or -p or on stdin, whatever argument follows it", () => {
   assert.equal(runScript([], ["node", "/a/check.js"]), "/a/check.js");
+  assert.equal(runScript([], ["node", "-", "a", "b"]), null);
+  assert.equal(runScript([], ["node"]), null);
   assert.equal(runScript(["-e"], ["node", "/tmp/all"]), null);
   assert.equal(runScript(["--eval=1"], ["node"]), null);
   assert.equal(runScript(["-p"], ["node", "x"]), null);

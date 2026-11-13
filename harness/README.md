@@ -106,7 +106,8 @@ Node 18 or later. See [ADR-0001](../docs/adr/0001-fork-abletonosc.md) for the de
   ADR-0009). Stop on the pill takes the mouse back: the run's later presses throw
   `DeviceUiError`, so a check fails there and still cleans up. The dialog, the pill and the
   notification name a check in `tests/live/` as
-  `tests/live/<check>.js`, another script by its file, and code run with `node -e` not at all.
+  `tests/live/<check>.js`, another script by its file, and code run with `node -e` or given
+  on stdin not at all.
   `openDeviceUi(live, {track, device, build})` takes the controls from the
   `.amxd`; `ui.press(name)` or `ui.press(tabName, item)` clicks, `ui.drag(name, {up, right})`
   turns a control by dragging it that many points with the button down (ADR-0010),

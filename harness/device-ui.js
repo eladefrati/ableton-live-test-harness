@@ -234,9 +234,11 @@ function readClickHost(file = LOCAL) {
 const ASK_SECONDS = 120;
 
 // The script node was started with, or null for code given inline (node -e, -p or -pe), where
-// process.argv[1] is the first argument passed to that code.
+// process.argv[1] is the first argument passed to that code, or on stdin (node -), where it
+// is "-".
 function runScript(execArgv = process.execArgv, argv = process.argv) {
-  return execArgv.some((arg) => /^(-e|-p|-pe|--eval|--print)(=|$)/.test(arg)) ? null : argv[1] || null;
+  if (execArgv.some((arg) => /^(-e|-p|-pe|--eval|--print)(=|$)/.test(arg)) || argv[1] === "-") return null;
+  return argv[1] || null;
 }
 
 // The running script as harness-computer-use names it: tests/live/<name> for a project's
