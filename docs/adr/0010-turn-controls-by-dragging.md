@@ -30,7 +30,7 @@ the mouse exercises.
    positive.
 3. **Evidence still comes from Live** (ADR-0004 decision 5): the parameter read back after the
    drag, which shows that it moved and which way.
-4. **The drag is bounded.** At most 400 points either way, and its end must be on screen.
+4. **The drag is bounded.** From 1 to 400 points either way, and its end must be on screen.
 
 ## Consequences
 

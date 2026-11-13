@@ -518,10 +518,11 @@ test("no drag when the Info View names something else", async () => {
   assert.equal(system.calls.some((call) => call[0] === "drag"), false);
 });
 
-test("a drag that is no drag or too long is refused before the pointer moves", async () => {
+test("a drag that is under 1 point or too long is refused before the pointer moves", async () => {
   const system = fakeMachine();
   const ui = await open(system);
-  for (const distance of [{}, { up: 0, right: 0 }, { up: 401 }, { right: -500 }, { up: Number.NaN }]) {
+  for (const distance of [{}, { up: 0, right: 0 }, { up: 401 }, { right: -500 }, { up: Number.NaN },
+    { up: 0.4 }, { right: -0.9 }, { up: -1e-15 }, { up: 0.5, right: 0.5 }]) {
     await assert.rejects(ui.drag("Button", distance), /Not dragged/);
   }
   assert.equal(system.calls.length, 0);
@@ -656,4 +657,18 @@ test("Stop between choose's Info View check and its opening click stops the clic
   system.windows = async () => { stop(); return windows(); };
   await assert.rejects((await openMenu(system)).choose("Menu", "Wander"), /stopped from its pill/);
   assert.equal(clicks(system).length, 0);
+});
+
+const tools = require("../tools.js");
+const hasDeveloperTools = (() => {
+  try { require("node:child_process").execFileSync("xcode-select", ["-p"], { stdio: "ignore" }); return true; } catch { return false; }
+})();
+
+// Runs the real helper, built with swiftc if it isn't cached. A drag refused for its distance
+// posts no event; nor would one that got past that check, as no window has the id -1.
+test("the helper refuses a drag under 1 point", { skip: !hasDeveloperTools && "no developer tools", timeout: 300000 }, async () => {
+  const helper = await tools.helperBinary(path.join(__dirname, "..", "device-ui.swift"));
+  for (const [dx, dy] of [[0, -1e-15], [0, -0.4], [0.9, 0], [0.5, -0.5]]) {
+    await assert.rejects(tools.run(helper, ["drag", -1, 100, 100, dx, dy]), /between 1 and 400 points/);
+  }
 });

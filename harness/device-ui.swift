@@ -27,8 +27,9 @@
 // hover, click and drag refuse, posting nothing, unless the screen is unlocked and <window> is
 // the topmost window at the point, which a click and a drag check again after their hover,
 // before the button goes down; the editor's commands also unless the point is inside the
-// editor and the editor is the size given; a drag also unless it is at most MAX_DRAG points
-// either way and ends on a screen. Exits 1 with the reason on stderr if anything fails.
+// editor and the editor is the size given; a drag also unless it moves at least 1 point, at
+// most MAX_DRAG either way, and ends on a screen. Exits 1 with the reason on stderr if
+// anything fails.
 
 import ApplicationServices
 import Foundation
@@ -263,58 +264,64 @@ func requireOnTop(_ id: Int, _ point: CGPoint) {
     }
 }
 
-func post(_ type: CGEventType, _ point: CGPoint) {
+func mouseEvent(_ type: CGEventType, _ point: CGPoint) -> CGEvent {
     guard let event = CGEvent(mouseEventSource: CGEventSource(stateID: .hidSystemState), mouseType: type,
                               mouseCursorPosition: point, mouseButton: .left)
     else { fail("Cannot create a mouse event") }
     event.setIntegerValueField(.mouseEventClickState, value: 1)
-    event.post(tap: .cghidEventTap)
+    return event
 }
+
+func post(_ type: CGEventType, _ point: CGPoint) { mouseEvent(type, point).post(tap: .cghidEventTap) }
 
 // The longest drag either way, in points (ADR-0010).
 let MAX_DRAG = 400.0
 
-// The end of a drag from `point`, or a failure, before any event is posted.
-func dragEnd(_ point: CGPoint, _ delta: CGVector) -> CGPoint {
-    guard abs(delta.dx) <= MAX_DRAG, abs(delta.dy) <= MAX_DRAG, delta.dx != 0 || delta.dy != 0
+// Refuses a drag from `point` by `delta`, before any event is posted, unless it moves at least
+// 1 point, at most MAX_DRAG either way, and ends on a screen.
+func requireDrag(_ point: CGPoint, _ delta: CGVector) {
+    guard abs(delta.dx) <= MAX_DRAG, abs(delta.dy) <= MAX_DRAG, max(abs(delta.dx), abs(delta.dy)) >= 1
     else { fail("A drag moves between 1 and \(Int(MAX_DRAG)) points either way, not \(delta.dx), \(delta.dy)") }
     let end = CGPoint(x: point.x + delta.dx, y: point.y + delta.dy)
     var count: UInt32 = 0
     guard CGGetDisplaysWithPoint(end, 0, nil, &count) == .success, count > 0 else { fail("A drag to \(end) ends off screen") }
-    return end
 }
 
-// Button down at `point`, one-point steps to `end`, button up there. Each drag event carries
-// its movement too, for controls that read how far the mouse moved: whole points, which add
-// up to the distance.
-func drag(_ point: CGPoint, to end: CGPoint) {
-    post(.leftMouseDown, point)
-    usleep(70_000)
-    let steps = Int(max(abs(end.x - point.x), abs(end.y - point.y)).rounded(.up))
+// Button down at `point`, steps of at most one point either way along `delta`, button up at
+// its end. Each drag event carries its movement too, for controls that read how far the mouse
+// moved: whole points, which add up to the distance. Every event is made before the button
+// goes down, so nothing here can fail and leave it held.
+func drag(_ point: CGPoint, by delta: CGVector) {
+    let steps = Int(max(abs(delta.dx), abs(delta.dy)).rounded(.up))
     var carried = (dx: Int64(0), dy: Int64(0))
-    for step in 1...steps {
-        let t = Double(step) / Double(steps)
-        let next = CGPoint(x: point.x + (end.x - point.x) * t, y: point.y + (end.y - point.y) * t)
-        guard let event = CGEvent(mouseEventSource: CGEventSource(stateID: .hidSystemState), mouseType: .leftMouseDragged,
-                                  mouseCursorPosition: next, mouseButton: .left)
-        else { fail("Cannot create a mouse event") }
-        event.setIntegerValueField(.mouseEventClickState, value: 1)
-        let moved = (dx: Int64((next.x - point.x).rounded()), dy: Int64((next.y - point.y).rounded()))
+    let moves = (0..<steps).map { step -> CGEvent in
+        let t = Double(step + 1) / Double(steps)
+        let event = mouseEvent(.leftMouseDragged, CGPoint(x: point.x + delta.dx * t, y: point.y + delta.dy * t))
+        let moved = (dx: Int64((delta.dx * t).rounded()), dy: Int64((delta.dy * t).rounded()))
         event.setIntegerValueField(.mouseEventDeltaX, value: moved.dx - carried.dx)
         event.setIntegerValueField(.mouseEventDeltaY, value: moved.dy - carried.dy)
-        event.post(tap: .cghidEventTap)
         carried = moved
+        return event
+    }
+    let down = mouseEvent(.leftMouseDown, point)
+    let up = mouseEvent(.leftMouseUp, CGPoint(x: point.x + delta.dx, y: point.y + delta.dy))
+    down.post(tap: .cghidEventTap)
+    usleep(70_000)
+    for move in moves {
+        move.post(tap: .cghidEventTap)
         usleep(8_000)
     }
     usleep(50_000)
-    post(.leftMouseUp, end)
+    up.post(tap: .cghidEventTap)
     usleep(100_000)
 }
 
+// Both events are made before the button goes down, as in a drag.
 func press(_ point: CGPoint) {
-    post(.leftMouseDown, point)
+    let (down, up) = (mouseEvent(.leftMouseDown, point), mouseEvent(.leftMouseUp, point))
+    down.post(tap: .cghidEventTap)
     usleep(70_000)
-    post(.leftMouseUp, point)
+    up.post(tap: .cghidEventTap)
     usleep(100_000)
 }
 
@@ -396,9 +403,10 @@ case "click-editor", "drag-editor":
     requireUnlocked()
     let (id, point) = editorPoint(arguments[2], numbers[0], numbers[1], CGSize(width: numbers[2], height: numbers[3]))
     if dragging {
-        let end = dragEnd(point, CGVector(dx: numbers[4], dy: numbers[5]))
+        let delta = CGVector(dx: numbers[4], dy: numbers[5])
+        requireDrag(point, delta)
         aim(id, point)
-        drag(point, to: end)
+        drag(point, by: delta)
     } else {
         aim(id, point)
         press(point)
@@ -407,11 +415,11 @@ case "drag":
     guard arguments.count == 7, let id = Int(arguments[2]), let x = Double(arguments[3]), let y = Double(arguments[4]),
           let dx = Double(arguments[5]), let dy = Double(arguments[6])
     else { fail("usage: device-ui drag <window> <x> <y> <dx> <dy>") }
-    let point = CGPoint(x: x, y: y)
-    let end = dragEnd(point, CGVector(dx: dx, dy: dy))
+    let (point, delta) = (CGPoint(x: x, y: y), CGVector(dx: dx, dy: dy))
+    requireDrag(point, delta)
     requireUnlocked()
     aim(id, point)
-    drag(point, to: end)
+    drag(point, by: delta)
 default:
     fail("usage: device-ui window | windows | text <png> | crop <png> <x> <y> <w> <h> <out> | hover <window> <x> <y> | click <window> <x> <y> | "
         + "plugin-window state|open|close <device> | plugin-editor <title> | click-editor <title> <x> <y> <w> <h> | "
