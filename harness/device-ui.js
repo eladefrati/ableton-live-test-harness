@@ -233,10 +233,10 @@ function readClickHost(file = LOCAL) {
 // How long the dialog asking to click waits for an answer (ADR-0006).
 const ASK_SECONDS = 120;
 
-// The script node was started with, or null for code given inline (node -e or -p), where
+// The script node was started with, or null for code given inline (node -e, -p or -pe), where
 // process.argv[1] is the first argument passed to that code.
 function runScript(execArgv = process.execArgv, argv = process.argv) {
-  return execArgv.some((arg) => /^(-e|-p|--eval|--print)(=|$)/.test(arg)) ? null : argv[1] || null;
+  return execArgv.some((arg) => /^(-e|-p|-pe|--eval|--print)(=|$)/.test(arg)) ? null : argv[1] || null;
 }
 
 // The running script as harness-computer-use names it: tests/live/<name> for a project's

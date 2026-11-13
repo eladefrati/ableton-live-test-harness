@@ -301,6 +301,7 @@ test("runScript is null for code given with -e or -p, whatever argument follows 
   assert.equal(runScript(["-e"], ["node", "/tmp/all"]), null);
   assert.equal(runScript(["--eval=1"], ["node"]), null);
   assert.equal(runScript(["-p"], ["node", "x"]), null);
+  assert.equal(runScript(["-pe", "1"], ["node", "a", "b"]), null);
   assert.equal(runScript(["--enable-source-maps"], ["node", "/a/check.js"]), "/a/check.js");
 });
 
