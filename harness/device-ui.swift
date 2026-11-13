@@ -285,12 +285,13 @@ func dragEnd(_ point: CGPoint, _ delta: CGVector) -> CGPoint {
 }
 
 // Button down at `point`, one-point steps to `end`, button up there. Each drag event carries
-// its movement too, for controls that read how far the mouse moved.
+// its movement too, for controls that read how far the mouse moved: whole points, which add
+// up to the distance.
 func drag(_ point: CGPoint, to end: CGPoint) {
     post(.leftMouseDown, point)
     usleep(70_000)
     let steps = Int(max(abs(end.x - point.x), abs(end.y - point.y)).rounded(.up))
-    var last = point
+    var carried = (dx: Int64(0), dy: Int64(0))
     for step in 1...steps {
         let t = Double(step) / Double(steps)
         let next = CGPoint(x: point.x + (end.x - point.x) * t, y: point.y + (end.y - point.y) * t)
@@ -298,10 +299,11 @@ func drag(_ point: CGPoint, to end: CGPoint) {
                                   mouseCursorPosition: next, mouseButton: .left)
         else { fail("Cannot create a mouse event") }
         event.setIntegerValueField(.mouseEventClickState, value: 1)
-        event.setIntegerValueField(.mouseEventDeltaX, value: Int64((next.x - last.x).rounded()))
-        event.setIntegerValueField(.mouseEventDeltaY, value: Int64((next.y - last.y).rounded()))
+        let moved = (dx: Int64((next.x - point.x).rounded()), dy: Int64((next.y - point.y).rounded()))
+        event.setIntegerValueField(.mouseEventDeltaX, value: moved.dx - carried.dx)
+        event.setIntegerValueField(.mouseEventDeltaY, value: moved.dy - carried.dy)
         event.post(tap: .cghidEventTap)
-        last = next
+        carried = moved
         usleep(8_000)
     }
     usleep(50_000)

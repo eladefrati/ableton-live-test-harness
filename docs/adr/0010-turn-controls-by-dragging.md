@@ -39,4 +39,5 @@ the mouse exercises.
 - A drag can't set an exact value; a check that needs one sets it over OSC and drags only to
   prove the mouse turns the control.
 - Each drag event carries its movement as well as its position, for controls that read how
-  far the mouse moved rather than where it is.
+  far the mouse moved rather than where it is. The movements are whole points and add up to
+  the distance.

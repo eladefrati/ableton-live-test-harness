@@ -84,6 +84,9 @@ unexpected.
   Live knob turns through its whole range in under 40 points; on a JUCE editor's horizontal
   slider, 100 points left took it from 1.00 to 0.34 and a drag right back to its end (remote
   Mac, Live 12.4.25b1, 2026-11-13).
+- Each drag event's delta fields are whole points that add up to the distance asked for.
+  Rounded step by step, they had added up to 2 for 1.4 points, 11 for 10.3, and 0 for the 10
+  up of a drag 60 left and 10 up (remote Mac, 2026-11-13).
 - While a Max device's Map button waits for a target, the Info View still names the knob
   under the pointer on a device on another track, and the click makes the mapping: Auto
   Filter's Frequency, Dry/Wet and Resonance, with `settleMs` 1000 (remote Mac, 2026-11-11).
