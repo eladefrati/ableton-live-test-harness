@@ -125,14 +125,19 @@ fix.
 ## Live's window
 
 Click inside Live only through `harness/device-ui.js`, which clicks only after Live's Info
-View names the control. On the click host (`clickHost` in `harness/local.json`) it clicks at
+View names the control, or, in a plug-in's own window, only inside the editor at the size
+its points were measured at (ADR-0008). On the click host (`clickHost` in `harness/local.json`) it clicks at
 once; on any other machine the run's first press shows the user a dialog and waits up to 2
 minutes for Allow (ADR-0006), so tell the user before such a run. Bring
 Live to the front only when a step needs it: keystrokes through System Events go to the frontmost app. To see Live, capture
 its window in the background, which works with Live behind other windows:
 `node ~/dev/ableton-live-test-harness/harness/cli.js capture <png>`. That shows Live's
 main window only. A dialog or panel is a window of its own: `cli.js windows` lists Live's
-windows with their ids, and `cli.js capture <png> --window <id>` captures one. Before acting on a Live window, list Live's windows (System
+windows with their ids, and `cli.js capture <png> --window <id>` captures one. A plug-in's
+own window (its editor) shows only while Live is in front: open and capture it with
+`cli.js plugin-window <track> <device> <png>`, and press its controls with
+`openPluginWindow` (`harness/README.md`), never by clicking the device's title bar or with
+`screencapture` of your own. Before acting on a Live window, list Live's windows (System
 Events) so a panel on top isn't missed. A dialog the Live API can't answer: capture it and
 ask the user, naming it.
 

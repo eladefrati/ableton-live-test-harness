@@ -96,7 +96,7 @@ Node 18 or later. See [ADR-0001](../docs/adr/0001-fork-abletonosc.md) for the de
   undo (`undoName`). `tempFolder(prefix)` makes a folder in `<system temp>/ableton-harness/`, where every
   set the harness saves goes; `relaunch.js` and `quit.js` empty it.
 - `device-ui.js`: presses a device's controls with real mouse events (ADR-0004), and
-  captures its panel.
+  captures its panel; does the same in a plug-in's own window (ADR-0008).
   On the machine `local.json` names as `clickHost` it clicks at once; on any other, a run's
   first press shows a dialog, and the run clicks only after Allow; Don't Allow or no answer
   in 2 minutes throws `DeviceUiError` (ADR-0006).
@@ -119,6 +119,18 @@ Node 18 or later. See [ADR-0001](../docs/adr/0001-fork-abletonosc.md) for the de
   knobs, named as its parameters (`Frequency`, `Resonance`, `Dry/Wet` and the others).
   `ui.capture(file)` saves a PNG of the device, title bar and frame included, from a capture
   of Live's window; its width comes from the build, the measured device or `width`.
+  A plug-in's own window, where its editor opens (ADR-0008):
+  `openPluginWindow(live, {track, device, size, controls})` selects the device and opens the
+  window if it isn't open (through Accessibility, no pointer), and resolves with an object
+  whose `press(name)` clicks a control, `capture(file)` saves a PNG of the editor without
+  Live's title bar, and `close()` closes the window. `size` is the editor's `[w, h]` and
+  `controls` is `{name: {x, y}}`, each control's centre, both in points from the editor's top
+  left. Live shows the window only while it is in front with the display on, so `press` and
+  `capture` wake the display and bring Live to the front; `capture` gives the front back. A
+  press throws `DeviceUiError` without clicking unless the screen is unlocked, the editor is
+  `size`, the point inside it, and the plug-in's window on top at the point. There is no Info
+  View to confirm the control: a moved point clicks another control of the plug-in, so take
+  the evidence from Live. A press needs `size`; opening and capturing don't.
 - `doctor.js`: read-only check that Live is ready to be driven; run it first. What it
   checks and what to do about each line: the
   [`verify-ableton` skill](../skills/verify-ableton/SKILL.md).
@@ -166,14 +178,17 @@ Node 18 or later. See [ADR-0001](../docs/adr/0001-fork-abletonosc.md) for the de
   (`{at, level, text}`) Live logged from `since` (ms timestamp or Date) on: take the time
   before a run and read them after it, to see why a device that loaded and answers OSC
   does nothing.
-- `cli.js`: `node harness/cli.js ping | reload | query <address> [args] | send <address> [args] | notes <track> <clip> [--arrangement] | song-notes <track> | max-log [since] | windows | capture <png> [--window <id>]`.
+- `cli.js`: `node harness/cli.js ping | reload | query <address> [args] | send <address> [args] | notes <track> <clip> [--arrangement] | song-notes <track> | max-log [since] | windows | capture <png> [--window <id>] | plugin-window <track> <device> <png>`.
   `max-log` reads Live's log, not OSC, so it runs beside a check; `since` is ms or a local
   time such as `2026-10-31T11:18`, and defaults to Live's start. `windows` lists Live's
-  windows on screen (`liveWindows` in `device-ui.js`): a dialog or a panel is a window of its
-  own. `capture` saves a picture of Live's main window, or with `--window <id>` of one from
-  that list, taken with Live behind other windows (`captureWindow`). Both need Screen
+  windows on screen with their layer (`liveWindows` in `device-ui.js`): a dialog or a panel
+  is a window of its own, and so is a plug-in's window (layer 3), listed only while Live is
+  in front. `capture` saves a picture of Live's main window, or with `--window <id>` of one
+  from that list, taken with Live behind other windows (`captureWindow`). Both need Screen
   Recording for the terminal app, and Automation for System Events: they wake the display
-  first, as `macos.js` does.
+  first, as `macos.js` does. `plugin-window` opens a plug-in's own window if it isn't open
+  and saves a picture of its editor (`openPluginWindow`), bringing Live to the front while it
+  captures; it also needs Accessibility.
 - `checks/record-roundtrip.js`: checks the recording path itself. It adds two tracks,
   records one's clip into the other through MIDI routing, compares, and deletes them.
 - `checks/plugin-record.js [--keep]`: checks the plug-in path on Apple's AUDelay, which
@@ -289,7 +304,8 @@ must stay off there: waking doesn't reliably dismiss it.
   brings Live forward itself, types nothing if Live doesn't come, and puts the app that was
   in front back afterwards. Don't type in another app meanwhile. Menu commands
   (`clickMenu`: `saveSet`, Key and MIDI Map Mode) bring Live forward for the click and put
-  it back too; nothing else brings Live forward.
+  it back too. A plug-in window's `press` and `capture` bring Live forward, since Live shows
+  the window only then; `capture` puts the app back. Nothing else brings Live forward.
 - Count-In off: "Installation" in the main README.
 - Recording uses the Arrangement: `recordArrangement()` turns the loop off and sets Record
   Quantization to None, and leaves them that way.
