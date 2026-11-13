@@ -15,6 +15,9 @@ code comments or commit messages.
 
 The repo names no project that uses it: tests and docs use plain stand-ins.
 
+A change to what the harness offers or needs is documented in the same branch, in the
+document that covers it, with a pointer from `harness/README.md` where one is needed.
+
 ## AbletonOSC's tests
 
 `tests/` is AbletonOSC's own pytest suite, kept from upstream. It isn't run before commits
