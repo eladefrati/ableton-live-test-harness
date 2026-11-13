@@ -232,7 +232,13 @@ unexpected.
   512-sample boundary, while the input is silent between bursts and the plug-in's output is
   a decaying tail under 2e-6 (about -114 dBFS); an offline render matches everywhere else.
   The plug-in passes its output through unchanged, and reporting a tail (0.25 s tried)
-  changed nothing. The rule Live applies is not known.
+  changed nothing. The level is not a fixed floor: seen 2026-11-13 (Live 12.4.25b1, VST3,
+  48 kHz, 32-bit float), another plug-in's recording equalled its offline render to the
+  bit through a 50 ms noise burst and into a slow 20 Hz tail with the input silent, then
+  read exact zeros where the render read up to 6.0e-6 (about -104 dBFS), the largest
+  difference at the same sample (9504 after the signal starts) on two runs. A check that
+  skips recorded zeros where the render is quiet needs its floor above the loudest output
+  Live has zeroed. The rule Live applies is not known.
 
 ## Logs and settings
 
