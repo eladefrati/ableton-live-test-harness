@@ -455,28 +455,34 @@ class DeviceUi {
   }
 
   // Opens the menu `name` and clicks its item `item`, confirmed by its text (ADR-0011): the
-  // menu's own window is read, and exactly one row must read `item`, or the menu is closed with
-  // Escape and nothing more is clicked.
+  // menu's own window is read, and exactly one row must read `item`. Whatever fails once the
+  // menu's control was clicked, the menu is closed with Escape and nothing more is clicked.
   async choose(name, item) {
+    if (typeof item !== "string" || !item) throw new DeviceUiError(`Choosing from ${name} needs the item's text. Not clicked`);
     const { window, x, y } = await this.aim(name);
     requireNotStopped(this.system);
     const before = new Set((await this.system.windows()).map((w) => w.id));
     await this.system.click(window, x, y);
-    let menu;
-    for (const deadline = Date.now() + MENU_WAIT_MS; !menu; await sleep(150)) {
-      menu = (await this.system.windows()).find((w) => !before.has(w.id) && w.layer > 0);
-      if (!menu && Date.now() > deadline) throw new DeviceUiError(`No menu opened over ${name}. Not chosen`);
+    try {
+      let menu;
+      for (const deadline = Date.now() + MENU_WAIT_MS; !menu; await sleep(150)) {
+        menu = (await this.system.windows()).find((w) => !before.has(w.id) && w.layer > 0);
+        if (!menu && Date.now() > deadline) throw new DeviceUiError(`No menu opened over ${name}. Not chosen`);
+      }
+      const { width, lines } = await this.system.read(menu.id);
+      const scale = width / menu.w;
+      const rows = lines.filter((line) => rowReads(line.text, item));
+      if (rows.length !== 1) {
+        throw new DeviceUiError(`The menu over ${name} has ${rows.length} items reading "${item}" (it reads: ${lines.map((l) => l.text).join(", ")}). Not chosen`);
+      }
+      const row = rows[0];
+      requireNotStopped(this.system);
+      await this.system.click(menu.id, menu.x + menu.w / 2, menu.y + (row.y + row.h / 2) / scale);
+    } catch (error) {
+      // The failure thrown is the one that stopped the choice, not Escape's.
+      await this.system.escape().catch((failed) => console.error(`warn harness-computer-use couldn't close the menu over ${name}: ${failed.message}`));
+      throw error;
     }
-    const { width, lines } = await this.system.read(menu.id);
-    const scale = width / menu.w;
-    const rows = lines.filter((line) => rowReads(line.text, item));
-    if (rows.length !== 1) {
-      await this.system.escape();
-      throw new DeviceUiError(`The menu over ${name} has ${rows.length} items reading "${item}" (it reads: ${lines.map((l) => l.text).join(", ")}). Not chosen`);
-    }
-    const row = rows[0];
-    requireNotStopped(this.system);
-    await this.system.click(menu.id, menu.x + menu.w / 2, menu.y + (row.y + row.h / 2) / scale);
   }
 
   // Puts the pointer on a control once the Info View names it, with Live in front, and

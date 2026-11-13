@@ -599,3 +599,51 @@ test("choose skips a row's icon, one word of one or two characters, and no other
     assert.equal(clicks(system).at(-1)[3], 900 + (y + 12) / 2);
   }
 });
+
+test("choose closes the menu when its read fails or its item's click is refused", async () => {
+  const reading = menuMachine(MENU_ROWS);
+  const read = reading.read;
+  reading.read = async (id) => { if (id === 9) throw new DeviceUiError("could not create image from window"); return read(id); };
+  await assert.rejects((await openMenu(reading)).choose("Menu", "Wander"), /could not create image/);
+  assert.equal(reading.calls.at(-1), "escape");
+
+  const clicking = menuMachine(MENU_ROWS);
+  const click = clicking.click;
+  clicking.click = async (id, x, y) => { if (id === 9) throw new DeviceUiError("The window at the point is Finder 3, not 9"); return click(id, x, y); };
+  await assert.rejects((await openMenu(clicking)).choose("Menu", "Wander"), /Finder 3/);
+  assert.equal(clicking.calls.at(-1), "escape");
+});
+
+test("choose refuses a missing item before anything is clicked", async () => {
+  const system = menuMachine(MENU_ROWS);
+  const ui = await openMenu(system);
+  for (const item of [undefined, "", 3]) {
+    await assert.rejects(ui.choose("Menu", item), (error) => error instanceof DeviceUiError && /Not clicked/.test(error.message));
+  }
+  assert.equal(system.calls.length, 0);
+});
+
+test("Stop while choose reads the menu closes it and clicks no item", async () => {
+  const system = menuMachine(MENU_ROWS);
+  let stop;
+  Object.assign(system, { hostname: () => "another-mac", ask: async () => true, showComputerUse: async (onStop) => { stop = onStop; } });
+  const read = system.read;
+  system.read = async (id) => { if (id === 9) stop(); return read(id); };
+  await assert.rejects((await openMenu(system)).choose("Menu", "Wander"), /stopped from its pill/);
+  assert.equal(clicks(system).length, 1);
+  assert.equal(system.calls.at(-1), "escape");
+});
+
+test("choose keeps its failure, with a warning, when Escape fails too", async () => {
+  const system = menuMachine(MENU_ROWS);
+  system.escape = async () => { throw new Error("System Events got an error"); };
+  const warnings = [];
+  const warn = console.error;
+  console.error = (message) => warnings.push(message);
+  try {
+    await assert.rejects((await openMenu(system)).choose("Menu", "Triangle"), /0 items reading "Triangle"/);
+  } finally {
+    console.error = warn;
+  }
+  assert.match(warnings.join("\n"), /couldn't close the menu over Menu: System Events got an error/);
+});

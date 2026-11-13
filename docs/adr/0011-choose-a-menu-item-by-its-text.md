@@ -19,7 +19,8 @@ click on an item has no Info View to confirm it.
 1. **The menu is pressed as any control,** once the Info View names it.
 2. **The item is confirmed by its text.** The harness captures the menu's window, reads its
    items with text recognition, and clicks the one item whose text is the item asked for, in
-   the middle of its row. No match, or more than one, closes the menu with Escape and refuses.
+   the middle of its row. No match, or more than one, closes the menu with Escape and refuses;
+   so does any other failure once the menu's control was clicked.
 3. **The click goes to the menu's window,** with ADR-0004's check that it is topmost at the
    point, and Stop (ADR-0009) is honoured before it.
 
