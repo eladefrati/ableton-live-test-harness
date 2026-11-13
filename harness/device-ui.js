@@ -331,8 +331,11 @@ const machine = {
   clickEditor: (title, x, y, [w, h]) => helper("click-editor", title, x, y, w, h),
   dragEditor: (title, x, y, [w, h], dx, dy) => helper("drag-editor", title, x, y, w, h, dx, dy),
   frontmost: () => mac.frontmostApp(),
-  // Escape to Live, which closes an open menu.
+  // Escape, which closes an open menu: `escape` brings Live to the front first, `typeEscape`
+  // types it to whatever app is in front.
   escape: () => mac.typeInLive("key code 53"),
+  liveInFront: () => mac.isFrontmost(),
+  typeEscape: () => mac.osascript('tell application "System Events" to key code 53'),
   giveBack: (id) => mac.giveBackFront(id),
   // Crops a capture of the window, `width` points wide, to [x, y, w, h] in points.
   async captureRect(windowId, width, rect, file) {
@@ -377,9 +380,15 @@ async function permit(system) {
 
 // The system as DeviceUi and PluginWindow hold it: each call that moves the pointer passes
 // permit first, so none can skip the dialog or Stop. `permit` asks ahead of such a call.
+// After Stop the run takes nothing more from the person, the front included: Escape is typed
+// only while Live is still in front, and Live isn't brought there.
 function guarded(system) {
   const guard = Object.create(system);
   guard.permit = () => permit(system);
+  guard.escape = async () => {
+    if (!permissions.get(system)?.stopped) return system.escape();
+    if (await system.liveInFront()) await system.typeEscape();
+  };
   for (const call of POINTER_CALLS) {
     guard[call] = async (...args) => {
       await permit(system);
@@ -472,7 +481,8 @@ class DeviceUi {
 
   // Opens the menu `name` and clicks its item `item`, confirmed by its text (ADR-0011): the
   // menu's own window is read, and exactly one row must read `item`. Whatever fails once the
-  // menu's control was clicked, the menu is closed with Escape and nothing more is clicked.
+  // menu's control was clicked, the menu is closed with Escape (after Stop, only while Live
+  // is still in front) and nothing more is clicked.
   async choose(name, item) {
     if (typeof item !== "string" || !item) throw new DeviceUiError(`Choosing from ${name} needs the item's text. Not clicked`);
     const { window, x, y } = await this.aim(name);

@@ -146,6 +146,10 @@ unexpected.
   non-activating panel that takes a click on its Stop without taking the front. Unlike the
   glow, the click guard doesn't skip it: a point under the pill is refused, with an error
   that names the pill.
+- After Stop on the pill, `choose` closes a menu it had opened only while Live is still in
+  front, and doesn't bring Live there: a stopped run takes nothing more from the person, the
+  front included. Escape typed with Live in front, and no activation, closed a chooser's menu
+  (remote Mac, Live 12.4.25b1, 2026-11-13).
 - While the remote Mac's display sleeps, `screencapture -l` fails with "could not create image from
   window", and the session reports the screen locked until the display wakes.
 - A Live started while the display slept never redrew its window: with the LOM at 2 tracks,

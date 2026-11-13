@@ -547,7 +547,7 @@ test("after Stop on the pill, no drag", async () => {
 });
 
 // A device whose menu control opens a window of its own, as a Live chooser does.
-function menuMachine(rows, { opens = true } = {}) {
+function menuMachine(rows, { opens = true, front = true } = {}) {
   const system = fakeMachine({ info: "Menu" });
   const menu = { id: 9, title: "", layer: 101, x: 600, y: 900, w: 88, h: 122 };
   let open = false;
@@ -555,6 +555,8 @@ function menuMachine(rows, { opens = true } = {}) {
     windows: async () => (open ? [menu, { ...WINDOW, layer: 0 }] : [{ ...WINDOW, layer: 0 }]),
     click: async (id, x, y) => { system.calls.push(["click", id, x, y]); if (id === 7 && opens) open = true; },
     escape: async () => { system.calls.push("escape"); },
+    liveInFront: async () => front,
+    typeEscape: async () => { system.calls.push("typeEscape"); },
   });
   const read = system.read;
   system.read = async (id) => (id === 9 ? { width: 176, lines: rows } : read(id));
@@ -624,15 +626,28 @@ test("choose refuses a missing item before anything is clicked", async () => {
   assert.equal(system.calls.length, 0);
 });
 
-test("Stop while choose reads the menu closes it and clicks no item", async () => {
-  const system = menuMachine(MENU_ROWS);
+// Stops the run while choose reads the menu it opened, and resolves with the system's calls.
+async function stoppedWhileReading(front) {
+  const system = menuMachine(MENU_ROWS, { front });
   let stop;
   Object.assign(system, { hostname: () => "another-mac", ask: async () => true, showComputerUse: async (onStop) => { stop = onStop; } });
   const read = system.read;
   system.read = async (id) => { if (id === 9) stop(); return read(id); };
   await assert.rejects((await openMenu(system)).choose("Menu", "Wander"), /stopped from its pill/);
   assert.equal(clicks(system).length, 1);
-  assert.equal(system.calls.at(-1), "escape");
+  return system.calls;
+}
+
+test("Stop while choose reads the menu closes it with Live still in front, without bringing Live forward", async () => {
+  const calls = await stoppedWhileReading(true);
+  assert.equal(calls.at(-1), "typeEscape");
+  assert.equal(calls.includes("escape"), false);
+});
+
+test("Stop while choose reads the menu types nothing once Live is no longer in front", async () => {
+  const calls = await stoppedWhileReading(false);
+  assert.equal(calls.includes("typeEscape"), false);
+  assert.equal(calls.includes("escape"), false);
 });
 
 test("choose keeps its failure, with a warning, when Escape fails too", async () => {
