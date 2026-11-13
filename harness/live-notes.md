@@ -72,9 +72,12 @@ unexpected.
   that section (remote Mac, Live 12.4.25b1, 2026-11-11).
 - A chooser in a device's panel (Auto Filter's LFO Wave) opens its menu as a window of its
   own over Live's, at window layer 101 (88 x 122 points), its rows read by text recognition
-  with each icon as a character or two ("w Wander"). `choose` skips one such word before a
-  row's text and nothing longer: asked for "H", it refuses a menu whose only match is
-  "S & H". The Info View names the chooser ("LFO Waveform"), not the rows. Over Auto Filter's filter display, its frequency dot included, the
+  with each icon as a word before the row's text ("w Wander"). In 8 captures the same icon
+  read differently from one to the next ("/" and "N"; "^", "A" and "•"), and one row's
+  wasn't read in 3. The icons' words began 4 to 8 points from the menu's left edge, once 18,
+  and the rows' texts 22 to 24. `choose` takes a row's text from the column the texts begin
+  in, so "H" doesn't match the row read "JF S& H", with its icon or without. The Info View
+  names the chooser ("LFO Waveform"), not the rows. Over Auto Filter's filter display, its frequency dot included, the
   Info View reads only "Device" (remote Mac, Live 12.4.25b1, 2026-11-13).
 - After Escape closed a menu, the Info View stayed blank while the pointer moved within the
   control that had opened it (3 points); moved onto it from 15 points away, it named it again.

@@ -29,8 +29,10 @@ click on an item has no Info View to confirm it.
 ## Consequences
 
 - Items with the same text in one menu can't be chosen.
-- Text recognition reads a row's icon as a word of one or two characters before its text. The
-  harness skips one such word, so an item can't be told from a row that reads a one- or
-  two-character word and then that item.
+- Text recognition reads a row's icon as a word before its text, or not at all. The harness
+  takes a row's text from the column the menu's rows start their texts in, the left edge
+  most rows have a word at: a word left of it is left out as the icon, whatever it reads,
+  and the start of a row's own text never is. A menu whose rows don't start their texts in
+  one column is matched by its rows' whole text only.
 - Text recognition misreads some characters (0 and O, 1 and I or l); the harness compares
   them as it does device titles.

@@ -401,15 +401,33 @@ function guarded(system) {
 // How long a menu takes to open after its click.
 const MENU_WAIT_MS = 2000;
 
-// The longest word text recognition reads a menu row's icon as, in characters ("w Wander").
-const ICON_MAX = 2;
+// How far left of the column a menu's rows start their texts in a word can begin and still be
+// text, in points. Text recognition put the texts' left edges up to 2.3 points apart, and the
+// nearest icon 6.3 points left of the rightmost of them (live-notes.md).
+const COLUMN_TOLERANCE = 4;
 
-// Whether a menu's row reads the item: as its whole text, or as its text after the row's icon.
-// Any other text before the item is another item ("S & H" doesn't read "H").
-function rowReads(text, item) {
-  const [row, wanted] = [normalized(text), normalized(item)];
-  const space = row.indexOf(" ");
-  return row === wanted || (space > 0 && space <= ICON_MAX && row.slice(space + 1) === wanted);
+// The left edge, in pixels, that a menu's rows start their texts at: the one the most rows
+// have a word at, and the rightmost of those. Text recognition reads a row's icon as a word
+// left of it ("w Wander") or not at all, so the icons outnumber the texts in no column.
+function textColumn(lines, tolerance) {
+  let column = null, most = 0;
+  for (const edge of lines.flatMap((line) => line.words.map((word) => word.x)).sort((a, b) => a - b)) {
+    const rows = lines.filter((line) => line.words.some((word) => Math.abs(word.x - edge) <= tolerance)).length;
+    if (rows >= most) [column, most] = [edge, rows];
+  }
+  return column;
+}
+
+// The menu's rows that read the item: by their words from the texts' column on, which leaves
+// out an icon whatever it reads and never the start of a row's own text ("S& H" doesn't read
+// "H"). Or by their whole text, for a menu with no icons whose second words line up.
+function rowsReading(lines, item, tolerance) {
+  const column = textColumn(lines, tolerance);
+  const wanted = normalized(item);
+  return lines.filter((line) => {
+    const text = line.words.filter((word) => word.x >= column - tolerance).map((word) => word.text).join(" ");
+    return normalized(text) === wanted || normalized(line.text) === wanted;
+  });
 }
 
 // The longest drag either way, in points (ADR-0010); device-ui.swift holds the same limit.
@@ -496,7 +514,7 @@ class DeviceUi {
       }
       const { width, lines } = await this.system.read(menu.id);
       const scale = width / menu.w;
-      const rows = lines.filter((line) => rowReads(line.text, item));
+      const rows = rowsReading(lines, item, COLUMN_TOLERANCE * scale);
       if (rows.length !== 1) {
         throw new DeviceUiError(`The menu over ${name} has ${rows.length} items reading "${item}" (it reads: ${lines.map((l) => l.text).join(", ")}). Not chosen`);
       }

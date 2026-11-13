@@ -563,8 +563,19 @@ function menuMachine(rows, { opens = true, front = true } = {}) {
   return system;
 }
 
-const row = (text, y) => ({ text, x: 4, y, w: 160, h: 24, words: [] });
-const MENU_ROWS = [row("N Sine", 4), row("Saw", 34), row("MM Wander", 184), row("S & H", 214)];
+// A menu's row as text recognition reads it: its words, each with its left edge in pixels.
+const row = (y, ...words) => ({
+  text: words.map(([text]) => text).join(" "), x: words[0][1], y, w: 160, h: 24,
+  words: words.map(([text, x]) => ({ text, x })),
+});
+// As read from a chooser's menu in Live, 176 pixels wide: each icon a word left of the column
+// the rows' texts start in, and one row's icon not read.
+const MENU_ROWS = [
+  row(4, ["N", 10], ["Sine", 47.5]),
+  row(34, ["Saw", 46.4]),
+  row(184, ["w", 8], ["Wander", 48.5]),
+  row(214, ["JF", 8], ["S&", 45.5], ["H", 85.5]),
+];
 
 test("choose opens the menu after the Info View check and clicks the row reading the item", async () => {
   const system = menuMachine(MENU_ROWS);
@@ -575,7 +586,7 @@ test("choose opens the menu after the Info View check and clicks the row reading
 });
 
 test("choose closes the menu and clicks nothing more when no row, or two, read the item", async () => {
-  for (const rows of [MENU_ROWS, [...MENU_ROWS, row("Wander", 244)]]) {
+  for (const rows of [MENU_ROWS, [...MENU_ROWS, row(244, ["Wander", 47])]]) {
     const system = menuMachine(rows);
     const ui = await openDeviceUi(fakeLive(), { track: 1, device: 1, controls: { Menu: { x: 10, y: 10, info: "Menu" } } }, system);
     await assert.rejects(ui.choose("Menu", rows === MENU_ROWS ? "Triangle" : "Wander"), /Not chosen/);
@@ -592,15 +603,58 @@ test("choose refuses when no menu opens", async () => {
 
 const openMenu = (system) => openDeviceUi(fakeLive(), { track: 1, device: 1, controls: { Menu: { x: 10, y: 10, info: "Menu" } } }, system);
 
-test("choose skips a row's icon, one word of one or two characters, and no other text before the item", async () => {
+// Chooses `item` from a menu reading `rows`, and resolves with the y of the row clicked.
+async function chosenRow(rows, item) {
+  const system = menuMachine(rows);
+  await (await openMenu(system)).choose("Menu", item);
+  assert.equal(clicks(system).length, 2);
+  return (clicks(system).at(-1)[3] - 900) * 2 - 12;
+}
+
+test("choose takes a row's text from the column the rows' texts start in, leaving out the icon left of it", async () => {
   const refused = menuMachine(MENU_ROWS);
   await assert.rejects((await openMenu(refused)).choose("Menu", "H"), /0 items reading "H"/);
   assert.equal(clicks(refused).length, 1);
-  for (const [item, y] of [["Sine", 4], ["Wander", 184], ["S & H", 214]]) {
-    const system = menuMachine(MENU_ROWS);
-    await (await openMenu(system)).choose("Menu", item);
-    assert.equal(clicks(system).at(-1)[3], 900 + (y + 12) / 2);
+  for (const [item, y] of [["Sine", 4], ["Saw", 34], ["Wander", 184], ["S& H", 214]]) {
+    assert.equal(await chosenRow(MENU_ROWS, item), y);
   }
+});
+
+test("choose never takes the start of a row's own text as its icon, however short", async () => {
+  const rows = [
+    row(4, ["N", 10], ["Sine", 47.5]),
+    row(34, ["w", 8], ["Wander", 48.5]),
+    row(64, ["S&", 45.5], ["H", 85.5]),
+    row(94, ["Hi", 46], ["Shelf", 70]),
+  ];
+  for (const item of ["H", "Shelf"]) {
+    const system = menuMachine(rows);
+    await assert.rejects((await openMenu(system)).choose("Menu", item), new RegExp(`0 items reading "${item}"`));
+    assert.equal(clicks(system).length, 1);
+  }
+  assert.equal(await chosenRow(rows, "S& H"), 64);
+  assert.equal(await chosenRow(rows, "Hi Shelf"), 94);
+});
+
+test("choose leaves out an icon whatever it reads: three characters, two words, or close to the text", async () => {
+  const rows = [
+    row(4, ["==>", 8], ["Ramp", 48], ["Down", 108]),
+    row(34, ["-", 9], ["1", 20], ["Ramp", 48.5], ["Up", 109]),
+    row(64, ["•", 35.9], ["Triangle", 46.9]),
+    row(94, ["Saw", 43.9]),
+  ];
+  for (const [item, y] of [["Ramp Down", 4], ["Ramp Up", 34], ["Triangle", 64], ["Saw", 94]]) {
+    assert.equal(await chosenRow(rows, item), y);
+  }
+});
+
+test("choose finds the texts' column when every icon is read and when the menu has none", async () => {
+  const icons = [row(4, ["/", 10], ["Sine", 47.5]), row(34, ["^", 11.9], ["Triangle", 47.6]), row(64, ["1", 16], ["Saw", 48.5])];
+  assert.equal(await chosenRow(icons, "Triangle"), 34);
+  const plain = [row(4, ["Low", 46], ["Pass", 80]), row(34, ["Band", 46], ["Pass", 92]), row(64, ["Notch", 46])];
+  assert.equal(await chosenRow(plain, "Low Pass"), 4);
+  const system = menuMachine(plain);
+  await assert.rejects((await openMenu(system)).choose("Menu", "Pass"), /0 items reading "Pass"/);
 });
 
 test("choose closes the menu when its read fails or its item's click is refused", async () => {
