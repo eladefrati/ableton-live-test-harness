@@ -328,7 +328,13 @@ function clickToken() {
   if (!clickTokenPath) {
     // Not in the harness's temp folder, which relaunch.js and quit.js empty.
     const folder = fs.mkdtempSync(path.join(os.tmpdir(), "harness-computer-use-"));
-    process.on("exit", () => fs.rmSync(folder, { recursive: true, force: true }));
+    // A folder that can't be removed, as one that can't be written to, stays: an error
+    // thrown as the process ends would be printed and become the run's exit status.
+    process.on("exit", () => {
+      try {
+        fs.rmSync(folder, { recursive: true, force: true });
+      } catch {}
+    });
     process.on("SIGUSR2", onStopSignal);
     const token = path.join(folder, "token");
     fs.writeFileSync(token, "");

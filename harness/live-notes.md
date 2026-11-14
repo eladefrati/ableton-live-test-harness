@@ -279,6 +279,12 @@ unexpected.
   happened. One holding a drag's button, before its move, posted the button up 5 to 13 ms
   after the signal and no drag event, and exited with status 3. Four runs each
   (`checks/pointer-guards.js`, remote Mac, 2026-11-14).
+- A run that couldn't remove its token's folder as it ended, the folder being unwritable,
+  ended with status 1 and node's `ENOTEMPTY` error on stderr, whatever its own result: the
+  removal threw as the process ended. Seen in Live in 2 of 2 runs that Stop's last resort
+  had stopped and that had cleaned up (remote Mac, Live 12.4.25b1, 2026-11-14). The folder
+  is now left there, and the run ends with its own status, saying nothing (unit tests,
+  remote Mac, 2026-11-14).
 - Stop pressed once the run has ended says that the run has ended, not Stopped, though the
   token's removal reads as stopped. The overlay looks for its run every 0.25 s and then says
   the same by itself, so a press that comes late proves nothing: with Stop's own look for

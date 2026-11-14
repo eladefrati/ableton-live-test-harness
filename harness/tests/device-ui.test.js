@@ -1305,6 +1305,23 @@ test("a run that listens for Stop's signal still ends by itself", async () => {
   assert.equal(printed, "1\n");
 });
 
+test("a run that can't remove its token's folder as it ends still ends with its own status, saying nothing", async () => {
+  const run = `const fs = require("node:fs"); const path = require("node:path");
+    const folder = path.dirname(require(${JSON.stringify(path.join(__dirname, "..", "device-ui.js"))}).clickToken());
+    fs.chmodSync(folder, 0o500);
+    console.log(folder);`;
+  const ended = await new Promise((resolve) => {
+    require("node:child_process").execFile(process.execPath, ["-e", run], { timeout: 10000 },
+      (error, stdout, stderr) => resolve({ status: error ? error.code : 0, folder: stdout.trim(), stderr }));
+  });
+  try {
+    assert.deepEqual({ status: ended.status, stderr: ended.stderr }, { status: 0, stderr: "" });
+  } finally {
+    fs.chmodSync(ended.folder, 0o700);
+    fs.rmSync(ended.folder, { recursive: true });
+  }
+});
+
 const hasDeveloperTools = (() => {
   try { require("node:child_process").execFileSync("xcode-select", ["-p"], { stdio: "ignore" }); return true; } catch { return false; }
 })();
