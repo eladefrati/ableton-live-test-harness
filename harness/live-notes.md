@@ -216,7 +216,9 @@ unexpected.
   2026-11-13).
 - Ctrl-C typed into the terminal of a run (a pty) while its helper held the button reached
   the helper as SIGINT: the button came up 6 ms after it in a click, and 15 ms in a drag,
-  before the drag's move, and the helper then died by SIGINT (remote Mac, 2026-11-13).
+  before the drag's move. In the drag, where the run caught the signal and went on, the
+  helper then died by SIGINT; in the click the run died by SIGINT, and its helper was gone
+  (remote Mac, 2026-11-13).
 - A run killed by a signal sent to it alone (SIGTERM) left its click token behind: it removes
   the token's folder only on a normal exit. The border went 0.54 s after the kill, with the
   notification that the mouse was free, and the helper that run had started, which could
