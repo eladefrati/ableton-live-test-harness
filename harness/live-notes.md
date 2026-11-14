@@ -202,6 +202,19 @@ unexpected.
   the overlay ended before it answered. With the folder unwritable, where Stop couldn't
   remove the token, the overlay said Stopped all the same, the run being stopped already
   (remote Mac, macOS 26, 2026-11-13).
+- A real click posted on the pill's Stop, the button down and up as mouse events at its
+  place, stops the run as the Accessibility press does: the token went 5 and 15 ms after
+  the button came up, and a press that waited under a notification's cover threw 208 and
+  251 ms after that, with no mouse event of the helper's after (remote Mac, Live 12.4.25b1,
+  2026-11-13).
+- Ctrl-C typed into the terminal of a run (a pty) while its helper held the button reached
+  the helper as SIGINT: the button came up 6 ms after it in a click, and 15 ms in a drag,
+  before the drag's move, and the helper then died by SIGINT (remote Mac, 2026-11-13).
+- In Live, a token removed 4 and 5 ms after the button of `choose`'s opening click went down
+  left that click to complete: the release was the one mouse event after, `choose` threw as
+  stopped with `done`, the menu was closed and the chooser's value unchanged. A press
+  stopped while it waited for the Info View, with another app in front by then, threw
+  without bringing Live forward (remote Mac, Live 12.4.25b1, 2026-11-13).
 - When the token can't be removed and can still be read (the user-immutable flag on it,
   `chflags uchg`), Stop ends the run's helper and the run by signal. With a helper waiting
   under a notification's cover, the run had died by SIGTERM and its helper was gone 0.10 to
