@@ -6,7 +6,7 @@ const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 const { spawn } = require("node:child_process");
-const { VideoError, parseVideoArgs, recordVideo, runVideoCommand } = require("../video.js");
+const { VideoError, parseVideoArgs, recordVideo, runVideoCommand, parseFrameArgs, videoFrame } = require("../video.js");
 
 // A stand-in for the video helper: a Node script that saves its arguments to `args.json` beside
 // itself and then does what `body` says.
@@ -158,16 +158,52 @@ test("a recording around a command lasts until the command ends, and returns its
   assert.deepEqual(result, { file: out(helper), seconds: 1.5, bytes: 1000, status: 3 });
 });
 
+test("the video-frame command reads a video, a time in seconds and a PNG", () => {
+  assert.deepEqual(parseFrameArgs(["a.mov", "1.5", "a.png"]), { file: "a.mov", at: 1.5, png: "a.png" });
+  for (const argv of [[], ["a.mov", "1"], ["a.mov", "x", "a.png"], ["a.mov", "-1", "a.png"], ["a.mov", "1", "a.jpg"], ["a.mp4", "1", "a.png"], ["a.mov", "1", "a.png", "b"]]) {
+    assert.throws(() => parseFrameArgs(argv), (e) => e instanceof VideoError && /usage: cli\.js video-frame/.test(e.message), argv.join(" "));
+  }
+});
+
+test("a frame is saved by the helper at the time asked, and resolves with the time it has and its size", async (t) => {
+  const helper = fakeHelper(t, `console.log(JSON.stringify({ at: 1.5, w: 20, h: 10 }));`);
+  const video = path.join(helper.folder, "video.mov");
+  fs.writeFileSync(video, "");
+  const png = path.join(helper.folder, "frames", "one.png");
+  assert.deepEqual(await videoFrame(video, 1.5, png, fakeSystem(helper)), { file: png, at: 1.5, w: 20, h: 10 });
+  assert.deepEqual(helper.args(), ["frame", video, "1.5", png]);
+  assert.ok(fs.existsSync(path.dirname(png)), "the PNG's folder is made");
+});
+
+test("a frame of a video that isn't there is refused before the helper runs", async (t) => {
+  const helper = fakeHelper(t, `console.log("{}");`);
+  const system = fakeSystem(helper);
+  await assert.rejects(videoFrame(path.join(helper.folder, "none.mov"), 1, path.join(helper.folder, "a.png"), system), /No video at/);
+  assert.deepEqual(system.calls, []);
+});
+
+test("a frame the helper can't save rejects with its reason", async (t) => {
+  const helper = fakeHelper(t, `console.error("video.mov is 2.00 s long, so it has no frame at 3 s"); process.exit(1);`);
+  const video = path.join(helper.folder, "video.mov");
+  fs.writeFileSync(video, "");
+  await assert.rejects(videoFrame(video, 3, path.join(helper.folder, "a.png"), fakeSystem(helper)), (e) => e instanceof VideoError && /no frame at 3 s/.test(e.message));
+});
+
 const hasDeveloperTools = (() => {
   try { require("node:child_process").execFileSync("xcode-select", ["-p"], { stdio: "ignore" }); return true; } catch { return false; }
 })();
-test("the helper refuses arguments it can't record from, with its usage, before recording anything",
+test("the helper refuses arguments it can't use, with its usage, and a video it can't read",
   { skip: !hasDeveloperTools && "no developer tools", timeout: 300000 }, async () => {
   const { execFile } = require("node:child_process");
   const binary = await require("../tools.js").helperBinary(path.join(__dirname, "..", "video.swift"));
-  for (const args of [[], ["record"], ["record", "a.mov", "window", "x", "3"], ["record", "a.mov", "screen", "0"], ["record", "a.mov", "tab", "3"]]) {
-    const failure = await new Promise((resolve) => execFile(binary, args, (error, stdout, stderr) => resolve({ error, stderr })));
+  const fails = (args) => new Promise((resolve) => execFile(binary, args, (error, stdout, stderr) => resolve({ error, stderr })));
+  for (const args of [[], ["record"], ["record", "a.mov", "window", "x", "3"], ["record", "a.mov", "screen", "0"], ["record", "a.mov", "tab", "3"],
+    ["frame", "a.mov", "x", "a.png"], ["frame", "a.mov", "1"]]) {
+    const failure = await fails(args);
     assert.equal(failure.error?.code, 1, args.join(" "));
     assert.match(failure.stderr, /^usage: video record/, args.join(" "));
   }
+  const missing = await fails(["frame", path.join(os.tmpdir(), "no-such-video.mov"), "1", path.join(os.tmpdir(), "no-such-frame.png")]);
+  assert.equal(missing.error?.code, 1);
+  assert.match(missing.stderr, /^Can't read .*no-such-video\.mov as a video/);
 });

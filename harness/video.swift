@@ -1,7 +1,8 @@
-// Records a video of one of Live's windows, or of the main display, with ScreenCaptureKit
-// (ADR-0016). macOS 15 or later (SCRecordingOutput).
+// Records a video of one of Live's windows, or of the main display, with ScreenCaptureKit, and
+// saves a frame of a video as a PNG (ADR-0016). macOS 15 or later (SCRecordingOutput).
 //
 //   video record <out.mov> window <id> | screen <seconds>
+//   video frame <in.mov> <seconds> <out.png>
 //
 // record writes H.264 in a .mov, at most 30 frames a second, the pointer included. A window is
 // recorded alone, behind other windows too; the display with everything on it. It prints
@@ -11,6 +12,9 @@
 // to then: SCRecordingOutput writes it as it goes (a recorder killed 5 s in left 5 s). While
 // it records the display is kept on: a display that sleeps leaves the video on its last
 // picture.
+//
+// frame saves the frame shown at <seconds> and prints {"at", "w", "h"}: the time of that
+// frame, and its size in pixels.
 //
 // Errors go to stderr, with exit status 1.
 
@@ -178,7 +182,33 @@ func record(_ file: URL, target: [String], seconds: Double) async {
     }
 }
 
-let RECORD_USAGE = "usage: video record <out.mov> window <id> | screen <seconds>"
+func frame(_ video: URL, at seconds: Double, to png: URL) async {
+    let asset = AVURLAsset(url: video)
+    let duration: CMTime
+    do {
+        duration = try await asset.load(.duration)
+    } catch {
+        fail("Can't read \(video.path) as a video: \(error.localizedDescription)")
+    }
+    guard seconds <= duration.seconds else {
+        fail(String(format: "%@ is %.2f s long, so it has no frame at %g s", video.path, duration.seconds, seconds))
+    }
+    let generator = AVAssetImageGenerator(asset: asset)
+    generator.requestedTimeToleranceBefore = .zero
+    generator.requestedTimeToleranceAfter = .zero
+    do {
+        let (image, actual) = try await generator.image(at: CMTime(seconds: seconds, preferredTimescale: 600))
+        guard let data = NSBitmapImageRep(cgImage: image).representation(using: .png, properties: [:])
+        else { fail("Couldn't encode the frame at \(seconds) s as a PNG") }
+        try data.write(to: png)
+        printJSON(["at": actual.seconds, "w": image.width, "h": image.height])
+        exit(0)
+    } catch {
+        fail("Couldn't save the frame at \(seconds) s: \(error.localizedDescription)")
+    }
+}
+
+let USAGE = "usage: video record <out.mov> window <id> | screen <seconds>\n       video frame <in.mov> <seconds> <out.png>"
 let arguments = CommandLine.arguments
 // ScreenCaptureKit needs a connection to the window server, which this makes.
 _ = NSApplication.shared
@@ -189,10 +219,13 @@ Task {
         let target = Array(arguments.dropFirst(3).dropLast())
         guard arguments.count >= 5, let seconds = Double(arguments.last!), seconds > 0,
               target == ["screen"] || (target.count == 2 && target[0] == "window" && UInt32(target[1]) != nil)
-        else { fail(RECORD_USAGE) }
+        else { fail(USAGE) }
         await record(URL(fileURLWithPath: arguments[2]), target: target, seconds: seconds)
+    case "frame":
+        guard arguments.count == 5, let seconds = Double(arguments[3]), seconds >= 0 else { fail(USAGE) }
+        await frame(URL(fileURLWithPath: arguments[2]), at: seconds, to: URL(fileURLWithPath: arguments[4]))
     default:
-        fail(RECORD_USAGE)
+        fail(USAGE)
     }
 }
 dispatchMain()

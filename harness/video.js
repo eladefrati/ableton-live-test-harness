@@ -11,6 +11,8 @@
 //   const video = await recordVideo(file, { seconds: 5 });   // or { window: id }, { screen: true }
 //   await video.done();                                    // when the 5 s are up
 //
+//   await videoFrame(file, 2.5, "/path/to/frame.png");     // what the video shows at 2.5 s
+//
 // The recording stops after `seconds` (10 minutes if not given), on stop(), or when this
 // process ends, however it ends: the helper then finishes the file. A run that doesn't wait
 // for the recording can exit while it goes on.
@@ -35,6 +37,7 @@ const STARTED_MS = 15000;
 const FIRST_DARWIN = 24;
 
 const USAGE = "usage: cli.js video <file.mov> [--seconds <n>] [--window <id> | --screen] [-- <command...>]";
+const FRAME_USAGE = "usage: cli.js video-frame <file.mov> <seconds> <file.png>";
 
 const machine = {
   startedMs: STARTED_MS,
@@ -184,4 +187,27 @@ async function runVideoCommand({ file, seconds, window, screen, command = [] }, 
   }
 }
 
-module.exports = { VideoError, parseVideoArgs, recordVideo, runVideoCommand, MAX_SECONDS };
+// The arguments of `cli.js video-frame`, after the command's name.
+function parseFrameArgs(argv) {
+  const [file, at, png] = [argv[0], Number(argv[1]), argv[2]];
+  if (argv.length !== 3 || path.extname(file) !== ".mov" || !(at >= 0) || path.extname(png) !== ".png") throw new VideoError(FRAME_USAGE);
+  return { file, at, png };
+}
+
+// Saves the frame `file` shows at `at` seconds as the PNG `png` (its folder is made), and
+// resolves with { file: png, at, w, h }: the time of that frame, and its size in pixels. For
+// an agent to see what a video shows, as it can't watch one.
+async function videoFrame(file, at, png, system = machine) {
+  if (!fs.existsSync(file)) throw new VideoError(`No video at ${file}`);
+  const binary = await system.binary();
+  png = path.resolve(png);
+  fs.mkdirSync(path.dirname(png), { recursive: true });
+  const args = ["frame", path.resolve(file), String(at), png];
+  const said = await tools.run(binary, args).catch((error) => {
+    // The helper's reason, without the command line run() puts before it.
+    throw new VideoError(error.message.replace(`${[binary, ...args].join(" ")} failed: `, ""), { cause: error });
+  });
+  return { file: png, ...JSON.parse(said) };
+}
+
+module.exports = { VideoError, parseVideoArgs, recordVideo, runVideoCommand, parseFrameArgs, videoFrame, MAX_SECONDS };

@@ -33,6 +33,9 @@
 //                                         minutes at most if no length is given); prints its
 //                                         length and size, and exits with the command's status;
 //                                         needs no OSC either
+//   node harness/cli.js video-frame <file.mov> <seconds> <png>
+//                                         saves the frame the video shows at that time, to see
+//                                         what it shows; prints the frame's time and size
 //
 // Arguments: "12" is an int, "12.0" a float, true/false booleans, anything else a string.
 
@@ -40,7 +43,7 @@ const { connect } = require("./live.js");
 const { float } = require("./osc.js");
 const { maxMessages } = require("./log.js");
 const { captureWindow, liveWindows, openPluginWindow } = require("./device-ui.js");
-const { parseVideoArgs, runVideoCommand } = require("./video.js");
+const { parseVideoArgs, runVideoCommand, parseFrameArgs, videoFrame } = require("./video.js");
 
 function parseArg(text) {
   if (text === "true") return true;
@@ -52,7 +55,8 @@ function parseArg(text) {
 
 const USAGE = "usage: cli.js ping | reload | query <address> [args] | send <address> [args] | "
   + "notes <track> <clip> [--arrangement] | song-notes <track> | max-log [since] | windows | capture <png> [--window <id>] | "
-  + "plugin-window <track> <device> <png> | video <file.mov> [--seconds <n>] [--window <id> | --screen] [-- <command...>]";
+  + "plugin-window <track> <device> <png> | video <file.mov> [--seconds <n>] [--window <id> | --screen] [-- <command...>] | "
+  + "video-frame <file.mov> <seconds> <png>";
 
 async function run(argv) {
   const [command, ...rest] = argv;
@@ -60,6 +64,10 @@ async function run(argv) {
     const result = await runVideoCommand(parseVideoArgs(rest));
     if (result.status) process.exitCode = result.status;
     return result;
+  }
+  if (command === "video-frame") {
+    const { file, at, png } = parseFrameArgs(rest);
+    return videoFrame(file, at, png);
   }
   const flags = new Set(rest.filter((a) => a.startsWith("--")));
   const args = rest.filter((a) => !a.startsWith("--"));
