@@ -12,7 +12,8 @@
 # node_modules, __pycache__) and AbletonOSC's logs (/logs/, written by the remote's Live)
 # are left alone: excluded files are neither copied nor deleted, so a project that needs
 # them installs them on the remote by hand. A check's logs (tests/live/logs/, see run-log.js)
-# are excluded too, and moved back to this Mac after the command. There is no lock: two runs
+# and the stills and videos taken there (tests/live/captures/) are excluded too, and moved back
+# to this Mac after the command. There is no lock: two runs
 # at once can replace files under a running check, so the slot rule in harness/README.md is
 # the guard.
 #
@@ -52,7 +53,7 @@ fi
 sync() {
   rsync -a --delete \
     --exclude .venv --exclude node_modules --exclude __pycache__ --exclude /logs/ \
-    --exclude /tests/live/logs/ \
+    --exclude /tests/live/logs/ --exclude /tests/live/captures/ \
     "$HOME/dev/$1/" "$host:dev/$1/"
 }
 
@@ -66,10 +67,16 @@ sync $harness
 run_status=0
 ssh "$host" "export PATH=\$HOME/.local/bin:/opt/homebrew/bin:/usr/local/bin:\$PATH; cd ~/dev/${(q)repo} && ${(j: :)${(q)@}}" || run_status=$?
 
-# Move the run's logs here, after a failed run too. Logs that can't be moved stay on the
-# remote, where the sync leaves them alone, and come back after the next run.
-if ssh "$host" test -d "dev/${(q)repo}/tests/live/logs"; then
-  rsync -a --remove-source-files "$host:dev/$repo/tests/live/logs/" "$HOME/dev/$repo/tests/live/logs/" \
-    || print -u2 "remote.sh: could not bring the run's logs back from $host; the next run will retry"
-fi
+# Move the run's logs and captures here, after a failed run too: each folder only if the
+# remote has it, made here if this Mac doesn't. What can't be moved stays on the remote, where
+# the sync leaves it alone, and comes back after the next run.
+bring_back() {
+  local folder=tests/live/$1
+  ssh "$host" test -d "dev/${(q)repo}/$folder" || return 0
+  mkdir -p "$HOME/dev/$repo/$folder"
+  rsync -a --remove-source-files "$host:dev/$repo/$folder/" "$HOME/dev/$repo/$folder/" \
+    || print -u2 "remote.sh: could not bring the run's $1 back from $host; the next run will retry"
+}
+bring_back logs
+bring_back captures
 exit $run_status
