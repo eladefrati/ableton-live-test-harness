@@ -977,7 +977,10 @@ async function failures(test, binaries) {
     const afterStop = seen.filter((event) => event.at >= stoppedAt && event.type !== "up");
     const upAfterStop = seen.find((event) => event.type === "up")?.at - stoppedAt;
     const killed = run.endedAt() - stoppedAt;
-    const left = Math.round(said?.at - stoppedAt);
+    // How long after Stop the overlay went. When it went is read as a whole millisecond, up
+    // to one before the moment itself, and the token went at a fraction of one: the lower
+    // bound gets that millisecond.
+    const left = said?.at - stoppedAt;
     return [
       ended && ended.status !== test.status && `the helper exited ${ended.status}, not ${test.status}${ended.stderr && `, with "${ended.stderr}"`}`,
       ended && ended.status === test.status && test.stderr && !test.stderr.test(ended.stderr) && `the helper's error was "${ended.stderr}"`,
@@ -996,7 +999,7 @@ async function failures(test, binaries) {
       test.says && said === null && `the overlay was still up ${OVERLAY_WAIT_MS} ms after Stop${unpressed}`,
       test.says && said !== null && !test.says.test(said.text) && `the overlay said ${JSON.stringify(said.text)}, not ${test.says}${unpressed}`,
       test.afterRun && said?.at < run.endedAt() - EXIT_NEWS_MS && `the overlay said ${JSON.stringify(said.text)} before the run had ended`,
-      test.leavesMs && said !== null && !(left >= test.leavesMs[0] && left <= test.leavesMs[1]) && `the overlay went ${left} ms after Stop, not ${test.leavesMs.join(" to ")}`,
+      test.leavesMs && said !== null && !(left + 1 >= test.leavesMs[0] && left <= test.leavesMs[1]) && `the overlay went ${left.toFixed(1)} ms after Stop, not ${test.leavesMs.join(" to ")}`,
       test.leavesMs && !outlived && "the run had ended when the overlay went",
       test.killedMs && !(killed >= test.killedMs[0] && killed <= test.killedMs[1]) && `the run ended ${killed} ms after Stop, not ${test.killedMs.join(" to ")}`,
       ran !== (test.run ?? 0) && `the run ended with ${ran}, not ${test.run ?? 0}`,
