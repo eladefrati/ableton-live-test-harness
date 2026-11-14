@@ -31,8 +31,8 @@ const RECT = [400, 200, 400, 300];
 const EVENT_WAIT_MS = 300;
 // How long Notification Center takes to cover the screen once a notification is posted.
 const BANNER_WAIT_MS = 1000;
-// How long the overlay has to end once Stop is pressed. Its last resort alone gives the run
-// 10 s to end, and a run it then kills 1 s more to be gone.
+// How long the overlay has to end once Stop is pressed. It gives the run 10 s to end, and a
+// run that its last resort then kills 1 s more to be gone.
 const OVERLAY_WAIT_MS = 15000;
 // How long after its signal Stop's last resort kills a run that is still there
 // (computer-use-overlay.swift), and how much later than that the check may see the run end,

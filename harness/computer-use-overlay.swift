@@ -5,8 +5,9 @@
 // holds, and takes the glow down. If the token is still there after that, Stop signals the
 // run instead: the run stops clicking and goes on to its clean-up, and the glow stays up.
 // Either way the pill stays, its button reading Stopping with a light going round it, until
-// the run has ended, for END_SECONDS at most: a run still going then is left running if its
-// token is gone, and killed if it was signalled (ADR-0015).
+// the run has ended. A run still going END_SECONDS after Stop is left running if its token
+// is gone, and the overlay ends; one that was signalled is killed, and the overlay ends once
+// it has gone (ADR-0015).
 // The glow lets every click through; nothing here takes the front.
 //
 //   computer-use-overlay <pid> <click-token> [<run>]
@@ -210,10 +211,10 @@ final class Stopper: NSObject {
     }
 
     // Ends the overlay once the run has ended, saying what became of it; until then, after
-    // Stop, the pill stays, for END_SECONDS at most (ADR-0015). Nothing here waits: a timer
-    // calls it again. A run still going then, whose token is gone, can't click: the overlay
-    // ends and leaves it running, saying so. In Stop's last resort such a run can click, and
-    // is killed: its helpers stop because their run has gone, and the overlay ends
+    // Stop, the pill stays (ADR-0015). Nothing here waits: a timer calls it again. A run
+    // still going END_SECONDS after Stop, whose token is gone, can't click: the overlay ends
+    // and leaves it running, saying so. In Stop's last resort such a run can click, and is
+    // killed: its helpers stop because their run has gone, and the overlay ends once it has,
     // KILLED_SECONDS later at the latest.
     @MainActor func watch() {
         let stopped = "Stopped: \(name.isEmpty ? "the run" : name) won't click again"

@@ -1,6 +1,8 @@
 // Presses Stop on harness-computer-use's pill for pointer-guards.js, as a click on it would:
 // through Accessibility, the button labelled "Stop" in the windows of the overlay <pid>
-// (computer-use-overlay.swift), or "Stopping", as it is labelled once it has been pressed.
+// (computer-use-overlay.swift). Once pressed the button is labelled "Stopping", and is
+// pressed by that label too: Accessibility delivers that press whether or not a click
+// would reach the button, which then lies under the view its light is drawn in.
 //
 //   press-stop <pid> [<run>]
 //

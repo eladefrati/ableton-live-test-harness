@@ -335,7 +335,8 @@ unexpected.
   event followed (remote Mac, Live 12.4.25b1, 2026-11-14).
 - After Stop the pill now stays, its button reading Stopping with a light going round it,
   until the run's process has ended, and only then does the overlay say Stopped and notify
-  (ADR-0015). Before, it took everything down as soon as it had removed the token, and in
+  (ADR-0015); over a run that goes on it stays 10 s, as the next entry records. Before, it
+  took everything down as soon as it had removed the token, and in
   its last resort it waited for the run on its main thread: asked through Accessibility
   for its button a few seconds into that wait, it gave no answer, where it now gives
   "Stopping". In Live, with a real click posted on Stop while a press's click waited under

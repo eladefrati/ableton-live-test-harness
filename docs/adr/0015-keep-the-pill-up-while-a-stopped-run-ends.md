@@ -23,19 +23,20 @@ thread, for up to 11 s, so the pill could show nothing of it.
 
 ## Decision
 
-1. **After Stop the pill stays, reading Stopping, until the run's process has ended, for
-   10 s at most.** On every Stop, not in the last resort alone. Its button reads Stopping in
-   place of Stop, a light goes round the button, and pressing it again does nothing. A run
-   whose token is gone and that is still running 10 s after Stop is left running: the pill
-   goes, and nothing is killed. In the last resort the run still there after its 10 s is
-   killed (ADR-0012), and the pill goes once it has ended.
+1. **After Stop the pill stays, reading Stopping, while the run ends: for 10 s at most when
+   the token is gone.** On every Stop, not in the last resort alone. Its button reads
+   Stopping in place of Stop, a light goes round the button, and pressing it again does
+   nothing. A run whose token is gone and that is still running 10 s after Stop is left
+   running: the pill goes, and nothing is killed. In the last resort the run still there
+   after its 10 s is killed (ADR-0012), and the pill goes once it has ended, a second later
+   at most.
 2. **The token still goes first.** Stop removes the token, or in its last resort signals the
    run, before anything on the pill changes: the run stops clicking as fast as it did.
 3. **The glow goes once the run can click no more.** At once when the token is gone; in the
    last resort, where the run can click until it has ended, together with the pill.
 4. **Stop says that the mouse is free when the pill goes,** in the one notification: that
-   the run was stopped, once it has ended, or that it was stopped and is still running,
-   when the pill goes without it.
+   the run was stopped, once it has ended; that it was stopped and is still running, when
+   the pill goes without it; or, after the last resort's kill, that it was ended (ADR-0012).
 5. **The border's program waits for the run's end without holding up its main thread,** in
    the last resort too: it looks for the run on a timer, so the light keeps moving and the
    program still answers Accessibility, which it didn't while it waited.
