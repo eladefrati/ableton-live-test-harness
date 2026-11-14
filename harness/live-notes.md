@@ -109,9 +109,13 @@ unexpected.
   Live device's number box (10 down, 16 % down). None of them read the delta fields or moved
   the pointer during the drag (remote Mac, Live 12.4.25b1, 2026-11-13).
 - A drag too short to move the pointer (`0 -1e-15`) crashed the helper after the button went
-  down and left it held. A drag under 1 point on its longer axis is now refused, and every
-  event of a click or a drag is made before the button goes down, so no failure in between
-  can leave it held (remote Mac, 2026-11-13).
+  down and left it held. A drag under 1 point on its longer axis is now refused (remote Mac,
+  2026-11-13).
+- A helper ended by SIGTERM while a drag held the button left it held. `device-ui.swift` now
+  holds SIGINT, SIGTERM and SIGHUP back while the button is down: it posts the button up
+  where the pointer is, then dies by that signal. A helper that fails with the button down
+  releases it the same way before it exits. A crash or SIGKILL still leaves the button held
+  (remote Mac, 2026-11-13).
 - While a Max device's Map button waits for a target, the Info View still names the knob
   under the pointer on a device on another track, and the click makes the mapping: Auto
   Filter's Frequency, Dry/Wet and Resonance, with `settleMs` 1000 (remote Mac, 2026-11-11).
@@ -161,15 +165,24 @@ unexpected.
   window the size of the screen at layer 21, gone about 4 s after the banner appeared; the
   click guard read it as covering the point and refused (main Mac, macOS 26, 2026-11-13). The
   guard now waits up to 10 s for it to go before it checks the point, and refuses after that.
-  harness-computer-use's own notification at the end of a run brings it up too.
+  harness-computer-use's own notification at the end of a run brings it up too. A helper
+  waiting for it to go leaves the wait once the run is stopped, posting nothing: stopped 1 s
+  into the wait it exited 0.12 s later, and left alone it waited 4.9 s and clicked (remote
+  Mac, 2026-11-13).
 - harness-computer-use's pill is a window of its own (title "harness-computer-use pill"), a
   non-activating panel that takes a click on its Stop without taking the front. Unlike the
   glow, the click guard doesn't skip it: a point under the pill is refused, with an error
   that names the pill.
+- Stop on the pill creates the run's stop marker, a file `device-ui.swift` looks for before
+  every mouse event it posts (ADR-0009). A helper started after Stop posted nothing. One
+  stopped while a click held the button posted the button up, so the click happened. One
+  stopped while a drag held the button, before its move, posted the button up at the press
+  point and no drag event. Each exited with status 3 (`checks/pointer-guards.js`, remote Mac,
+  2026-11-13).
 - A mouse event posted as the last thing a program does is lost: a button-up posted just
   before exit left the button held in 3 of 3 runs, and with 100 ms between the post and the
-  exit it came up in 2 of 2. `device-ui.swift` waits 100 ms after a click's or a drag's
-  button-up (remote Mac, macOS 26, 2026-11-13).
+  exit it came up in 2 of 2. `device-ui.swift` waits 100 ms after every button-up, a stopped
+  or signalled helper's included (remote Mac, macOS 26, 2026-11-13).
 - The window server doesn't list a window an app has just ordered front until the app's run
   loop has run: it was listed neither at once nor 30 ms later in 8 of 8 starts, and was by
   the run loop's first timer, 50 to 70 ms after the loop started. A click posted in between

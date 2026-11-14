@@ -7,6 +7,8 @@
 // pointer, so it refuses, posting nothing, anywhere but on the click host ("clickHost" in
 // harness/local.json). Exits 1 on failure.
 
+const fs = require("node:fs");
+const os = require("node:os");
 const path = require("node:path");
 const readline = require("node:readline");
 const { execFile, spawn } = require("node:child_process");
@@ -20,16 +22,28 @@ const PILL_TITLE = "harness-computer-use pill";
 const RECT = [400, 200, 400, 300];
 // How long the target has to report an event after the helper has ended.
 const EVENT_WAIT_MS = 300;
+// How long Notification Center takes to cover the screen once a notification is posted.
+const BANNER_WAIT_MS = 1000;
+
+// The stop marker every helper here is given, as a run's helpers are (ADR-0009). Each case
+// starts without it.
+const MARKER = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "pointer-guards-")), "stopped");
+process.on("exit", () => fs.rmSync(path.dirname(MARKER), { recursive: true, force: true }));
+// How a stopped helper exits, and what it says.
+const STOPPED = 3;
+const STOPPED_ERROR = /^harness-computer-use was stopped from its pill: this run clicks no more, and the helper (held no button|released the button at [\d.]+, [\d.]+)$/;
 
 const click = (window, x, y) => ["click", window, x, y];
 // A drag 30 points right and 20 up, and the one drag event it posts.
 const drag = (window, x, y) => ["drag", window, x, y, 30, -20];
 const DRAGGED = { type: "drag", dx: 30, dy: -20 };
 
-// Each case: the target's options, whether harness-computer-use's overlay runs, and the
-// helper's command, given the target's window and its centre. Then what must come of it: the
-// helper's exit status, its error, and the button events the target's windows received, by
-// the fields named.
+// Each case: the target's options, whether harness-computer-use's overlay runs, whether a
+// notification's banner shows first, whether the run was stopped before the helper starts or
+// how long after, and the helper's command, given the target's window and its centre. Then
+// what must come of it: the helper's exit status (the signal, if one ended it), its error,
+// how soon it ended, and the button events the target's windows received, by the fields
+// named.
 const CASES = [
   {
     name: "a click reaches the target",
@@ -69,6 +83,51 @@ const CASES = [
     status: 0,
     events: (x, y) => [{ type: "down", x, y }, { ...DRAGGED, x: x + 30, y: y - 20 }, { type: "up", x, y }],
   },
+  {
+    name: "a helper started after Stop posts nothing",
+    target: RECT,
+    stopped: true,
+    command: click,
+    status: STOPPED,
+    stderr: STOPPED_ERROR,
+    events: () => [],
+  },
+  {
+    name: "Stop while a click holds the button: its release is still posted",
+    target: [...RECT, "--stop", MARKER],
+    command: click,
+    status: STOPPED,
+    stderr: STOPPED_ERROR,
+    events: (x, y) => [{ type: "down", x, y }, { type: "up", x, y }],
+  },
+  {
+    name: "Stop while a drag holds the button, before its move: the button comes up at the press point, with no drag event",
+    target: [...RECT, "--stop", MARKER],
+    command: drag,
+    status: STOPPED,
+    stderr: STOPPED_ERROR,
+    events: (x, y) => [{ type: "down", x, y }, { type: "up", x, y }],
+  },
+  {
+    name: "SIGTERM while a drag holds the button: the helper releases it at the press point, then dies by the signal",
+    target: [...RECT, "--signal"],
+    command: drag,
+    status: "SIGTERM",
+    events: (x, y) => [{ type: "down", x, y }, { type: "up", x, y }],
+  },
+  // Last: the banner's cover outlasts the case by a few seconds. Without Stop the helper
+  // waits for the cover to go, 4.9 s in one run.
+  {
+    name: "Stop while the helper waits for a notification's cover to go: it leaves the wait, posting nothing",
+    banner: true,
+    target: RECT,
+    stopAfterMs: 1000,
+    command: click,
+    status: STOPPED,
+    stderr: STOPPED_ERROR,
+    withinMs: 2500,
+    events: () => [],
+  },
 ];
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -98,7 +157,7 @@ async function showTarget(binary, options) {
 // How the helper ended: its exit status (the signal, if one ended it) and what it wrote to
 // stderr.
 const runHelper = (binary, args) => new Promise((resolve) => {
-  execFile(binary, args.map(String), (error, stdout, stderr) => {
+  execFile(binary, args.map(String), { env: { ...process.env, HARNESS_COMPUTER_USE_STOP: MARKER } }, (error, stdout, stderr) => {
     resolve({ status: error ? error.code ?? error.signal : 0, stderr: stderr.trim() });
   });
 });
@@ -108,15 +167,25 @@ const sameEvents = (seen, expected) => seen.length === expected.length
 
 // Runs one case and resolves with what differed from what it expects, nothing if it passed.
 async function failures(test, binaries) {
-  const overlay = test.overlay ? spawn(binaries.overlay, [String(process.pid), path.basename(__filename)], { stdio: "ignore" }) : null;
+  const overlay = test.overlay ? spawn(binaries.overlay, [String(process.pid), MARKER, path.basename(__filename)], { stdio: "ignore" }) : null;
   try {
+    fs.rmSync(MARKER, { force: true });
+    if (test.stopped) fs.writeFileSync(MARKER, "");
     const target = await showTarget(binaries.target, test.target);
     const [x, y] = [target.x + target.w / 2, target.y + target.h / 2];
-    let ended, printed;
+    if (test.banner) {
+      await tools.run("osascript", ["-e", `display notification "${path.basename(__filename)}" with title "harness-computer-use"`]);
+      await sleep(BANNER_WAIT_MS);
+    }
+    const stop = test.stopAfterMs && setTimeout(() => fs.writeFileSync(MARKER, ""), test.stopAfterMs);
+    const started = Date.now();
+    let ended, took, printed;
     try {
       ended = await runHelper(binaries.helper, test.command(target.window, x, y));
+      took = Date.now() - started;
       await sleep(EVENT_WAIT_MS);
     } finally {
+      clearTimeout(stop);
       // Ending the target also releases a button the helper left held.
       printed = await target.end();
     }
@@ -125,6 +194,7 @@ async function failures(test, binaries) {
     return [
       ended.status !== test.status && `the helper exited ${ended.status}, not ${test.status}${ended.stderr && `, with "${ended.stderr}"`}`,
       ended.status === test.status && test.stderr && !test.stderr.test(ended.stderr) && `the helper's error was "${ended.stderr}"`,
+      took > test.withinMs && `the helper took ${took} ms, over ${test.withinMs}`,
       !sameEvents(seen, expected) && `the target received ${JSON.stringify(seen)}, not ${JSON.stringify(expected)}`,
       held && `the button was left held, and ${held.released ? "has been released" : "could not be released"}`,
     ].filter(Boolean);

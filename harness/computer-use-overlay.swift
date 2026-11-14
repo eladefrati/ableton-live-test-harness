@@ -1,10 +1,11 @@
 // Shows that harness-computer-use holds the mouse (ADR-0009): a breathing purple glow in from
 // the edges of every screen and a pill naming the run, until the process <pid> exits, then a
-// notification that the mouse is free again. The pill's Stop sends the run SIGUSR2, after
-// which it clicks no more, and takes all of this down at once. The glow lets every click
-// through; nothing here takes the front.
+// notification that the mouse is free again. The pill's Stop creates the file <stop-marker>,
+// after which the run and its helper post nothing but the release of a button the helper
+// holds, and takes all of this down at once. The glow lets every click through; nothing here
+// takes the front.
 //
-//   computer-use-overlay <pid> [<run>]
+//   computer-use-overlay <pid> <stop-marker> [<run>]
 //
 // device-ui.swift's click guard skips the glow's windows, titled OVERLAY_TITLE, that this
 // program owns. It doesn't skip the pill, which takes clicks.
@@ -30,8 +31,9 @@ func fail(_ message: String) -> Never {
 }
 
 let arguments = CommandLine.arguments
-guard (2...3).contains(arguments.count), let pid = pid_t(arguments[1]) else { fail("usage: computer-use-overlay <pid> [<run>]") }
-let run = arguments.count == 3 ? arguments[2] : ""
+guard (3...4).contains(arguments.count), let pid = pid_t(arguments[1]) else { fail("usage: computer-use-overlay <pid> <stop-marker> [<run>]") }
+let marker = arguments[2]
+let run = arguments.count == 4 ? arguments[3] : ""
 
 // A soft glow inward from every edge: one-point rings whose opacity falls off with the distance
 // from the edge, with no line where it starts or ends. Drawn once into the view's layer.
@@ -61,29 +63,38 @@ func breathe(_ layer: CALayer?, from: Double, to: Double, seconds: Double) {
     layer?.add(animation, forKey: "breathe")
 }
 
+func notify(_ message: String) {
+    let script = Process()
+    script.executableURL = URL(fileURLWithPath: "/usr/bin/osascript")
+    script.arguments = ["-e", "on run argv", "-e",
+                        "display notification (item 1 of argv) with title \"harness-computer-use\"",
+                        "-e", "end run", message]
+    try? script.run()
+    script.waitUntilExit()
+}
+
 // Ends the overlay with a notification saying why.
 @MainActor func finish(_ message: String) -> Never {
     NSApp.windows.forEach { $0.orderOut(nil) }
-    let notify = Process()
-    notify.executableURL = URL(fileURLWithPath: "/usr/bin/osascript")
-    notify.arguments = ["-e", "on run argv", "-e",
-                        "display notification (item 1 of argv) with title \"harness-computer-use\"",
-                        "-e", "end run", message]
-    try? notify.run()
-    notify.waitUntilExit()
+    notify(message)
     exit(0)
 }
 
 // Stop's target. It is called on the main thread, as AppKit calls every action.
 final class Stopper: NSObject {
-    let target: pid_t, name: String
-    init(target: pid_t, name: String) { (self.target, self.name) = (target, name) }
+    let marker: String, name: String
+    init(marker: String, name: String) { (self.marker, self.name) = (marker, name) }
     @objc func stop() {
-        kill(target, SIGUSR2)
+        // The marker first: once it exists the run's helper posts nothing but a release, so
+        // the notification is true when it shows. Without it the run still holds the mouse,
+        // and the border stays.
+        guard FileManager.default.createFile(atPath: marker, contents: nil) else {
+            return notify("Stop failed: \(name.isEmpty ? "the run" : name) may still click.")
+        }
         MainActor.assumeIsolated { finish("Stopped: \(name.isEmpty ? "the run" : name) won't click again. The mouse is yours.") }
     }
 }
-let stopper = Stopper(target: pid, name: run)
+let stopper = Stopper(marker: marker, name: run)
 
 // A panel that takes a click without taking the front from the app in front.
 final class PillPanel: NSPanel {

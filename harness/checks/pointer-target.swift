@@ -1,7 +1,7 @@
 // A window that reports the mouse events it receives, for pointer-guards.js: a floating panel
 // that takes clicks without taking the front.
 //
-//   pointer-target <x> <y> <w> <h> [--cover] [--return]
+//   pointer-target <x> <y> <w> <h> [--cover] [--return] [--stop <file>] [--signal]
 //                                     at that rectangle, in points from the screen's top left
 //   pointer-target --under <title>    at the rectangle of the window of that title, under it
 //
@@ -10,7 +10,9 @@
 // "dy"}, the event's position in points from the screen's top left and its delta fields. With
 // --cover it shows a second window over the panel when the pointer first moves in it. With
 // --return it moves the pointer back to where the button went down at every drag event, as a
-// knob of one of Live's devices does.
+// knob of one of Live's devices does. When the button goes down, with --stop it creates <file>,
+// as Stop on harness-computer-use's pill creates a run's stop marker, and with --signal it
+// sends SIGTERM to the process that posted the event.
 //
 // SIGTERM ends it, and so does the end of the process that started it. If the left button is
 // held then, it posts the button up first and prints {"released": <whether that released it>}.
@@ -30,11 +32,13 @@ func printJSON(_ value: [String: Any]) {
 
 final class Pad: NSView {
     var onFirstMove: (() -> Void)?
+    var onDown: ((CGEvent) -> Void)?
     var returnsPointer = false
     var pressed = CGPoint.zero
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
     override func mouseDown(with event: NSEvent) {
         pressed = event.cgEvent?.location ?? .zero
+        if let posted = event.cgEvent { onDown?(posted) }
         report("down", event)
     }
     override func mouseDragged(with event: NSEvent) {
@@ -100,19 +104,31 @@ func flag(_ name: String) -> Bool {
     options.remove(at: index)
     return true
 }
-let (cover, returnsPointer) = (flag("--cover"), flag("--return"))
+func value(_ name: String) -> String? {
+    guard let index = options.firstIndex(of: name), index + 1 < options.count else { return nil }
+    defer { options.removeSubrange(index...index + 1) }
+    return options[index + 1]
+}
+let stopMarker = value("--stop")
+let (cover, returnsPointer, signals) = (flag("--cover"), flag("--return"), flag("--signal"))
 let rect: CGRect
 if options.count == 2, options[0] == "--under" {
     rect = windowTitled(options[1])
 } else {
     let numbers = options.compactMap { Double($0) }
     guard options.count == 4, numbers.count == 4
-    else { fail("usage: pointer-target <x> <y> <w> <h> [--cover] [--return] | --under <title>") }
+    else { fail("usage: pointer-target <x> <y> <w> <h> [--cover] [--return] [--stop <file>] [--signal] | --under <title>") }
     rect = CGRect(x: numbers[0], y: numbers[1], width: numbers[2], height: numbers[3])
 }
 
 let (panel, pad) = showPanel(rect)
 pad.returnsPointer = returnsPointer
+pad.onDown = { posted in
+    if let stopMarker { FileManager.default.createFile(atPath: stopMarker, contents: nil) }
+    let poster = pid_t(posted.getIntegerValueField(.eventSourceUnixProcessID))
+    // Never 0, which would signal this program's own process group.
+    if signals, poster > 0 { kill(poster, SIGTERM) }
+}
 var over: Panel?
 if cover {
     pad.addTrackingArea(NSTrackingArea(rect: .zero, options: [.mouseMoved, .activeAlways, .inVisibleRect], owner: pad))

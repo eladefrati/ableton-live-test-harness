@@ -275,13 +275,22 @@ async function askToClick(script) {
 // process ends, then a notification. It watches this process itself, so it goes also when the
 // run is killed.
 const OVERLAY_SOURCE = path.join(__dirname, "computer-use-overlay.swift");
-// The pill's Stop sends this process SIGUSR2; `onStop` is called then. The handler goes in
-// before the overlay starts, since SIGUSR2's default is to end the process.
-async function showComputerUse(onStop) {
-  process.on("SIGUSR2", onStop);
+
+// The variable that names the run's stop marker (ADR-0009), the file the pill's Stop creates,
+// so that every helper the run starts reads it too (device-ui.swift). The click host is never
+// read from the environment (ADR-0005), where a variable could lift a guard; this one can
+// only stop a run.
+const STOP_MARKER = "HARNESS_COMPUTER_USE_STOP";
+const stopped = () => Boolean(process.env[STOP_MARKER]) && fs.existsSync(process.env[STOP_MARKER]);
+
+async function showComputerUse() {
   const binary = await tools.helperBinary(OVERLAY_SOURCE);
+  // Not in the harness's temp folder, which relaunch.js and quit.js empty.
+  const folder = fs.mkdtempSync(path.join(os.tmpdir(), "harness-computer-use-"));
+  process.on("exit", () => fs.rmSync(folder, { recursive: true, force: true }));
+  process.env[STOP_MARKER] = path.join(folder, "stopped");
   const run = runName();
-  const overlay = spawn(binary, [String(process.pid), ...(run ? [run] : [])], { detached: true, stdio: "ignore" });
+  const overlay = spawn(binary, [String(process.pid), process.env[STOP_MARKER], ...(run ? [run] : [])], { detached: true, stdio: "ignore" });
   overlay.on("error", (error) => console.error(`warn harness-computer-use couldn't show its border: ${error.message}`));
   overlay.unref();
 }
@@ -291,6 +300,7 @@ const machine = {
   clickHost: () => readClickHost(),
   ask: () => askToClick(runName()),
   showComputerUse,
+  stopped,
   // A slept display has no windows to capture.
   wake: () => mac.wakeDisplay(),
   // The display first: activate() returns at once if Live is already in front, even asleep.
@@ -357,27 +367,25 @@ const machine = {
 // The system's calls that move the pointer or press its button.
 const POINTER_CALLS = ["hover", "click", "drag", "clickEditor", "dragEditor"];
 
-// Whether each system's run may use the pointer: { allowed, stopped }.
-const permissions = new WeakMap();
+// The systems whose run may use the pointer.
+const allowed = new WeakSet();
 
 // Before a run's first hover: on the click host at once, on any other machine after the
 // person at it allows the run's clicks (ADR-0006). The answer holds for the rest of the run,
 // and while it does a purple border shows there (ADR-0009). The border only informs: a run
 // that can't show it still clicks, with a warning. After Stop on the pill (ADR-0009) it
-// throws: the run goes on, so a check fails at its next press and still cleans up.
+// throws, as the helper does in a press under way: the run goes on, so a check fails there
+// and still cleans up.
 async function permit(system) {
-  let permission = permissions.get(system);
-  if (!permission) permissions.set(system, permission = { allowed: false, stopped: false });
-  if (!permission.allowed) {
+  if (!allowed.has(system)) {
     const host = system.hostname();
     if (host !== system.clickHost()) {
       if (!(await system.ask())) throw new DeviceUiError(`Clicks in Live on ${host} weren't allowed (ADR-0006). Not clicked`);
-      const stop = () => { permission.stopped = true; };
-      await system.showComputerUse(stop).catch((error) => console.error(`warn harness-computer-use couldn't show its border: ${error.message}`));
+      await system.showComputerUse().catch((error) => console.error(`warn harness-computer-use couldn't show its border: ${error.message}`));
     }
-    permission.allowed = true;
+    allowed.add(system);
   }
-  if (permission.stopped) throw new DeviceUiError("harness-computer-use was stopped from its pill: this run clicks no more. Not clicked");
+  if (system.stopped()) throw new DeviceUiError("harness-computer-use was stopped from its pill: this run clicks no more. Not clicked");
 }
 
 // The system as DeviceUi and PluginWindow hold it: each call that moves the pointer passes
@@ -388,7 +396,7 @@ function guarded(system) {
   const guard = Object.create(system);
   guard.permit = () => permit(system);
   guard.escape = async () => {
-    if (!permissions.get(system)?.stopped) return system.escape();
+    if (!system.stopped()) return system.escape();
     if (await system.liveInFront()) await system.typeEscape();
   };
   for (const call of POINTER_CALLS) {

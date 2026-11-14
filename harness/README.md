@@ -103,8 +103,9 @@ Node 18 or later. See [ADR-0001](../docs/adr/0001-fork-abletonosc.md) for the de
   in 2 minutes throws `DeviceUiError` (ADR-0006). From Allow until the run's process ends, a
   breathing purple glow in from the screen's edges, with a pill naming the run, shows that the
   run may take the pointer; a notification says when it has ended (`computer-use-overlay.swift`,
-  ADR-0009). Stop on the pill takes the mouse back: the run's later presses throw
-  `DeviceUiError`, so a check fails there and still cleans up. The dialog, the pill and the
+  ADR-0009). Stop on the pill takes the mouse back: the press under way stops, with a button
+  it holds released, and it and the run's later presses throw `DeviceUiError`, so a check
+  fails there and still cleans up. The dialog, the pill and the
   notification name a check in `tests/live/` as
   `tests/live/<check>.js`, another script by its file, and code run with `node -e` or given
   on stdin not at all.
@@ -238,7 +239,11 @@ Node 18 or later. See [ADR-0001](../docs/adr/0001-fork-abletonosc.md) for the de
   received: a click reaches the window; a window that comes over the point during a click's
   hover gets no click; a point under harness-computer-use's pill is refused; a drag is one
   button-down at the point, one drag event at its end with the whole distance in its delta
-  fields, and one button-up, where the pointer then is. It takes the
+  fields, and one button-up, where the pointer then is; a helper started after Stop posts
+  nothing; Stop while a click or a drag holds the button brings the button up and posts
+  nothing more; SIGTERM while a drag holds the button brings it up before the helper dies;
+  Stop while the helper waits under a notification's banner ends the wait, for which the
+  check posts a notification, whose banner must show. It takes the
   pointer, so it runs only on the click host and refuses on any other machine, posting
   nothing. A case that leaves the button held releases it and fails.
 

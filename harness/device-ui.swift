@@ -31,12 +31,32 @@
 // editor and the editor is the size given; a drag also unless it moves whole points, at least
 // 1 on its longer axis and at most MAX_DRAG on either, and ends on a screen. Exits 1 with the
 // reason on stderr if anything fails.
+//
+// Once the run is stopped (ADR-0009: the file named in HARNESS_COMPUTER_USE_STOP exists),
+// hover, click and drag post nothing but the release of a button this helper holds, and exit
+// 3 saying so. A helper that fails, or is sent SIGINT, SIGTERM or SIGHUP, while it holds the
+// button releases it before it ends.
 
 import ApplicationServices
 import Foundation
 import Vision
 
+// Stop (ADR-0009). The run names its stop marker in HARNESS_COMPUTER_USE_STOP, and the pill's
+// Stop creates that file.
+let STOP_MARKER = ProcessInfo.processInfo.environment["HARNESS_COMPUTER_USE_STOP"]
+let STOPPED_STATUS: Int32 = 3
+
+func stopped() -> Bool { STOP_MARKER.map { access($0, F_OK) == 0 } ?? false }
+
+// Where the button went down, while this helper holds it.
+var heldAt: CGPoint? = nil
+// A signal that would end the helper, as Ctrl-C on the run does, is held back once the button
+// goes down: the helper releases the button first, then dies by that signal.
+let ENDING_SIGNALS = [SIGINT, SIGTERM, SIGHUP]
+var signalled: sig_atomic_t = 0
+
 func fail(_ message: String) -> Never {
+    release()
     FileHandle.standardError.write(Data((message + "\n").utf8))
     exit(1)
 }
@@ -254,6 +274,7 @@ func requireOnTop(_ id: Int, _ point: CGPoint) {
     let deadline = Date().addingTimeInterval(NOTIFICATION_WAIT_SECONDS)
     var top = clickableWindows().first(where: { bounds($0).contains(point) })
     while let cover = top, isNotificationCover(cover), Date() < deadline {
+        if stopped() { halt() }
         usleep(250_000)
         top = clickableWindows().first(where: { bounds($0).contains(point) })
     }
@@ -265,15 +286,72 @@ func requireOnTop(_ id: Int, _ point: CGPoint) {
     }
 }
 
-func mouseEvent(_ type: CGEventType, _ point: CGPoint) -> CGEvent {
+func emit(_ type: CGEventType, _ point: CGPoint, moved: CGVector? = nil) {
     guard let event = CGEvent(mouseEventSource: CGEventSource(stateID: .hidSystemState), mouseType: type,
                               mouseCursorPosition: point, mouseButton: .left)
     else { fail("Cannot create a mouse event") }
     event.setIntegerValueField(.mouseEventClickState, value: 1)
-    return event
+    if let moved {
+        event.setIntegerValueField(.mouseEventDeltaX, value: Int64(moved.dx))
+        event.setIntegerValueField(.mouseEventDeltaY, value: Int64(moved.dy))
+    }
+    event.post(tap: .cghidEventTap)
 }
 
-func post(_ type: CGEventType, _ point: CGPoint) { mouseEvent(type, point).post(tap: .cghidEventTap) }
+// The button up, for a click, a drag and a release alike, and then a wait: a mouse event
+// posted as the last thing a program does is lost (live-notes.md).
+func buttonUp(_ point: CGPoint) {
+    heldAt = nil
+    emit(.leftMouseUp, point)
+    // A signal held back cuts a sleep short, so the rest of it is slept again.
+    var (wait, left) = (timespec(tv_sec: 0, tv_nsec: 100_000_000), timespec())
+    while nanosleep(&wait, &left) != 0 && errno == EINTR { wait = left }
+}
+
+// The one event a helper that is stopped, signalled or failing still posts: the button up
+// where the pointer is, if it holds the button. Returns that point.
+@discardableResult func release() -> CGPoint? {
+    guard let held = heldAt else { return nil }
+    let point = CGEvent(source: nil)?.location ?? held
+    buttonUp(point)
+    return point
+}
+
+// Dies by a signal that was held back, now that the button is up.
+func obeySignal() {
+    guard signalled != 0 else { return }
+    signal(signalled, SIG_DFL)
+    raise(signalled)
+}
+
+// Ends a helper that may post nothing more: by the signal held back, or else as stopped.
+func halt() -> Never {
+    let released = release()
+    obeySignal()
+    let did = released.map { "released the button at \($0.x), \($0.y)" } ?? "held no button"
+    FileHandle.standardError.write(Data("harness-computer-use was stopped from its pill: this run clicks no more, and the helper \(did)\n".utf8))
+    exit(STOPPED_STATUS)
+}
+
+// The one function a hover's, a click's and a drag's events leave from, so the one place that
+// checks Stop.
+func post(_ type: CGEventType, _ point: CGPoint, moved: CGVector? = nil) {
+    if signalled != 0 || stopped() { halt() }
+    switch type {
+    case .leftMouseDown:
+        // A signal the helper was started ignoring, as under nohup, stays ignored.
+        for number in ENDING_SIGNALS {
+            if let before = signal(number, { signalled = $0 }) { signal(number, before) }
+        }
+        emit(type, point)
+        heldAt = point
+    case .leftMouseUp:
+        buttonUp(point)
+        obeySignal()
+    default:
+        emit(type, point, moved: moved)
+    }
+}
 
 // The longest drag either way, in points (ADR-0010).
 let MAX_DRAG = 400.0
@@ -297,31 +375,22 @@ func requireDrag(_ point: CGPoint, _ delta: CGVector) {
 // so a path measured from the press point is counted again at each step (live-notes.md). A
 // control that reads where the pointer is ends at the same value either way. The event
 // carries the whole distance in its delta fields too, for controls that read how far the
-// mouse moved. Every event is made before the button goes down, so nothing here can fail and
-// leave it held.
+// mouse moved.
 func drag(_ point: CGPoint, by delta: CGVector) {
     let end = CGPoint(x: point.x + delta.dx, y: point.y + delta.dy)
-    let (down, move, up) = (mouseEvent(.leftMouseDown, point), mouseEvent(.leftMouseDragged, end), mouseEvent(.leftMouseUp, end))
-    move.setIntegerValueField(.mouseEventDeltaX, value: Int64(delta.dx))
-    move.setIntegerValueField(.mouseEventDeltaY, value: Int64(delta.dy))
-    down.post(tap: .cghidEventTap)
+    post(.leftMouseDown, point)
     usleep(70_000)
-    move.post(tap: .cghidEventTap)
+    post(.leftMouseDragged, end, moved: delta)
     usleep(50_000)
     // Live has moved the pointer back to the press point by now; other controls left it at
     // the end.
-    up.location = CGEvent(source: nil)?.location ?? end
-    up.post(tap: .cghidEventTap)
-    usleep(100_000)
+    post(.leftMouseUp, CGEvent(source: nil)?.location ?? end)
 }
 
-// Both events are made before the button goes down, as in a drag.
 func press(_ point: CGPoint) {
-    let (down, up) = (mouseEvent(.leftMouseDown, point), mouseEvent(.leftMouseUp, point))
-    down.post(tap: .cghidEventTap)
+    post(.leftMouseDown, point)
     usleep(70_000)
-    up.post(tap: .cghidEventTap)
-    usleep(100_000)
+    post(.leftMouseUp, point)
 }
 
 // Within this of a size counts as that size: Accessibility reports whole points.

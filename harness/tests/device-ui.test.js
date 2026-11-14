@@ -59,6 +59,7 @@ function fakeMachine({ info = "Button", titles = [line(`> ${TITLE}`, 1800, 1400)
     clickHost: () => "click-mac",
     wake: async () => {},
     showComputerUse: async () => { calls.push("border"); },
+    stopped: () => false,
     focus: async () => { calls.push("focus"); onFocus(calls); },
     window: async () => WINDOW,
     read: async () => ({ width: 2880, lines: [line(info, 26, 1400), ...titles, line("text", 2000, 1560)] }),
@@ -67,6 +68,13 @@ function fakeMachine({ info = "Button", titles = [line(`> ${TITLE}`, 1800, 1400)
     click: async (id, x, y) => { calls.push(["click", id, x, y]); },
     drag: async (id, x, y, dx, dy) => { calls.push(["drag", id, x, y, dx, dy]); },
   };
+}
+
+// Makes the machine one that asks, and returns the function that stops its run, as Stop on
+// the pill does.
+function stoppable(system) {
+  Object.assign(system, { hostname: () => "another-mac", ask: async () => true });
+  return () => { system.stopped = () => true; };
 }
 
 const fakeLive = (className = "MxDeviceAudioEffect") => ({
@@ -225,8 +233,7 @@ test("a press on another machine asks once, before the hover, and clicks after A
 
 test("after Stop on the pill, no press of the run hovers or clicks again", async () => {
   const system = fakeMachine();
-  let stop;
-  Object.assign(system, { hostname: () => "another-mac", ask: async () => true, showComputerUse: async (onStop) => { stop = onStop; } });
+  const stop = stoppable(system);
   const ui = await open(system);
   await ui.press("Button");
   stop();
@@ -238,8 +245,7 @@ test("after Stop on the pill, no press of the run hovers or clicks again", async
 
 test("after Stop on the pill, no press in a plug-in's window clicks", async () => {
   const system = fakePluginMachine();
-  let stop;
-  Object.assign(system, { hostname: () => "another-mac", ask: async () => true, showComputerUse: async (onStop) => { stop = onStop; } });
+  const stop = stoppable(system);
   const window = await openPluginWindow(pluginLive(), PLUGIN, system);
   await window.press("Button");
   stop();
@@ -249,8 +255,7 @@ test("after Stop on the pill, no press in a plug-in's window clicks", async () =
 
 test("Stop between a press's hover and its click stops the click", async () => {
   const system = fakeMachine();
-  let stop;
-  Object.assign(system, { hostname: () => "another-mac", ask: async () => true, showComputerUse: async (onStop) => { stop = onStop; } });
+  const stop = stoppable(system);
   const hover = system.hover;
   system.hover = async (...args) => { await hover(...args); stop(); };
   const ui = await open(system);
@@ -260,12 +265,29 @@ test("Stop between a press's hover and its click stops the click", async () => {
 
 // The machine's calls that never move the pointer or press its button, so need no permit.
 const OTHER_CALLS = [
-  "hostname", "clickHost", "ask", "showComputerUse", "wake", "focus", "window", "windows", "capture", "read", "captureCrop",
+  "hostname", "clickHost", "ask", "showComputerUse", "stopped", "wake", "focus", "window", "windows", "capture", "read", "captureCrop",
   "pluginWindow", "editor", "frontmost", "escape", "liveInFront", "typeEscape", "giveBack", "captureRect",
 ];
 
 test("every call of the machine is either one that takes the pointer, which passes permit, or listed as one that never does", () => {
   assert.deepEqual(Object.keys(machine).sort(), [...POINTER_CALLS, ...OTHER_CALLS].sort());
+});
+
+test("the run is stopped once the file named as its stop marker exists", () => {
+  const folder = fs.mkdtempSync(path.join(os.tmpdir(), "device-ui-test-"));
+  const before = process.env.HARNESS_COMPUTER_USE_STOP;
+  try {
+    delete process.env.HARNESS_COMPUTER_USE_STOP;
+    assert.equal(machine.stopped(), false);
+    process.env.HARNESS_COMPUTER_USE_STOP = path.join(folder, "stopped");
+    assert.equal(machine.stopped(), false);
+    fs.writeFileSync(process.env.HARNESS_COMPUTER_USE_STOP, "");
+    assert.equal(machine.stopped(), true);
+  } finally {
+    if (before === undefined) delete process.env.HARNESS_COMPUTER_USE_STOP;
+    else process.env.HARNESS_COMPUTER_USE_STOP = before;
+    fs.rmSync(folder, { recursive: true, force: true });
+  }
 });
 
 test("the click host shows no border, and a border that fails to show doesn't stop the clicks", async () => {
@@ -436,6 +458,7 @@ function fakePluginMachine({ open = false, shown = [EDITOR] } = {}) {
     clickHost: () => "click-mac",
     wake: async () => {},
     showComputerUse: async () => { calls.push("border"); },
+    stopped: () => false,
     focus: async () => { calls.push("focus"); },
     pluginWindow: async (action, device) => {
       calls.push(["button", action, device]);
@@ -549,8 +572,7 @@ test("a drag in a plug-in's editor goes to the helper with the point, the size a
 
 test("after Stop on the pill, no drag", async () => {
   const system = fakePluginMachine();
-  let stop;
-  Object.assign(system, { hostname: () => "another-mac", ask: async () => true, showComputerUse: async (onStop) => { stop = onStop; } });
+  const stop = stoppable(system);
   const window = await openPluginWindow(pluginLive(), PLUGIN, system);
   await window.drag("Button", { up: 10 });
   stop();
@@ -695,8 +717,7 @@ test("choose refuses a missing item before anything is clicked", async () => {
 // Stops the run while choose reads the menu it opened, and resolves with the system's calls.
 async function stoppedWhileReading(front) {
   const system = menuMachine(MENU_ROWS, { front });
-  let stop;
-  Object.assign(system, { hostname: () => "another-mac", ask: async () => true, showComputerUse: async (onStop) => { stop = onStop; } });
+  const stop = stoppable(system);
   const read = system.read;
   system.read = async (id) => { if (id === 9) stop(); return read(id); };
   await assert.rejects((await openMenu(system)).choose("Menu", "Wander"), /stopped from its pill/);
@@ -732,8 +753,7 @@ test("choose keeps its failure, with a warning, when Escape fails too", async ()
 
 test("Stop between choose's Info View check and its opening click stops the click", async () => {
   const system = menuMachine(MENU_ROWS);
-  let stop;
-  Object.assign(system, { hostname: () => "another-mac", ask: async () => true, showComputerUse: async (onStop) => { stop = onStop; } });
+  const stop = stoppable(system);
   const windows = system.windows;
   system.windows = async () => { stop(); return windows(); };
   await assert.rejects((await openMenu(system)).choose("Menu", "Wander"), /stopped from its pill/);
