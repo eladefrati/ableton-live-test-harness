@@ -208,7 +208,10 @@ unexpected.
   already, with its folder or without, not by whether the run can read it: with the folder
   unwritable the run had died by SIGTERM 0.07 to 0.08 s after the press was started, and
   the overlay said that the run was ended 0.05 s later, in three runs
-  (`checks/pointer-guards.js`, remote Mac, 2026-11-14).
+  (`checks/pointer-guards.js`, remote Mac, 2026-11-14). In Live, with a real click posted
+  on Stop after a press had thrown for the unwritable folder, the run died by SIGTERM about
+  0.03 s after the button came up, in 2 of 2, and no mouse event followed, also once the
+  folder could be written to again (remote Mac, Live 12.4.25b1, 2026-11-14).
 - A real click posted on the pill's Stop, the button down and up as mouse events at its
   place, stops the run as the Accessibility press does: the token went 5 and 15 ms after
   the button came up, and a press that waited under a notification's cover threw 208 and
@@ -230,7 +233,10 @@ unexpected.
   posted, and the overlay said that the run had ended 0.16 to 0.20 s after the kill; one
   holding a drag's button, before its move, posted the button up, which reached the check's
   window 74 to 80 ms after the kill, and no drag event, in three runs
-  (`checks/pointer-guards.js`, remote Mac, 2026-11-13).
+  (`checks/pointer-guards.js`, remote Mac, 2026-11-13). In Live, a helper waiting under a
+  notification's cover was gone 0.12 s after its run was killed by SIGTERM and 0.28 s after
+  SIGKILL, and posted nothing; the border went 0.55 s after the kill in both (remote Mac,
+  Live 12.4.25b1, 2026-11-14).
 - In Live, a token removed 4 and 5 ms after the button of `choose`'s opening click went down
   left that click to complete: the release was the one mouse event after, `choose` threw as
   stopped with `done`, the menu was closed and the chooser's value unchanged. A press
