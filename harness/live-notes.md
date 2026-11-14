@@ -333,6 +333,18 @@ unexpected.
   2.4 s after the click. The border went 0.5 to 0.6 s after the run's end. A run that
   ignored the signal was killed 10.0 s after the click and left its track in Live; no mouse
   event followed (remote Mac, Live 12.4.25b1, 2026-11-14).
+- In Live, Stop's last resort during a drag: the run's helper suspended (SIGSTOP) as its
+  drag's button went down on one of Auto Filter's knobs, before its move, the user-immutable
+  flag set on the token, and Stop pressed on the pill through Accessibility, as
+  `checks/pointer-guards.js` presses it inside a gesture (a real click would post a
+  button-down of its own while the helper held the button). The run had the signal 105 and
+  124 ms after the press was started, the pill then reading Stopping with the glow up. Let
+  go on 0.38 and 0.44 s after the press, the helper posted the button up at the press point
+  11 and 2 ms later and no drag event, and the drag threw as stopped, without `done`. The
+  knob's value was unchanged; the run deleted its track and ended by itself, with status 0,
+  0.90 and 0.87 s after the press, and the pill and the glow went together 0.36 and 0.41 s
+  after the run's end. Frequency dragged 10 points up and Dry/Wet 12 down (remote Mac, Live
+  12.4.25b1, macOS 26, 2026-11-14).
 - After Stop the pill now stays, its button reading Stopping with a light going round it,
   until the run's process has ended, and only then does the overlay say Stopped and notify
   (ADR-0015); over a run that goes on it stays 10 s, as the next entry records. Before, it
