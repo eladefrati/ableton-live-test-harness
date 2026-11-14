@@ -2,9 +2,10 @@
 // the edges of every screen and a pill naming the run, until the process <pid> exits, then a
 // notification that the mouse is free again. The pill's Stop removes the file <click-token>,
 // without which the run and its helper post nothing but the release of a button the helper
-// holds, and takes all of this down at once. If the token is still there after that, Stop
-// signals the run instead: the run stops clicking and goes on to its clean-up, and all of
-// this stays up until the run has ended, by itself or, END_SECONDS after the signal, killed.
+// holds, and takes the glow down. If the token is still there after that, Stop signals the
+// run instead: the run stops clicking and goes on to its clean-up, and the glow stays up.
+// Either way the pill stays, its button reading Stopping with a light going round it, until
+// the run has ended, by itself or, after that signal, killed END_SECONDS later (ADR-0015).
 // The glow lets every click through; nothing here takes the front.
 //
 //   computer-use-overlay <pid> <click-token> [<run>]
@@ -13,8 +14,9 @@
 // resort signals <pid> and kills it if it stays, and to kill, 0 is this program's own
 // process group and -1 every process the user may signal.
 //
-// Prints "shown" once the window server lists its windows and, as it ends, the message it
-// notifies. If its windows can't show (no desktop session, no screen, or not listed within
+// Prints "shown" once the window server lists its windows, "stopping" once Stop is pressed
+// and has removed the token or signalled the run, and, as it ends, the message it notifies.
+// If its windows can't show (no desktop session, no screen, or not listed within
 // SHOWN_SECONDS), it says why on stderr and exits 1, so the run can warn that it clicks with
 // no border.
 //
@@ -122,44 +124,104 @@ func ended(_ run: pid_t) -> Bool {
 let END_SECONDS = 10.0
 let KILLED_SECONDS = 1.0
 
-// Stop's last resort (ADR-0012), for a run whose token is still there after Stop tried to
-// remove it: sends the run SIGUSR2, on which it counts itself stopped, stops its helpers and
-// goes on to its clean-up, and waits for it to end, the border still up. A run still there
-// after END_SECONDS is killed; its helpers stop because their run has gone. Returns whether
-// the run ended by itself.
-func endRun(_ run: pid_t) -> Bool {
-    kill(run, SIGUSR2)
-    let deadline = Date().addingTimeInterval(END_SECONDS)
-    while !ended(run) {
-        if Date() > deadline {
-            kill(run, SIGKILL)
-            let gone = Date().addingTimeInterval(KILLED_SECONDS)
-            while !ended(run), Date() < gone { usleep(50_000) }
-            return false
-        }
-        usleep(50_000)
+// What the pill's button reads once Stop is pressed, and how long the light that then goes
+// round the button takes for a round.
+let STOPPING_TITLE = NSAttributedString(string: "Stopping", attributes: [
+    .font: NSFont.systemFont(ofSize: 12, weight: .semibold), .foregroundColor: NSColor.white.withAlphaComponent(0.7)])
+let ROUND_SECONDS = 1.1
+
+// The pill's button once Stop is pressed (ADR-0015): it reads Stopping, and a light goes
+// round its edge until the overlay ends. The light is drawn in a view of its own over the
+// button, whose layer is AppKit's to draw in: a bright head and a fainter, longer tail, two
+// dashes of the button's outline that start with their leading ends together.
+@MainActor func showStopping(_ button: NSButton) {
+    button.image = nil
+    button.attributedTitle = STOPPING_TITLE
+    button.setAccessibilityLabel("Stopping")
+    let ring = NSView(frame: button.frame)
+    ring.layer = CALayer()
+    ring.wantsLayer = true
+    let edge = ring.bounds.insetBy(dx: 0.75, dy: 0.75)
+    let length = 2 * (edge.width - edge.height) + .pi * edge.height
+    for (share, alpha) in [(0.4, 0.35), (0.14, 1.0)] {
+        let light = CAShapeLayer()
+        light.path = CGPath(roundedRect: edge, cornerWidth: edge.height / 2, cornerHeight: edge.height / 2, transform: nil)
+        light.fillColor = nil
+        light.strokeColor = LIGHT_PURPLE.withAlphaComponent(alpha).cgColor
+        light.lineWidth = 1.5
+        light.lineCap = .round
+        light.lineDashPattern = [NSNumber(value: share * length), NSNumber(value: (1 - share) * length)]
+        let round = CABasicAnimation(keyPath: "lineDashPhase")
+        round.fromValue = share * length
+        round.toValue = share * length - length
+        round.duration = ROUND_SECONDS
+        round.repeatCount = .infinity
+        light.add(round, forKey: "round")
+        ring.layer?.addSublayer(light)
     }
-    return true
+    button.superview?.addSubview(ring)
 }
 
-// Stop's target. It is called on the main thread, as AppKit calls every action.
+// Stop's target, which also watches for the run's end. Its methods are called on the main
+// thread: stop as AppKit calls every action, watch by timers.
 final class Stopper: NSObject {
     let target: pid_t, token: String, name: String
+    // Since Stop was pressed: when that was, whether the token went, and when the run was
+    // killed, if it was.
+    var pressed: Date?, removed = false, killed: Date?
     init(target: pid_t, token: String, name: String) { (self.target, self.token, self.name) = (target, token, name) }
-    @objc func stop() {
-        // The token first: once it is gone the run's helper posts nothing but a release, so
-        // the notification is true when it shows. It is gone if this removed it, or if it or
-        // its folder had gone already. Whether the run can read it doesn't count: with a
-        // folder that can't be written to the run reads as stopped, but what made it so may
-        // pass, and the token would let the run click again.
-        let gone = unlink(token) == 0 || errno == ENOENT
+
+    @objc func stop(_ button: NSButton) {
+        // Pressed again: the run is stopping already.
+        guard pressed == nil else { return }
+        // The token first, before the pill shows anything: once it is gone the run's helper
+        // posts nothing but a release. It is gone if this removed it, or if it or its folder
+        // had gone already. Whether the run can read it doesn't count: with a folder that
+        // can't be written to the run reads as stopped, but what made it so may pass, and
+        // the token would let the run click again.
+        removed = unlink(token) == 0 || errno == ENOENT
         MainActor.assumeIsolated {
             // A run that has ended has nothing left to stop, whatever became of its token: it
             // removes the token's folder a moment before this program notices it has gone.
             if ended(target) { finish(RUN_ENDED) }
-            // Nothing is said, and the border stays, until a run that is signalled has ended.
-            if gone || endRun(target) { finish("Stopped: \(name.isEmpty ? "the run" : name) won't click again. The mouse is yours.") }
-            finish("\(name.isEmpty ? "The run" : name) was ended: its click token couldn't be removed. The mouse is yours.")
+            // Stop's last resort (ADR-0012), for a token that is still there: the run is sent
+            // SIGUSR2, on which it counts itself stopped, stops its helpers and goes on to
+            // its clean-up.
+            if !removed { kill(target, SIGUSR2) }
+            pressed = Date()
+            print("stopping")
+            fflush(stdout)
+            // The glow says that the run may take the pointer, which a run whose token is
+            // gone can't. A run that was signalled can, until it has ended. It goes without
+            // the closing animation of a window, which kept it on screen 0.3 s longer.
+            if removed {
+                for glow in NSApp.windows where glow.title == OVERLAY_TITLE {
+                    glow.animationBehavior = .none
+                    glow.orderOut(nil)
+                }
+            }
+            showStopping(button)
+            // The run's end is looked for more often from now on: the pill goes with it.
+            Timer.scheduledTimer(withTimeInterval: 0.05, repeats: true) { _ in MainActor.assumeIsolated { stopper.watch() } }
+        }
+    }
+
+    // Ends the overlay once the run has ended, saying what became of it; until then, after
+    // Stop, the pill stays (ADR-0015). Nothing here waits: a timer calls it again. In Stop's
+    // last resort a run still there END_SECONDS after its signal is killed, and its helpers
+    // stop because their run has gone; the overlay ends KILLED_SECONDS later at the latest.
+    @MainActor func watch() {
+        let wasEnded = "\(name.isEmpty ? "The run" : name) was ended: its click token couldn't be removed. The mouse is yours."
+        if ended(target) {
+            guard pressed != nil else { finish(RUN_ENDED) }
+            finish(killed == nil ? "Stopped: \(name.isEmpty ? "the run" : name) won't click again. The mouse is yours." : wasEnded)
+        }
+        guard let pressed, !removed else { return }
+        if let killed {
+            if Date() > killed.addingTimeInterval(KILLED_SECONDS) { finish(wasEnded) }
+        } else if Date() > pressed.addingTimeInterval(END_SECONDS) {
+            kill(target, SIGKILL)
+            killed = Date()
         }
     }
 }
@@ -185,7 +247,7 @@ func pill(on screen: NSScreen) -> NSPanel {
     text.sizeToFit()
     // Drawn by hand, white on a faint capsule: AppKit greys a control in a window that never
     // becomes key, as this one doesn't.
-    let stop = NSButton(title: "", target: stopper, action: #selector(Stopper.stop))
+    let stop = NSButton(title: "", target: stopper, action: #selector(Stopper.stop(_:)))
     stop.isBordered = false
     stop.image = NSImage(systemSymbolName: "stop.fill", accessibilityDescription: nil)?
         .withSymbolConfiguration(NSImage.SymbolConfiguration(pointSize: 9, weight: .bold)
@@ -196,7 +258,13 @@ func pill(on screen: NSScreen) -> NSPanel {
     stop.imageHugsTitle = true
     stop.setAccessibilityLabel("Stop")
     stop.sizeToFit()
-    stop.frame.size = NSSize(width: stop.frame.width + 20, height: 24)
+    // Wide enough for what it reads once pressed too (showStopping), so that the pill keeps
+    // its size then.
+    let stopping = NSButton(title: "", target: nil, action: nil)
+    stopping.isBordered = false
+    stopping.attributedTitle = STOPPING_TITLE
+    stopping.sizeToFit()
+    stop.frame.size = NSSize(width: max(stop.frame.width, stopping.frame.width) + 20, height: 24)
     stop.wantsLayer = true
     stop.layer?.backgroundColor = NSColor.white.withAlphaComponent(0.14).cgColor
     stop.layer?.cornerRadius = 12
@@ -286,8 +354,5 @@ Timer.scheduledTimer(withTimeInterval: 0.05, repeats: true) { timer in
 }
 
 // Looks every quarter of a second whether the run that holds the mouse has ended.
-Timer.scheduledTimer(withTimeInterval: 0.25, repeats: true) { _ in
-    guard ended(pid) else { return }
-    MainActor.assumeIsolated { finish(RUN_ENDED) }
-}
+Timer.scheduledTimer(withTimeInterval: 0.25, repeats: true) { _ in MainActor.assumeIsolated { stopper.watch() } }
 app.run()

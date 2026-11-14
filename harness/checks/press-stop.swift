@@ -8,8 +8,8 @@
 // and presses as soon as it has gone: sooner than the overlay looks for its run again.
 //
 // Exits 1, saying why, if the overlay shows no such button or refuses the press. An overlay
-// that obeys ends before it answers, which Accessibility reports as a press it couldn't
-// complete: that counts as pressed.
+// whose run has ended obeys by ending before it answers, which Accessibility reports as a
+// press it couldn't complete: that counts as pressed.
 
 import ApplicationServices
 import Foundation

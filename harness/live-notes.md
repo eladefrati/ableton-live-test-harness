@@ -333,6 +333,26 @@ unexpected.
   2.4 s after the click. The border went 0.5 to 0.6 s after the run's end. A run that
   ignored the signal was killed 10.0 s after the click and left its track in Live; no mouse
   event followed (remote Mac, Live 12.4.25b1, 2026-11-14).
+- After Stop the pill now stays, its button reading Stopping with a light going round it,
+  until the run's process has ended, and only then does the overlay say Stopped and notify
+  (ADR-0015). Before, it took everything down as soon as it had removed the token, and in
+  its last resort it waited for the run on its main thread: asked through Accessibility
+  for its button a few seconds into that wait, it gave no answer, where it now gives
+  "Stopping". In Live, with a real click posted on Stop while a press's click waited under
+  a notification's cover: the token went 2 and 16 ms after the click's button came up, the
+  run posted no mouse event after it, the glow was off the screen 29 and 55 ms after it,
+  the run ended by itself 0.53 and 0.61 s after it, its track deleted, and the pill went
+  1.04 and 1.01 s after it, 0.4 to 0.5 s after the run's end, while the notification was
+  posted. With the user-immutable flag on the token the glow stayed up with the pill: the
+  run ended 0.49 s after the click, and both went 1.03 and 1.04 s after it. A run that
+  ignored the signal was killed 10.01 and 10.02 s after the click, and both went 0.5 s
+  later; its helper, which could still read the token, posted its click 4.0 and 2.9 s
+  after Stop, once the notification's cover had gone, the cost ADR-0012 states. The glow's
+  windows stayed on screen 0.3 s after they were ordered out (315 ms) until their closing
+  animation was turned off (37 and 45 ms). The pointer, left over the pill by the click,
+  was an arrow 4.2 and 6.9 s into the last resort's wait, and so it was with the overlay as
+  it was before, 5.1 and 7.9 s in (`screencapture -C`; that it shows a wait cursor when
+  there is one wasn't tried). Remote Mac, Live 12.4.25b1, macOS 26, 2026-11-14.
 - A helper sent that signal itself stopped as after Stop. One waiting under a
   notification's cover exited with status 3 4 to 13 ms later. One holding a click's button
   posted the button up 6 to 8 ms after the signal, which cuts the hold short (73 to 81 ms

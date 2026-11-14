@@ -21,6 +21,7 @@ const { hostname, readClickHost } = require("../device-ui.js");
 
 const HARNESS = path.join(__dirname, "..");
 const PILL_TITLE = "harness-computer-use pill";
+const OVERLAY_TITLE = "harness-computer-use overlay";
 // Where the target shows: [x, y, w, h] in points from the screen's top left.
 const RECT = [400, 200, 400, 300];
 // How long the target has to report an event after the helper has ended.
@@ -130,7 +131,9 @@ const DRAGGED = { type: "drag", dx: 30, dy: -20 };
 // what must come of it: the helper's
 // exit status (the signal, if one ended it), its error, how soon it ended, the button events
 // the target's windows received, by the fields named, and the pointer's moves where a case
-// names them, all that the overlay says as it ends,
+// names them, what the overlay must show while a run that Stop stopped goes on (the pill
+// alone, or the pill and the border, the pill's button reading Stopping), all that the
+// overlay says as it ends,
 // whether it may say so only once the run has ended, how long after Stop the run must be
 // killed, at the least and at the most, and the signal that ends the run, if one does. In
 // every case, once the run is stopped the target must receive no event but a
@@ -346,7 +349,8 @@ const CASES = [
     run: "SIGTERM",
   },
   {
-    name: "Stop on the pill removes the token: the overlay says Stopped and takes the border down, and a helper started then posts nothing",
+    name: "Stop on the pill removes the token: a helper started then posts nothing, the overlay takes the border down and keeps the pill up, "
+      + "reading Stopping, while the run goes on, and says Stopped only once the run has ended",
     overlay: true,
     target: RECT,
     stopped: true,
@@ -355,13 +359,16 @@ const CASES = [
     status: STOPPED,
     stderr: stoppedError(),
     events: () => [],
+    stopping: "pill",
     says: SAID_STOPPED,
+    afterRun: true,
   },
   // Stop on the pill while the helper is in a gesture. The press takes longer to remove the
   // token than the helper holds a button, so the target freezes the helper at the event the
   // case names, and it goes on once the token is gone.
   {
-    name: "Stop on the pill during a click's hover, the helper frozen at its first move: it posts nothing more, and the overlay says Stopped",
+    name: "Stop on the pill during a click's hover, the helper frozen at its first move: it posts nothing more, "
+      + "the pill reads Stopping while the run goes on, and the overlay says Stopped once the run has ended",
     overlay: true,
     target: [...RECT, "--freeze", "move"],
     loss: stopPressed,
@@ -370,11 +377,13 @@ const CASES = [
     stderr: stoppedError(),
     moves: (x, y) => [firstMove(x, y)],
     events: () => [],
+    stopping: "pill",
     says: SAID_STOPPED,
+    afterRun: true,
   },
   {
     name: "Stop on the pill while a click holds the button, the helper frozen with it down: the click completes, the helper ends as stopped, "
-      + "saying the click had happened, and the overlay says Stopped",
+      + "saying the click had happened, the pill reads Stopping while the run goes on, and the overlay says Stopped once the run has ended",
     overlay: true,
     target: [...RECT, "--freeze", "down"],
     loss: stopPressed,
@@ -383,11 +392,13 @@ const CASES = [
     stderr: happened("click"),
     upAfterStopMs: 0,
     events: (x, y) => [{ type: "down", x, y }, { type: "up", x, y }],
+    stopping: "pill",
     says: SAID_STOPPED,
+    afterRun: true,
   },
   {
-    name: "Stop on the pill while a drag holds the button, before its move, the helper frozen with it down: "
-      + "the button comes up at the press point, with no drag event, and the overlay says Stopped",
+    name: "Stop on the pill while a drag holds the button, before its move, the helper frozen with it down: the button comes up at the "
+      + "press point, with no drag event, the pill reads Stopping while the run goes on, and the overlay says Stopped once the run has ended",
     overlay: true,
     target: [...RECT, "--freeze", "down"],
     loss: stopPressed,
@@ -395,7 +406,9 @@ const CASES = [
     status: STOPPED,
     stderr: stoppedError(),
     events: (x, y) => [{ type: "down", x, y }, { type: "up", x, y }],
+    stopping: "pill",
     says: SAID_STOPPED,
+    afterRun: true,
   },
   {
     name: "Stop on the pill when the token can't be removed, while the helper waits for a notification's cover to go: "
@@ -417,8 +430,8 @@ const CASES = [
   // No helper runs here: one that waits under a notification's cover gives up after 10 s, as
   // long as the run is given, and a helper whose run is killed is the case further up.
   {
-    name: "Stop on the pill when the token can't be removed and the run ignores the signal: "
-      + "the run is killed 10 s after Stop, not sooner, and only then does the overlay say that the run was ended",
+    name: "Stop on the pill when the token can't be removed and the run ignores the signal: the border stays up and the pill reads "
+      + "Stopping, the run is killed 10 s after Stop, not sooner, and only then does the overlay say that the run was ended",
     overlay: true,
     immutable: true,
     deaf: true,
@@ -426,6 +439,7 @@ const CASES = [
     stopped: true,
     loss: stopPressed,
     events: () => [],
+    stopping: "border",
     says: SAID_ENDED_RUN,
     afterRun: true,
     killedMs: [KILL_AFTER_MS, KILL_AFTER_MS + KILL_SLACK_MS],
@@ -600,19 +614,26 @@ function orphaned(binaries, args) {
 }
 
 // Starts the overlay over the run `pid` and resolves once it says its windows are on screen:
-// { pid, said, end }. `said` resolves, once the overlay has ended and so taken its windows
-// down, with all it said as it did and when it began to ({ text, at }), or with null if it
-// doesn't end in time. `end` ends one that is still up, which doesn't notify.
+// { pid, stopping, said, end }. `stopping` resolves with when the overlay said that Stop was
+// pressed ("stopping"), if it does. `said` resolves, once the overlay has ended and so taken
+// its windows down, with all else it said as it did and when it began to ({ text, at }), or
+// with null if it doesn't end in time. `end` ends one that is still up, which doesn't notify.
 async function showOverlay(binary, pid) {
   const child = spawn(binary, [String(pid), TOKEN, path.basename(__filename)], { stdio: ["ignore", "pipe", "inherit"] });
   const ended = new Promise((resolve) => child.on("exit", resolve));
   const line = linesOf(child);
   if ((await line()) !== "shown") throw new Error("The overlay ended before its windows showed");
+  let saidStopping;
+  const stopping = new Promise((resolve) => { saidStopping = resolve; });
   // Read from now on, not when asked for, so that `at` is when the overlay said it.
   const last = (async () => {
     const lines = [];
     let at;
     for (let next = await line(); next !== null; next = await line()) {
+      if (next === "stopping") {
+        saidStopping(Date.now());
+        continue;
+      }
       at ??= Date.now();
       lines.push(next);
     }
@@ -621,6 +642,7 @@ async function showOverlay(binary, pid) {
   })();
   return {
     pid: child.pid,
+    stopping: () => stopping,
     said: () => within(OVERLAY_WAIT_MS, last),
     async end() {
       child.kill();
@@ -710,6 +732,28 @@ async function unreapedFailures(test, binaries) {
   }
 }
 
+// What differed, while a run that Stop stopped goes on, from what the overlay must show
+// then (ADR-0015): it has said that it is stopping, and its pill is on screen, the button
+// reading Stopping. Its border is up too in Stop's last resort (`shows` is "border"), where
+// the run can still click, and is down once the token is gone ("pill").
+async function stoppingFailures(shows, overlay, binary) {
+  const said = await within(END_WAIT_MS, overlay.stopping());
+  let shown;
+  try {
+    shown = JSON.parse(await tools.run(binary, [overlay.pid]));
+  } catch (error) {
+    return [`what the overlay shows couldn't be read: ${error.message}`];
+  }
+  const border = shown.windows.includes(OVERLAY_TITLE);
+  return [
+    said === null && "the overlay didn't say that it was stopping",
+    !shown.windows.includes(PILL_TITLE) && "the pill wasn't on screen while the stopped run went on",
+    shown.button !== "Stopping" && `the pill's button read ${JSON.stringify(shown.button)}, not "Stopping", while the stopped run went on`,
+    border && shows === "pill" && "the border was still up once the token was gone",
+    !border && shows === "border" && "the border wasn't up while the run could still click",
+  ].filter(Boolean);
+}
+
 const sameEvents = (seen, expected) => seen.length === expected.length
   && expected.every((event, i) => Object.entries(event).every(([field, value]) => seen[i][field] === value));
 
@@ -774,6 +818,11 @@ async function failures(test, binaries) {
       printed = await target.end();
     }
     await lost;
+    const stopping = test.stopping ? await stoppingFailures(test.stopping, overlay, binaries.state) : [];
+    // A run stopped by its token's removal goes on until it ends by itself, and the overlay
+    // stays up until it has: the check ends the run. In Stop's last resort the run ends at
+    // the signal, or the overlay ends it.
+    if (test.stopping === "pill") await run.end();
     const said = test.says ? await overlay.said() : null;
     // The overlay's notification covers the screen a moment after it is posted: the next
     // case's target is to find the cover there, and wait for it to go.
@@ -799,6 +848,7 @@ async function failures(test, binaries) {
       test.upAfterStopMs !== undefined && !fs.existsSync(TOKEN) && !(upAfterStop >= test.upAfterStopMs)
         && `not shown that Stop came before the release: the button-up reached the target ${upAfterStop.toFixed(1)} ms after the token was removed, under ${test.upAfterStopMs}`,
       held && `the button was left held, and ${held.released ? "has been released" : "could not be released"}`,
+      ...stopping,
       test.says && said === null && `the overlay was still up ${OVERLAY_WAIT_MS} ms after Stop${unpressed}`,
       test.says && said !== null && !test.says.test(said.text) && `the overlay said ${JSON.stringify(said.text)}, not ${test.says}${unpressed}`,
       test.afterRun && said?.at < run.endedAt() && `the overlay said ${JSON.stringify(said.text)} before the run had ended`,
@@ -820,6 +870,7 @@ async function main() {
   const binaries = {};
   const sources = {
     helper: "device-ui", target: "checks/pointer-target", overlay: "computer-use-overlay", press: "checks/press-stop", orphan: "checks/run-orphaned",
+    state: "checks/overlay-state",
   };
   for (const [name, source] of Object.entries(sources)) {
     binaries[name] = await tools.helperBinary(path.join(HARNESS, `${source}.swift`));

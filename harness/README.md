@@ -107,7 +107,9 @@ Node 18 or later. See [ADR-0001](../docs/adr/0001-fork-abletonosc.md) for the de
   run may take the pointer; a notification says when it has ended (`computer-use-overlay.swift`,
   ADR-0012). Stop on the pill takes the mouse back: the press under way stops, with a button
   it holds released, and throws `DeviceUiError`, as do the run's later presses, so a
-  check fails at the press that throws and still cleans up. If only the press's release was
+  check fails at the press that throws and still cleans up. The glow goes at once, and the
+  pill stays, its button reading Stopping, until the run's process has ended: the
+  notification that the mouse is free comes then (ADR-0015). If only the press's release was
   left, the click or the drag has happened: `error.done` is `true` on that press's error, and
   set on no other, so a check that must undo what a click did reads it in its cleanup. Stop
   removes the run's click token, a file the run and its click helper must be able to read
