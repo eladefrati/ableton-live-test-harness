@@ -38,6 +38,7 @@ let arguments = CommandLine.arguments
 guard (3...4).contains(arguments.count), let pid = pid_t(arguments[1]) else { fail("usage: computer-use-overlay <pid> <stop-marker> [<run>]") }
 let marker = arguments[2]
 let run = arguments.count == 4 ? arguments[3] : ""
+let RUN_ENDED = "\(run.isEmpty ? "The run" : run) has ended: the mouse is yours again."
 // The run may be gone, with its end of the pipes, when this writes to them.
 signal(SIGPIPE, SIG_IGN)
 // With no window server a program gets no session, no screens and windows that never show,
@@ -91,19 +92,22 @@ func notify(_ message: String) {
 
 // Stop's target. It is called on the main thread, as AppKit calls every action.
 final class Stopper: NSObject {
-    let marker: String, name: String
-    init(marker: String, name: String) { (self.marker, self.name) = (marker, name) }
+    let target: pid_t, marker: String, name: String
+    init(target: pid_t, marker: String, name: String) { (self.target, self.marker, self.name) = (target, marker, name) }
     @objc func stop() {
         // The marker first: once it exists the run's helper posts nothing but a release, so
         // the notification is true when it shows. Without it the run still holds the mouse,
         // and the border stays.
         guard FileManager.default.createFile(atPath: marker, contents: nil) else {
+            // A run that ends removes the marker's folder, a moment before this program
+            // notices it has gone: then there is nothing left to stop.
+            if kill(target, 0) != 0 { MainActor.assumeIsolated { finish(RUN_ENDED) } }
             return notify("Stop failed: \(name.isEmpty ? "the run" : name) may still click.")
         }
         MainActor.assumeIsolated { finish("Stopped: \(name.isEmpty ? "the run" : name) won't click again. The mouse is yours.") }
     }
 }
-let stopper = Stopper(marker: marker, name: run)
+let stopper = Stopper(target: pid, marker: marker, name: run)
 
 // A panel that takes a click without taking the front from the app in front.
 final class PillPanel: NSPanel {
@@ -228,6 +232,6 @@ Timer.scheduledTimer(withTimeInterval: 0.05, repeats: true) { timer in
 // The run that holds the mouse is gone once signal 0 to it fails.
 Timer.scheduledTimer(withTimeInterval: 0.25, repeats: true) { _ in
     guard kill(pid, 0) != 0 else { return }
-    MainActor.assumeIsolated { finish("\(run.isEmpty ? "The run" : run) has ended: the mouse is yours again.") }
+    MainActor.assumeIsolated { finish(RUN_ENDED) }
 }
 app.run()
