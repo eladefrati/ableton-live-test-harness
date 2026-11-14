@@ -353,6 +353,17 @@ unexpected.
   was an arrow 4.2 and 6.9 s into the last resort's wait, and so it was with the overlay as
   it was before, 5.1 and 7.9 s in (`screencapture -C`; that it shows a wait cursor when
   there is one wasn't tried). Remote Mac, Live 12.4.25b1, macOS 26, 2026-11-14.
+- A stopped run that goes on no longer keeps the pill up for as long as it runs: when Stop
+  removed the token and the run is still going 10 s later, the overlay goes, notifying that
+  the run was stopped and is still running, and kills nothing (ADR-0015). Before, it was
+  still up 15 s after Stop over such a run (`checks/pointer-guards.js`). In Live, with a
+  real click posted on Stop while a press's click waited under a notification's cover, and
+  a run that then went on for 20 s: the token went 11 ms after the click's button came up
+  and the glow 56 ms after it; the pill, asked 0.2, 5 and 9 s in, was up alone, its button
+  reading Stopping, and went 10.40 s after the click; the banner then read "Stopped: (the
+  run) won't click again, and is still running. The mouse is yours."; the run posted no
+  mouse event after Stop, was warned of no lost border, and ended by itself 20.44 s after
+  the click, its track deleted (remote Mac, Live 12.4.25b1, macOS 26, 2026-11-14).
 - Stop pressed before the overlay had said that its windows were on screen took the glow
   down, so the overlay never found all its windows listed: it ended with status 1 two
   seconds after it began to look, with no notification, and its run would have warned that

@@ -5,7 +5,8 @@
 // holds, and takes the glow down. If the token is still there after that, Stop signals the
 // run instead: the run stops clicking and goes on to its clean-up, and the glow stays up.
 // Either way the pill stays, its button reading Stopping with a light going round it, until
-// the run has ended, by itself or, after that signal, killed END_SECONDS later (ADR-0015).
+// the run has ended, for END_SECONDS at most: a run still going then is left running if its
+// token is gone, and killed if it was signalled (ADR-0015).
 // The glow lets every click through; nothing here takes the front.
 //
 //   computer-use-overlay <pid> <click-token> [<run>]
@@ -119,8 +120,8 @@ func ended(_ run: pid_t) -> Bool {
     return info.kp_proc.p_stat == SZOMB
 }
 
-// How long a run that Stop signalled has to end by itself before it is killed, and how long
-// a killed run then has to end.
+// How long a run has to end by itself after Stop, before the overlay leaves one whose token
+// is gone and kills one that it signalled, and how long a killed run then has to end.
 let END_SECONDS = 10.0
 let KILLED_SECONDS = 1.0
 
@@ -207,19 +208,23 @@ final class Stopper: NSObject {
     }
 
     // Ends the overlay once the run has ended, saying what became of it; until then, after
-    // Stop, the pill stays (ADR-0015). Nothing here waits: a timer calls it again. In Stop's
-    // last resort a run still there END_SECONDS after its signal is killed, and its helpers
-    // stop because their run has gone; the overlay ends KILLED_SECONDS later at the latest.
+    // Stop, the pill stays, for END_SECONDS at most (ADR-0015). Nothing here waits: a timer
+    // calls it again. A run still going then, whose token is gone, can't click: the overlay
+    // ends and leaves it running, saying so. In Stop's last resort such a run can click, and
+    // is killed: its helpers stop because their run has gone, and the overlay ends
+    // KILLED_SECONDS later at the latest.
     @MainActor func watch() {
+        let stopped = "Stopped: \(name.isEmpty ? "the run" : name) won't click again"
         let wasEnded = "\(name.isEmpty ? "The run" : name) was ended: its click token couldn't be removed. The mouse is yours."
         if ended(target) {
             guard pressed != nil else { finish(RUN_ENDED) }
-            finish(killed == nil ? "Stopped: \(name.isEmpty ? "the run" : name) won't click again. The mouse is yours." : wasEnded)
+            finish(killed == nil ? "\(stopped). The mouse is yours." : wasEnded)
         }
-        guard let pressed, !removed else { return }
+        guard let pressed else { return }
         if let killed {
             if Date() > killed.addingTimeInterval(KILLED_SECONDS) { finish(wasEnded) }
         } else if Date() > pressed.addingTimeInterval(END_SECONDS) {
+            if removed { finish("\(stopped), and is still running. The mouse is yours.") }
             kill(target, SIGKILL)
             killed = Date()
         }

@@ -108,8 +108,10 @@ Node 18 or later. See [ADR-0001](../docs/adr/0001-fork-abletonosc.md) for the de
   ADR-0012). Stop on the pill takes the mouse back: the press under way stops, with a button
   it holds released, and throws `DeviceUiError`, as do the run's later presses, so a
   check fails at the press that throws and still cleans up. The glow goes at once, and the
-  pill stays, its button reading Stopping, until the run's process has ended: the
-  notification that the mouse is free comes then (ADR-0015). If only the press's release was
+  pill stays, its button reading Stopping, until the run's process has ended, for 10 s at
+  most: the notification that the mouse is free comes when the pill goes, and says of a run
+  still going then that it was stopped and is still running, as it is left to do
+  (ADR-0015). If only the press's release was
   left, the click or the drag has happened: `error.done` is `true` on that press's error, and
   set on no other, so a check that must undo what a click did reads it in its cleanup. Stop
   removes the run's click token, a file the run and its click helper must be able to read
@@ -302,7 +304,8 @@ Node 18 or later. See [ADR-0001](../docs/adr/0001-fork-abletonosc.md) for the de
   takes the border down and keeps the pill up, its button reading Stopping, while the run
   goes on (`checks/overlay-state.swift` reads the overlay's windows and that button), and
   says Stopped only once the run has ended, which the check's run does when the check ends
-  it; when the
+  it; over a run that goes on, the pill goes 10 s after Stop, not sooner, the overlay says
+  that the run was stopped and is still running, and the run is left running; when the
   token can't be removed, it signals the check's run, which passes the signal on to its
   helper as a run does: the helper stops as after Stop, the run ends by itself, and only
   then does the overlay say Stopped, as it does when the token's folder can't be written
@@ -335,7 +338,7 @@ Node 18 or later. See [ADR-0001](../docs/adr/0001-fork-abletonosc.md) for the de
   suspended with the button down, not before the token went: under that the case fails,
   as it hasn't shown that Stop came before the release. The cases that end under a
   notification's banner come last, each waiting for the banner of the case before to go,
-  and the check takes about 146 s. It takes the
+  and the check takes about 156 s. It takes the
   pointer, so it runs only on the click host and refuses on any other machine, posting
   nothing. A case that leaves the button held releases it and fails.
 

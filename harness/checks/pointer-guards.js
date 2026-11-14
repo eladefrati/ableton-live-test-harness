@@ -39,6 +39,10 @@ const OVERLAY_WAIT_MS = 15000;
 // counted from when it started to press Stop.
 const KILL_AFTER_MS = 10000;
 const KILL_SLACK_MS = 1000;
+// How long after Stop the overlay leaves a run that goes on with its token gone
+// (computer-use-overlay.swift), and how much later than that the check may see it go.
+const LEAVE_AFTER_MS = 10000;
+const LEAVE_SLACK_MS = 1000;
 // How much sooner the check may read what the overlay says of a run's end than it hears of
 // that end itself. The overlay reads the run's state from the kernel, where a run that has
 // ended shows before the check has waited for it, and when both are waiting for the check
@@ -108,6 +112,7 @@ const withRun = (signal) => `with its run (${signal})`;
 // What the overlay says as it ends: the run named as the overlay is given it.
 const RUN_NAME = literal(path.basename(__filename));
 const SAID_STOPPED = new RegExp(`^Stopped: ${RUN_NAME} won't click again\\. The mouse is yours\\.$`);
+const SAID_STILL_RUNNING = new RegExp(`^Stopped: ${RUN_NAME} won't click again, and is still running\\. The mouse is yours\\.$`);
 const SAID_RUN_ENDED = new RegExp(`^${RUN_NAME} has ended: the mouse is yours again\\.$`);
 const SAID_ENDED_RUN = new RegExp(`^${RUN_NAME} was ended: its click token couldn't be removed\\. The mouse is yours\\.$`);
 
@@ -145,7 +150,8 @@ const dragBy = (dx, dy) => (window, x, y) => ["drag", window, x, y, dx, dy];
 // alone, or the pill and the border, the pill's button reading Stopping), how long after
 // Stop it is pressed again, on the button that then reads Stopping, all that the
 // overlay says as it ends,
-// whether it may say so only once the run has ended, how long after Stop the run must be
+// whether it may say so only once the run has ended, how long after Stop it must go and
+// leave a run that goes on, at the least and at the most, how long after Stop the run must be
 // killed, at the least and at the most, and the signal that ends the run, if one does. In
 // every case, once the run is stopped the target must receive no event but a
 // button-up, not a pointer's move either. A helper that says its click or drag had happened
@@ -441,6 +447,18 @@ const CASES = [
     stopping: "pill",
     says: SAID_STOPPED,
     afterRun: true,
+  },
+  {
+    name: "Stop on the pill removes the token and the run goes on: the pill stays, reading Stopping, and goes 10 s after Stop, not sooner, "
+      + "the overlay saying that the run was stopped and is still running, and the run is left running",
+    overlay: true,
+    target: RECT,
+    stopped: true,
+    loss: stopPressed,
+    events: () => [],
+    stopping: "pill",
+    says: SAID_STILL_RUNNING,
+    leavesMs: [LEAVE_AFTER_MS, LEAVE_AFTER_MS + LEAVE_SLACK_MS],
   },
   // Stop on the pill while the helper is in a gesture. The press takes longer to remove the
   // token than the helper holds a button, so the target freezes the helper at the event the
@@ -935,10 +953,13 @@ async function failures(test, binaries) {
     await lost;
     const stopping = test.stopping ? await stoppingFailures(test.stopping, overlay, binaries.state) : [];
     // A run stopped by its token's removal goes on until it ends by itself, and the overlay
-    // stays up until it has: the check ends the run. In Stop's last resort the run ends at
+    // stays up until it has: the check ends the run, unless the case is of a run that goes
+    // on, which the overlay must leave (`leavesMs`). In Stop's last resort the run ends at
     // the signal, or the overlay ends it.
-    if (test.stopping === "pill") await run.end();
+    if (test.stopping === "pill" && !test.leavesMs) await run.end();
     const said = test.says ? await overlay.said() : null;
+    // Whether the run was still going once the overlay had gone.
+    const outlived = run.endedAt() === null;
     await again;
     // The overlay's notification covers the screen a moment after it is posted: the next
     // case's target is to find the cover there, and wait for it to go.
@@ -952,6 +973,7 @@ async function failures(test, binaries) {
     const afterStop = seen.filter((event) => event.at >= stoppedAt && event.type !== "up");
     const upAfterStop = seen.find((event) => event.type === "up")?.at - stoppedAt;
     const killed = run.endedAt() - stoppedAt;
+    const left = Math.round(said?.at - stoppedAt);
     return [
       ended && ended.status !== test.status && `the helper exited ${ended.status}, not ${test.status}${ended.stderr && `, with "${ended.stderr}"`}`,
       ended && ended.status === test.status && test.stderr && !test.stderr.test(ended.stderr) && `the helper's error was "${ended.stderr}"`,
@@ -969,6 +991,8 @@ async function failures(test, binaries) {
       test.says && said === null && `the overlay was still up ${OVERLAY_WAIT_MS} ms after Stop${unpressed}`,
       test.says && said !== null && !test.says.test(said.text) && `the overlay said ${JSON.stringify(said.text)}, not ${test.says}${unpressed}`,
       test.afterRun && said?.at < run.endedAt() - EXIT_NEWS_MS && `the overlay said ${JSON.stringify(said.text)} before the run had ended`,
+      test.leavesMs && said !== null && !(left >= test.leavesMs[0] && left <= test.leavesMs[1]) && `the overlay went ${left} ms after Stop, not ${test.leavesMs.join(" to ")}`,
+      test.leavesMs && !outlived && "the run had ended when the overlay went",
       test.killedMs && !(killed >= test.killedMs[0] && killed <= test.killedMs[1]) && `the run ended ${killed} ms after Stop, not ${test.killedMs.join(" to ")}`,
       ran !== (test.run ?? 0) && `the run ended with ${ran}, not ${test.run ?? 0}`,
     ].filter(Boolean);
