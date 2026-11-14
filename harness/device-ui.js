@@ -285,30 +285,56 @@ async function askToClick(script) {
 // run is killed.
 const OVERLAY_SOURCE = path.join(__dirname, "computer-use-overlay.swift");
 
-// The run's stop marker (ADR-0012), the file the pill's Stop creates: one for the run, named
-// when first needed and kept here, so that Stop on any pill the run shows stops it. Exported
-// for the tests: creating the file can only stop a run.
-let stopMarkerPath = null;
-function stopMarker() {
-  if (!stopMarkerPath) {
+// The run's click token (ADR-0012), a file that exists while the run may click and that the
+// pill's Stop removes: one for the run, in a folder of its own, made when first needed and
+// kept here, so that Stop on any pill the run shows stops it. It is never made again: a run
+// whose token has gone stays stopped. Exported for the tests.
+let clickTokenPath = null;
+function clickToken() {
+  if (!clickTokenPath) {
     // Not in the harness's temp folder, which relaunch.js and quit.js empty.
     const folder = fs.mkdtempSync(path.join(os.tmpdir(), "harness-computer-use-"));
     process.on("exit", () => fs.rmSync(folder, { recursive: true, force: true }));
-    stopMarkerPath = path.join(folder, "stopped");
+    const token = path.join(folder, "token");
+    fs.writeFileSync(token, "");
+    clickTokenPath = token;
   }
-  return stopMarkerPath;
+  return clickTokenPath;
 }
-const stopped = () => stopMarkerPath !== null && fs.existsSync(stopMarkerPath);
 
-// The variable that names the run's stop marker to a helper (device-ui.swift), and to nothing
-// else. This process's own environment is neither read nor written: a marker named there
+// Why the run may click no more, or null while it may: while its token can be opened for
+// reading and the token's folder can be written to and searched, so that Stop can remove the
+// token. Anything else counts as stopped, since the run can't tell that it wasn't;
+// device-ui.swift and computer-use-overlay.swift read the token the same way. A run with no
+// token, one that showed no border, has no Stop to obey.
+function stopped(token = clickTokenPath) {
+  if (token === null) return null;
+  const folder = path.dirname(token);
+  const cantTell = (why) => `harness-computer-use can't tell that it wasn't stopped (${why}), which counts as stopped: this run clicks no more`;
+  try {
+    fs.accessSync(folder, fs.constants.W_OK | fs.constants.X_OK);
+  } catch (error) {
+    return cantTell(error.code === "ENOENT" ? `the token's folder ${folder} is gone`
+      : `the folder ${folder} can't be written to, so Stop couldn't remove the token`);
+  }
+  try {
+    fs.closeSync(fs.openSync(token, "r"));
+    return null;
+  } catch (error) {
+    return error.code === "ENOENT" ? "harness-computer-use was stopped from its pill: this run clicks no more"
+      : cantTell(`the token ${token} can't be read`);
+  }
+}
+
+// The variable that names the run's click token to a helper (device-ui.swift), and to nothing
+// else. This process's own environment is neither read nor written: a token named there
 // belongs to the run that started this one, whose Stop isn't this run's, and one written
 // there would reach every process this run starts.
-const STOP_MARKER = "HARNESS_COMPUTER_USE_STOP";
+const CLICK_TOKEN = "HARNESS_COMPUTER_USE_TOKEN";
 function helperEnvironment() {
   const env = { ...process.env };
-  if (stopMarkerPath) env[STOP_MARKER] = stopMarkerPath;
-  else delete env[STOP_MARKER];
+  if (clickTokenPath) env[CLICK_TOKEN] = clickTokenPath;
+  else delete env[CLICK_TOKEN];
   return env;
 }
 
@@ -336,7 +362,7 @@ async function buildComputerUse() {
 // person has lost the pill and its Stop. Nothing of the overlay keeps this process running.
 async function showComputerUse(binary, { shownMs = OVERLAY_SHOWN_MS } = {}) {
   const run = runName();
-  const overlay = spawn(binary, [String(process.pid), stopMarker(), ...(run ? [run] : [])], { detached: true, stdio: ["ignore", "pipe", "pipe"] });
+  const overlay = spawn(binary, [String(process.pid), clickToken(), ...(run ? [run] : [])], { detached: true, stdio: ["ignore", "pipe", "pipe"] });
   let [said, complained] = ["", ""];
   overlay.stderr.on("data", (data) => { complained += data; });
   let timer;
@@ -453,9 +479,9 @@ const allowed = new WeakSet();
 // Before a run's first hover: on the click host at once, on any other machine after the
 // person at it allows the run's clicks (ADR-0006). The answer holds for the rest of the run,
 // and while it does a purple border shows there (ADR-0012), built before the person is asked.
-// The border only informs: a run that can't show it still clicks, with a warning. After Stop
-// on the pill (ADR-0012) it throws: the run goes on, so a check fails there and still cleans
-// up.
+// The border only informs: a run that can't show it still clicks, with a warning. Once the
+// run is stopped (ADR-0012), by Stop on the pill or because it can't tell that it wasn't, it
+// throws, saying which: the run goes on, so a check fails there and still cleans up.
 async function permit(system) {
   if (!allowed.has(system)) {
     const host = system.hostname();
@@ -466,7 +492,8 @@ async function permit(system) {
     }
     allowed.add(system);
   }
-  if (system.stopped()) throw new DeviceUiError("harness-computer-use was stopped from its pill: this run clicks no more. Not clicked");
+  const why = system.stopped();
+  if (why) throw new DeviceUiError(`${why}. Not clicked`);
 }
 
 // The system as DeviceUi and PluginWindow hold it: each call that moves the pointer passes
@@ -815,5 +842,5 @@ async function openPluginWindow(live, { track, device, size, controls = {} }, sy
 module.exports = {
   DeviceUiError, openDeviceUi, openPluginWindow, captureWindow, liveWindows, readControls, readPanelWidth, pointControls, controlPoint,
   findTitle, infoTitle, readClickHost, hostname, runName, runScript, MEASURED_DEVICES, POINTER_CALLS, MACHINE_CALLS,
-  stopped, stopMarker, buildComputerUse, showComputerUse,
+  stopped, clickToken, buildComputerUse, showComputerUse,
 };

@@ -6,18 +6,19 @@
 //                                     at that rectangle, in points from the screen's top left
 //   pointer-target --under <title>    at the rectangle of the window of that title, under it
 //
-// Prints {"window", "x", "y", "w", "h"} once the panel is on screen, then one line per mouse
+// Prints {"window", "x", "y", "w", "h"} once the panel is on screen and no notification's
+// banner covers the screen, which the helper would wait out, then one line per mouse
 // event a window of its receives: {"type": "move" | "down" | "drag" | "up", "window", "x", "y",
 // "dx", "dy", "at"}, the event's position in points from the screen's top left, its delta
 // fields, and when it was received, in ms. With
 // --cover it shows a second window over the panel when the pointer first moves in it. With
 // --return it moves the pointer back to where the button went down at every drag event, as a
 // knob of one of Live's devices does after an event with a vertical part. When the button goes
-// down, with --stop it creates <file>,
-// as Stop on harness-computer-use's pill creates a run's stop marker, and with --signal it
+// down, with --stop it removes <file>,
+// as Stop on harness-computer-use's pill removes a run's click token, and with --signal it
 // sends the signal of that name to the process that posted the event. With --stop-at-drag it
-// creates <file> at a drag event. Having created <file>, it prints {"stopped": <when, in ms>},
-// after the line of the event it created it at.
+// removes <file> at a drag event. Having removed <file>, it prints {"stopped": <when, in ms>},
+// after the line of the event it removed it at.
 //
 // SIGTERM ends it, and so does the end of the process that started it. If the left button is
 // held then, it posts the button up first and prints {"released": <whether that released it>}.
@@ -123,9 +124,9 @@ func value(_ name: String) -> String? {
     defer { options.removeSubrange(index...index + 1) }
     return options[index + 1]
 }
-let (stopMarker, dragStopMarker) = (value("--stop"), value("--stop-at-drag"))
-func stop(_ marker: String?) {
-    guard let marker, FileManager.default.createFile(atPath: marker, contents: nil) else { return }
+let (token, dragToken) = (value("--stop"), value("--stop-at-drag"))
+func stop(_ token: String?) {
+    guard let token, unlink(token) == 0 else { return }
     printJSON(["stopped": now()])
 }
 let SIGNALS = ["SIGINT": SIGINT, "SIGQUIT": SIGQUIT, "SIGTERM": SIGTERM, "SIGHUP": SIGHUP]
@@ -147,19 +148,32 @@ if options.count == 2, options[0] == "--under" {
 let (panel, pad) = showPanel(rect)
 pad.returnsPointer = returnsPointer
 pad.onDown = { posted in
-    stop(stopMarker)
+    stop(token)
     let poster = pid_t(posted.getIntegerValueField(.eventSourceUnixProcessID))
     // Never 0, which would signal this program's own process group.
     if let sent, poster > 0 { kill(poster, sent) }
 }
-pad.onDrag = { stop(dragStopMarker) }
+pad.onDrag = { stop(dragToken) }
 var over: Panel?
 if cover { pad.onFirstMove = { over = showPanel(rect).0 } }
+// While a notification's banner shows, Notification Center holds a transparent window over
+// the whole screen (live-notes.md).
+func isNotificationCover(_ window: [String: Any]) -> Bool {
+    (window[kCGWindowOwnerName as String] as? String) == "Notification Center"
+        && CGRect(dictionaryRepresentation: window[kCGWindowBounds as String] as! CFDictionary) == CGDisplayBounds(CGMainDisplayID())
+}
+// Longer than a banner shows.
+let COVER_WAIT_SECONDS = 15.0
+let started = Date()
 // The window server lists the panel only once the run loop below has run: 50 to 70 ms after
 // it was ordered front, and a click posted before that went to the window under it.
 Timer.scheduledTimer(withTimeInterval: 0.01, repeats: true) { timer in
     let list = CGWindowListCopyWindowInfo([.optionOnScreenOnly], kCGNullWindowID) as? [[String: Any]] ?? []
     guard list.contains(where: { $0[kCGWindowNumber as String] as? Int == panel.windowNumber }) else { return }
+    if list.contains(where: isNotificationCover) {
+        if Date().timeIntervalSince(started) > COVER_WAIT_SECONDS { fail("A notification has covered the screen for \(Int(COVER_WAIT_SECONDS)) s") }
+        return
+    }
     timer.invalidate()
     printJSON(["window": panel.windowNumber, "x": rect.minX, "y": rect.minY, "w": rect.width, "h": rect.height])
 }

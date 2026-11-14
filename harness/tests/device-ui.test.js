@@ -7,7 +7,7 @@ const os = require("node:os");
 const path = require("node:path");
 const {
   DeviceUiError, openDeviceUi, readControls, readPanelWidth, pointControls, controlPoint, findTitle, infoTitle, readClickHost, runName, runScript,
-  MEASURED_DEVICES, POINTER_CALLS, MACHINE_CALLS, stopped, stopMarker, buildComputerUse, showComputerUse, liveWindows,
+  MEASURED_DEVICES, POINTER_CALLS, MACHINE_CALLS, stopped, clickToken, buildComputerUse, showComputerUse, liveWindows,
 } = require("../device-ui.js");
 
 const chunk = (tag, payload) => {
@@ -60,7 +60,7 @@ function fakeMachine({ info = "Button", titles = [line(`> ${TITLE}`, 1800, 1400)
     wake: async () => {},
     buildComputerUse: async () => "border binary",
     showComputerUse: async () => { calls.push("border"); },
-    stopped: () => false,
+    stopped: () => null,
     focus: async () => { calls.push("focus"); onFocus(calls); },
     window: async () => WINDOW,
     read: async () => ({ width: 2880, lines: [line(info, 26, 1400), ...titles, line("text", 2000, 1560)] }),
@@ -71,15 +71,20 @@ function fakeMachine({ info = "Button", titles = [line(`> ${TITLE}`, 1800, 1400)
   };
 }
 
+// What a run says once Stop on its pill has removed its click token, and once it can't tell
+// that it wasn't stopped, for a reason.
+const STOPPED = "harness-computer-use was stopped from its pill: this run clicks no more";
+const cantTell = (why) => `harness-computer-use can't tell that it wasn't stopped (${why}), which counts as stopped: this run clicks no more`;
+
 // Makes the machine one that asks, and returns the function that stops its run, as Stop on
 // the pill does.
 function stoppable(system) {
   Object.assign(system, { hostname: () => "another-mac", ask: async () => true });
-  return () => { system.stopped = () => true; };
+  return () => { system.stopped = () => STOPPED; };
 }
 
 // The error of a click or a drag that Stop caught with only its release left (ADR-0012).
-const happened = () => Object.assign(new DeviceUiError("harness-computer-use was stopped from its pill: this run clicks no more"), { done: true });
+const happened = () => Object.assign(new DeviceUiError(STOPPED), { done: true });
 const isHappened = (error) => error instanceof DeviceUiError && error.done === true && /stopped from its pill/.test(error.message);
 
 // Runs `body` and resolves with what the harness warned meanwhile: its lines start "warn".
@@ -338,15 +343,49 @@ test("the module exports nothing that carries a call that takes the pointer, whi
   }
 });
 
-test("the run is stopped once its stop marker exists", () => {
-  const marker = stopMarker();
+test("the run's click token exists from when it is first asked for, and is never made again: once it is gone the run stays stopped", () => {
+  const token = clickToken();
   try {
-    assert.equal(stopped(), false);
-    fs.writeFileSync(marker, "");
-    assert.equal(stopped(), true);
+    assert.equal(fs.existsSync(token), true);
+    assert.equal(stopped(), null);
+    fs.rmSync(token);
+    assert.equal(clickToken(), token);
+    assert.equal(fs.existsSync(token), false);
+    assert.equal(stopped(), STOPPED);
   } finally {
-    fs.rmSync(marker, { force: true });
+    // The test's own repair, for the tests after it: a run never does this.
+    fs.writeFileSync(token, "");
   }
+});
+
+test("a run may click while its token can be read and the token's folder written to, and every loss counts as stopped and says which it was", () => {
+  const folderOf = path.dirname;
+  for (const [lose, said] of [
+    [(token) => fs.rmSync(token), () => STOPPED],
+    [(token) => fs.rmSync(folderOf(token), { recursive: true }), (token) => cantTell(`the token's folder ${folderOf(token)} is gone`)],
+    [(token) => fs.chmodSync(folderOf(token), 0o500), (token) => cantTell(`the folder ${folderOf(token)} can't be written to, so Stop couldn't remove the token`)],
+    [(token) => fs.chmodSync(folderOf(token), 0o600), (token) => cantTell(`the folder ${folderOf(token)} can't be written to, so Stop couldn't remove the token`)],
+    [(token) => fs.chmodSync(token, 0o000), (token) => cantTell(`the token ${token} can't be read`)],
+  ]) {
+    const token = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "device-ui-test-")), "token");
+    fs.writeFileSync(token, "");
+    try {
+      assert.equal(stopped(token), null);
+      lose(token);
+      assert.equal(stopped(token), said(token));
+    } finally {
+      if (fs.existsSync(folderOf(token))) fs.chmodSync(folderOf(token), 0o700);
+      fs.rmSync(folderOf(token), { recursive: true, force: true });
+    }
+  }
+});
+
+test("a press of a run that can't tell that it wasn't stopped says why, and neither hovers nor clicks", async () => {
+  const system = fakeMachine();
+  const why = cantTell("the token's folder /tmp/harness-computer-use-1 is gone");
+  Object.assign(system, { hostname: () => "another-mac", ask: async () => true, stopped: () => why });
+  await assert.rejects((await open(system)).press("Button"), { message: `${why}. Not clicked` });
+  assert.deepEqual(system.calls, ["border"]);
 });
 
 test("the click host shows no border, and a border that fails to show doesn't stop the clicks", async () => {
@@ -513,7 +552,7 @@ function fakePluginMachine({ open = false, shown = [EDITOR] } = {}) {
     wake: async () => {},
     buildComputerUse: async () => "border binary",
     showComputerUse: async () => { calls.push("border"); },
-    stopped: () => false,
+    stopped: () => null,
     focus: async () => { calls.push("focus"); },
     pluginWindow: async (action, device) => {
       calls.push(["button", action, device]);
@@ -910,8 +949,8 @@ const gone = (file) => {
   try { process.kill(pid, 0); return false; } catch { return true; }
 };
 
-test("showComputerUse resolves once the border says it has shown, having given it the stop marker the run reads", async () => {
-  const slow = standIn("sleep 0.3", ': > "$0.shown"', "echo shown", ': > "$2"', STAYS);
+test("showComputerUse resolves once the border says it has shown, having given it the click token the run reads", async () => {
+  const slow = standIn("sleep 0.3", ': > "$0.shown"', "echo shown", 'rm "$2"', STAYS);
   try {
     const warnings = await warningsOf(async () => {
       await showComputerUse(slow);
@@ -920,16 +959,22 @@ test("showComputerUse resolves once the border says it has shown, having given i
     });
     assert.deepEqual(warnings, []);
   } finally {
-    fs.rmSync(stopMarker(), { force: true });
+    fs.writeFileSync(clickToken(), "");
   }
 });
 
-test("every border the run shows is given the run's one stop marker, so Stop on any of their pills stops it", async () => {
-  const borders = [1, 2].map(() => standIn('echo "$2" > "$0.marker"', "echo shown", STAYS));
+test("the click token exists before a border is started", async () => {
+  const border = standIn('test -r "$2" && : > "$0.readable"', "echo shown", STAYS);
+  await showComputerUse(border);
+  assert.equal(fs.existsSync(`${border}.readable`), true);
+});
+
+test("every border the run shows is given the run's one click token, so Stop on any of their pills stops it", async () => {
+  const borders = [1, 2].map(() => standIn('echo "$2" > "$0.token"', "echo shown", STAYS));
   for (const border of borders) await showComputerUse(border);
-  const [first, second] = borders.map((border) => fs.readFileSync(`${border}.marker`, "utf8").trim());
+  const [first, second] = borders.map((border) => fs.readFileSync(`${border}.token`, "utf8").trim());
   assert.equal(second, first);
-  assert.equal(first, stopMarker());
+  assert.equal(first, clickToken());
 });
 
 test("showComputerUse leaves this process's environment as it was", async () => {
@@ -963,46 +1008,45 @@ test("a helper that exits 4, stopped with only a button's release left, rejects 
 });
 
 // A run of its own, started with `env` added to its environment, whose helper is a stand-in
-// that answers `windows` with the stop marker its own environment names. Resolves with
-// whether the run is stopped, the marker its helper was given ("" for none) and, with
-// `marked`, the run's own marker, which it then makes first.
-function runStartedWith(env, marked = false) {
-  const helper = standIn(`printf '[{"title":"%s"}]' "$HARNESS_COMPUTER_USE_STOP"`);
+// that answers `windows` with the click token its own environment names. Resolves with why
+// the run is stopped (null if it isn't), the token its helper was given ("" for none) and,
+// with `asked`, the run's own token, which it then makes first.
+function runStartedWith(env, asked = false) {
+  const helper = standIn(`printf '[{"title":"%s"}]' "$HARNESS_COMPUTER_USE_TOKEN"`);
   const run = `
     const [tools, mac, ui] = ["tools", "macos", "device-ui"].map((name) => require(${JSON.stringify(path.join(__dirname, ".."))} + "/" + name + ".js"));
     tools.helperBinary = async () => process.argv[1];
     mac.wakeDisplay = async () => {};
-    const marker = process.argv[2] ? ui.stopMarker() : null;
-    ui.liveWindows().then(([window]) => console.log(JSON.stringify({ stopped: ui.stopped(), given: window.title, marker })));`;
+    const token = process.argv[2] ? ui.clickToken() : null;
+    ui.liveWindows().then(([window]) => console.log(JSON.stringify({ stopped: ui.stopped(), given: window.title, token })));`;
   return new Promise((resolve, reject) => {
-    require("node:child_process").execFile(process.execPath, ["-e", run, helper, ...(marked ? ["marked"] : [])], { env: { ...process.env, ...env }, timeout: 10000 },
+    require("node:child_process").execFile(process.execPath, ["-e", run, helper, ...(asked ? ["asked"] : [])], { env: { ...process.env, ...env }, timeout: 10000 },
       (error, stdout) => (error ? reject(error) : resolve(JSON.parse(stdout))));
   });
 }
 
-// As a run started by another run would be, were the other's marker named in its environment.
-async function withInheritedMarker(body) {
+// As a run started by another run would be, were the other's token named in its environment:
+// one that Stop has removed, which a run that read it would take as its own Stop.
+async function withInheritedToken(body) {
   const folder = fs.mkdtempSync(path.join(os.tmpdir(), "device-ui-test-"));
-  const inherited = path.join(folder, "stopped");
-  fs.writeFileSync(inherited, "");
   try {
-    await body(inherited);
+    await body(path.join(folder, "token"));
   } finally {
     fs.rmSync(folder, { recursive: true, force: true });
   }
 }
 
-test("a stop marker named in the environment a run starts with, which exists, neither stops the run nor reaches its helper", async () => {
-  await withInheritedMarker(async (inherited) => {
-    assert.deepEqual(await runStartedWith({ HARNESS_COMPUTER_USE_STOP: inherited }), { stopped: false, given: "", marker: null });
+test("a click token named in the environment a run starts with, which is gone, neither stops the run nor reaches its helper", async () => {
+  await withInheritedToken(async (inherited) => {
+    assert.deepEqual(await runStartedWith({ HARNESS_COMPUTER_USE_TOKEN: inherited }), { stopped: null, given: "", token: null });
   });
 });
 
-test("the helper is given the run's own stop marker, whatever marker the run's environment names", async () => {
-  await withInheritedMarker(async (inherited) => {
-    const run = await runStartedWith({ HARNESS_COMPUTER_USE_STOP: inherited }, true);
-    assert.notEqual(run.marker, inherited);
-    assert.deepEqual(run, { stopped: false, given: run.marker, marker: run.marker });
+test("the helper is given the run's own click token, whatever token the run's environment names", async () => {
+  await withInheritedToken(async (inherited) => {
+    const run = await runStartedWith({ HARNESS_COMPUTER_USE_TOKEN: inherited }, true);
+    assert.notEqual(run.token, inherited);
+    assert.deepEqual(run, { stopped: null, given: run.token, token: run.token });
   });
 });
 

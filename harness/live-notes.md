@@ -172,28 +172,59 @@ unexpected.
   harness-computer-use's own notification at the end of a run brings it up too. A helper
   waiting for it to go leaves the wait once the run is stopped, posting nothing: stopped 1 s
   into the wait it exited 0.12 s later, and left alone it waited 4.9 s and clicked (remote
-  Mac, 2026-11-13).
+  Mac, 2026-11-13). `checks/pointer-target.swift` reports its window only once no cover is
+  up, so that a case of the check doesn't start under the banner of the case before.
 - harness-computer-use's pill is a window of its own (title "harness-computer-use pill"), a
   non-activating panel that takes a click on its Stop without taking the front. Unlike the
   glow, the click guard doesn't skip it: a point under the pill is refused, with an error
   that names the pill.
-- Stop on the pill creates the run's stop marker, a file `device-ui.swift` looks for before
-  every mouse event it posts but a button-up (ADR-0012). A helper started after Stop posted
+- Stop on the pill removes the run's click token, a file `device-ui.swift` must be able to
+  open for reading, in a folder it must be able to write to, before every mouse event it
+  posts but a button-up (ADR-0012). A helper started after Stop posted
   nothing, and one stopped while a drag held the button, before its move, posted the button
   up at the press point and no drag event: each exited with status 3. One stopped while a
   click held the button posted the button up, so the click happened, and one stopped after
   its drag's move did too, so the drag happened: with only the release left, each exited
   with status 4, saying that the click or the drag had happened, its button-up reaching the
-  check's window 71 and 78 ms after the marker was made in the click, 54 and 54 ms in the
-  drag (`checks/pointer-guards.js`, remote Mac, 2026-11-13). That press throws with `done`
-  on its error, and the run's next press throws too.
-- A run has one stop marker: every border it shows is given the same one, and the run names
-  it to each helper it starts, in that helper's environment (`HARNESS_COMPUTER_USE_STOP`),
-  and nowhere else. It used to write the name into its own environment, which every process
-  it started inherited: a run started with the variable naming a file that existed read
-  itself as stopped and gave that marker to its helper, and a second border in one run was
-  given a marker of its own, after which the run no longer read the first (unit tests, remote
-  Mac, 2026-11-13). A marker named in the environment a run starts with now neither stops
+  check's window 73 to 81 ms after the token was removed in the click, 52 to 70 ms in the
+  drag, in three runs (`checks/pointer-guards.js`, remote Mac, 2026-11-13). That press
+  throws with `done` on its error, and the run's next press throws too.
+- Any other loss of the token counts as stopped, since the helper can't tell that the run
+  wasn't. With the token's folder removed, with the folder made unwritable (mode 500, where
+  Stop couldn't remove the token) and with the token unreadable (mode 000), a helper started
+  then posted nothing and exited with status 3, saying which it was. One waiting under a
+  notification's cover left the wait 0.12 s after the folder was removed, and 0.18 s after
+  it was made unwritable (`checks/pointer-guards.js`, remote Mac, 2026-11-13).
+- Stop pressed on the pill through Accessibility (AXPress on its Stop button, as
+  `checks/press-stop.swift` does) was taken as a click on it: the overlay removed the token,
+  said Stopped 0.09 s after the press was started and was gone 0.3 s later, once its
+  notification was posted. The press itself returned -25204 (cannot complete) in 2 of 2, as
+  the overlay ended before it answered. With the folder unwritable, where Stop couldn't
+  remove the token, the overlay said Stopped all the same, the run being stopped already
+  (remote Mac, macOS 26, 2026-11-13).
+- When the token can't be removed and can still be read (the user-immutable flag on it,
+  `chflags uchg`), Stop ends the run's helper and the run by signal. With a helper waiting
+  under a notification's cover, the run had died by SIGTERM and its helper was gone 0.10 to
+  0.11 s after the press was started, with no mouse event posted, and the overlay said that
+  the run was ended 0.05 to 0.06 s later, in three runs. A run that outlives SIGTERM was
+  killed, after the 2 s it is given (`checks/pointer-guards.js`, remote Mac, 2026-11-13).
+- Stop pressed once the run has ended says that the run has ended, not Stopped, though the
+  token's removal reads as stopped. The overlay looks for its run every 0.25 s and then says
+  the same by itself, so a press that comes late proves nothing: with Stop's own look for
+  the run taken out, a press started after the run's end said Stopped in 1 of 5, and one made
+  as soon as the run had gone (`press-stop <pid> <run>`) in 5 of 5 (remote Mac, 2026-11-13).
+- `Process.waitUntilExit()` runs the run loop while it waits. Waiting that way for its
+  notification, an overlay whose Stop had just ended the run, or was pressed as the run
+  ended, had its timer fire meanwhile and notified a second time that the run had ended. It
+  now waits without running the run loop, and notified once (remote Mac, macOS 26,
+  2026-11-13).
+- A run has one click token: every border it shows is given the same one, and the run names
+  it to each helper it starts, in that helper's environment (`HARNESS_COMPUTER_USE_TOKEN`),
+  and nowhere else. A run once wrote the name of the file its Stop used into its own
+  environment, which every process it started inherited: a run started that way took the
+  other run's Stop for its own and gave that file to its helper, and a second border in one
+  run was given a file of its own, after which the run no longer read the first (unit tests,
+  remote Mac, 2026-11-13). A token named in the environment a run starts with neither stops
   the run nor reaches its helper.
 - With no window server, as for a process with no desktop session, a program gets no session
   (`CGSessionCopyCurrentDictionary()` is nil), no screens, and windows that say they are

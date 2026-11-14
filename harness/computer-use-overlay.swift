@@ -1,15 +1,17 @@
 // Shows that harness-computer-use holds the mouse (ADR-0012): a breathing purple glow in from
 // the edges of every screen and a pill naming the run, until the process <pid> exits, then a
-// notification that the mouse is free again. The pill's Stop creates the file <stop-marker>,
-// after which the run and its helper post nothing but the release of a button the helper
-// holds, and takes all of this down at once. The glow lets every click through; nothing here
-// takes the front.
+// notification that the mouse is free again. The pill's Stop removes the file <click-token>,
+// without which the run and its helper post nothing but the release of a button the helper
+// holds, and takes all of this down at once. If the token can still be read after that, Stop
+// ends the run's helpers and the run by signal instead. The glow lets every click through;
+// nothing here takes the front.
 //
-//   computer-use-overlay <pid> <stop-marker> [<run>]
+//   computer-use-overlay <pid> <click-token> [<run>]
 //
-// Prints "shown" once the window server lists its windows. If they can't show (no desktop
-// session, no screen, or not listed within SHOWN_SECONDS), it says why on stderr and exits 1,
-// so the run can warn that it clicks with no border.
+// Prints "shown" once the window server lists its windows and, as it ends, the message it
+// notifies. If its windows can't show (no desktop session, no screen, or not listed within
+// SHOWN_SECONDS), it says why on stderr and exits 1, so the run can warn that it clicks with
+// no border.
 //
 // device-ui.swift's click guard skips the glow's windows, titled OVERLAY_TITLE, that this
 // program owns. It doesn't skip the pill, which takes clicks.
@@ -35,8 +37,8 @@ func fail(_ message: String) -> Never {
 }
 
 let arguments = CommandLine.arguments
-guard (3...4).contains(arguments.count), let pid = pid_t(arguments[1]) else { fail("usage: computer-use-overlay <pid> <stop-marker> [<run>]") }
-let marker = arguments[2]
+guard (3...4).contains(arguments.count), let pid = pid_t(arguments[1]) else { fail("usage: computer-use-overlay <pid> <click-token> [<run>]") }
+let token = arguments[2]
 let run = arguments.count == 4 ? arguments[3] : ""
 let RUN_ENDED = "\(run.isEmpty ? "The run" : run) has ended: the mouse is yours again."
 // The run may be gone, with its end of the pipes, when this writes to them.
@@ -73,41 +75,94 @@ func breathe(_ layer: CALayer?, from: Double, to: Double, seconds: Double) {
     layer?.add(animation, forKey: "breathe")
 }
 
+// Waits for the notification without running the run loop, as waitUntilExit would: the timer
+// that watches the run would fire meanwhile and say a second time that the run has ended.
 func notify(_ message: String) {
     let script = Process()
     script.executableURL = URL(fileURLWithPath: "/usr/bin/osascript")
     script.arguments = ["-e", "on run argv", "-e",
                         "display notification (item 1 of argv) with title \"harness-computer-use\"",
                         "-e", "end run", message]
-    try? script.run()
-    script.waitUntilExit()
+    let posted = DispatchSemaphore(value: 0)
+    script.terminationHandler = { _ in posted.signal() }
+    if (try? script.run()) != nil { posted.wait() }
 }
 
-// Ends the overlay with a notification saying why.
+// Ends the overlay with a notification saying why, printed first for a program that reads
+// this one's output.
 @MainActor func finish(_ message: String) -> Never {
     NSApp.windows.forEach { $0.orderOut(nil) }
+    print(message)
+    fflush(stdout)
     notify(message)
     exit(0)
 }
 
-// Stop's target. It is called on the main thread, as AppKit calls every action.
-final class Stopper: NSObject {
-    let target: pid_t, marker: String, name: String
-    init(target: pid_t, marker: String, name: String) { (self.target, self.marker, self.name) = (target, marker, name) }
-    @objc func stop() {
-        // The marker first: once it exists the run's helper posts nothing but a release, so
-        // the notification is true when it shows. Without it the run still holds the mouse,
-        // and the border stays.
-        guard FileManager.default.createFile(atPath: marker, contents: nil) else {
-            // A run that ends removes the marker's folder, a moment before this program
-            // notices it has gone: then there is nothing left to stop.
-            if kill(target, 0) != 0 { MainActor.assumeIsolated { finish(RUN_ENDED) } }
-            return notify("Stop failed: \(name.isEmpty ? "the run" : name) may still click.")
-        }
-        MainActor.assumeIsolated { finish("Stopped: \(name.isEmpty ? "the run" : name) won't click again. The mouse is yours.") }
+// Whether the run may still click, as device-ui.swift and device-ui.js read it (ADR-0012):
+// its token can be opened for reading, and the token's folder written to and searched.
+func mayClick(_ token: String) -> Bool {
+    guard access((token as NSString).deletingLastPathComponent, W_OK | X_OK) == 0 else { return false }
+    let file = open(token, O_RDONLY)
+    if file >= 0 { close(file) }
+    return file >= 0
+}
+
+// Sends SIGTERM to the helpers the run has started: its child processes named as tools.js
+// names device-ui.swift's binary. A helper that holds the button releases it first.
+func endHelpers(of run: pid_t) {
+    var children = [pid_t](repeating: 0, count: 4096)
+    let count = proc_listchildpids(run, &children, Int32(children.count * MemoryLayout<pid_t>.size))
+    for child in children.prefix(max(0, Int(count))) {
+        var name = [CChar](repeating: 0, count: 64)
+        proc_name(child, &name, UInt32(name.count))
+        if String(cString: name).hasPrefix("device-ui-") { kill(child, SIGTERM) }
     }
 }
-let stopper = Stopper(target: pid, marker: marker, name: run)
+
+// How long the run has to die by SIGTERM before it is killed.
+let TERMINATE_SECONDS = 2.0
+
+// Stop's last resort (ADR-0012), for a run that could still click after Stop tried to remove
+// its token: ends the run's helpers and the run by signal. The run is suspended while its
+// helpers are found, so that it starts none meanwhile, and again before it is killed, as one
+// that outlives SIGTERM may have started more.
+func endRun(_ run: pid_t) {
+    kill(run, SIGSTOP)
+    endHelpers(of: run)
+    kill(run, SIGTERM)
+    kill(run, SIGCONT)
+    let deadline = Date().addingTimeInterval(TERMINATE_SECONDS)
+    while kill(run, 0) == 0 {
+        if Date() > deadline {
+            kill(run, SIGSTOP)
+            endHelpers(of: run)
+            kill(run, SIGKILL)
+            return
+        }
+        usleep(50_000)
+        endHelpers(of: run)
+    }
+}
+
+// Stop's target. It is called on the main thread, as AppKit calls every action.
+final class Stopper: NSObject {
+    let target: pid_t, token: String, name: String
+    init(target: pid_t, token: String, name: String) { (self.target, self.token, self.name) = (target, token, name) }
+    @objc func stop() {
+        // The token first: once it is gone the run's helper posts nothing but a release, so
+        // the notification is true when it shows.
+        unlink(token)
+        MainActor.assumeIsolated {
+            // A run that has ended has nothing left to stop, whatever became of its token: it
+            // removes the token's folder a moment before this program notices it has gone.
+            if kill(target, 0) != 0 { finish(RUN_ENDED) }
+            if !mayClick(token) { finish("Stopped: \(name.isEmpty ? "the run" : name) won't click again. The mouse is yours.") }
+            endRun(target)
+            finish("\(name.isEmpty ? "The run" : name) was ended: its click token couldn't be removed. The mouse is yours.")
+        }
+    }
+}
+let stopper = Stopper(target: pid, token: token, name: run)
 
 // A panel that takes a click without taking the front from the app in front.
 final class PillPanel: NSPanel {

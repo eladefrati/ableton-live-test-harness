@@ -108,7 +108,12 @@ Node 18 or later. See [ADR-0001](../docs/adr/0001-fork-abletonosc.md) for the de
   it holds released, and throws `DeviceUiError`, as do the run's later presses, so a
   check fails at the press that throws and still cleans up. If only the press's release was
   left, the click or the drag has happened: `error.done` is `true` on that press's error, and
-  set on no other, so a check that must undo what a click did reads it in its cleanup. A run
+  set on no other, so a check that must undo what a click did reads it in its cleanup. Stop
+  removes the run's click token, a file the run and its click helper must be able to read
+  before they click: a run that loses the token any other way (its folder removed, or made
+  unwritable, so that Stop couldn't remove the token) can't tell that it wasn't stopped,
+  stops the same way, and says which it was. If Stop can't remove the token, it ends the
+  run and its click helper by signal, and that run cleans nothing up. A run
   whose border can't show, or goes while the run goes
   on, says so on stderr in a line starting `warn harness-computer-use`, and clicks without
   it. The dialog, the pill and the
@@ -239,27 +244,40 @@ Node 18 or later. See [ADR-0001](../docs/adr/0001-fork-abletonosc.md) for the de
   Places; `devices/make-example-transpose.js` regenerates the device.
 - `checks/save-reopen.js`: checks the save and reopen path. It replaces the open set with
   a new one saved in a temp folder; the file the set was opened from is untouched.
-- `checks/pointer-guards.js`: checks what `device-ui.swift` posts and what it refuses, with
-  real mouse events and no Live. Each case shows a window of its own
+- `checks/pointer-guards.js`: checks what `device-ui.swift` posts and what it refuses, and
+  what Stop on the pill of `computer-use-overlay.swift` does, with real mouse events and no
+  Live. Each case shows a window of its own
   (`checks/pointer-target.swift`, which prints the mouse events it receives, pointer moves
   included, and when), runs the helper
-  against it, and compares the helper's exit status and error and the events the window
-  received: a click reaches the window; a window that comes over the point during a click's
+  against it, from a run of the check's own and with a click token as a run's helpers have,
+  and compares the helper's exit status and error and the events the window
+  received: a click reaches the window, under harness-computer-use's border too; a window
+  that comes over the point during a click's
   hover gets no click; a point under harness-computer-use's pill is refused; a drag is one
   button-down at the point, one drag event at its end with the whole distance in its delta
-  fields, and one button-up, where the pointer then is; a helper started after Stop posts
-  nothing; Stop while a click holds the button, or once a drag's move is posted, leaves the
+  fields, and one button-up, where the pointer then is; a helper started after Stop, which
+  removes the token, posts nothing, and so does one whose token's folder is gone or can't be
+  written to, or whose token can't be read, each saying which; Stop while a click holds
+  the button, or once a drag's move is posted, leaves the
   click or the drag to complete, and the helper exits 4, saying that it had happened; Stop
   while a drag holds the button, before its move, brings the button up and posts nothing
   more; SIGTERM or SIGQUIT while a
   drag holds the button brings it up before the helper dies by SIGTERM, or exits with status
   131 after SIGQUIT;
-  Stop while the helper waits under a notification's banner ends the wait, for which the
-  check posts a notification, whose banner must show. In every case the window may receive
+  Stop while the helper waits under a notification's banner ends the wait, and so does the
+  loss of the token's folder, for which the
+  check posts a notification, whose banner must show. Stop is also pressed on the pill
+  itself, through Accessibility (`checks/press-stop.swift`): the overlay removes the token,
+  says Stopped and goes, as it does when the token's folder can't be written to; when the
+  token can't be removed, it ends the helper and the run by signal, and kills a run that
+  outlives SIGTERM; pressed as the run ends, it says that the run has ended. In every case
+  the window may receive
   nothing but a button-up once the run is stopped. Where a stopped click or drag must
   complete, the button-up must reach the window at least half the helper's hold after the
-  marker was made (35 ms in a click, 25 ms after a drag's move): under that the case fails,
-  as it hasn't shown that Stop came before the release. It takes the
+  token was removed (35 ms in a click, 25 ms after a drag's move): under that the case fails,
+  as it hasn't shown that Stop came before the release. The cases that end under a
+  notification's banner come last, each waiting for the banner of the case before to go,
+  and the check takes about a minute. It takes the
   pointer, so it runs only on the click host and refuses on any other machine, posting
   nothing. A case that leaves the button held releases it and fails.
 

@@ -32,26 +32,48 @@
 // 1 on its longer axis and at most MAX_DRAG on either, and ends on a screen. Exits 1 with the
 // reason on stderr if anything fails.
 //
-// Once the run is stopped (ADR-0012: the file named in HARNESS_COMPUTER_USE_STOP exists),
-// hover, click and drag post nothing but the release of a button this helper holds, and exit
-// 3 saying so. A click or a drag with only that release left has happened: the helper posts
-// it and exits 4, saying that too. A helper that fails, or is sent SIGINT, SIGQUIT, SIGTERM
-// or SIGHUP, while it holds the button releases it before it ends: by that signal, or with
-// status 131 after SIGQUIT.
+// Once the run is stopped (ADR-0012), hover, click and drag post nothing but the release of a
+// button this helper holds, and exit 3 saying so. The run counts as stopped unless the helper
+// can tell that it wasn't: the click token named in HARNESS_COMPUTER_USE_TOKEN can be read,
+// and its folder written to. A click or a drag with only that release left has happened: the
+// helper posts it and exits 4, saying that too. A helper that fails, or is sent SIGINT,
+// SIGQUIT, SIGTERM or SIGHUP, while it holds the button releases it before it ends: by that
+// signal, or with status 131 after SIGQUIT.
 
 import ApplicationServices
 import Foundation
 import Vision
 
-// Stop (ADR-0012). The run names its stop marker in HARNESS_COMPUTER_USE_STOP, and the pill's
-// Stop creates that file.
-let STOP_MARKER = ProcessInfo.processInfo.environment["HARNESS_COMPUTER_USE_STOP"]
-let STOPPED = "harness-computer-use was stopped from its pill: this run clicks no more"
+// Stop (ADR-0012). The run names its click token in HARNESS_COMPUTER_USE_TOKEN: a file that
+// exists while the run may click, which the pill's Stop removes.
+let CLICK_TOKEN = ProcessInfo.processInfo.environment["HARNESS_COMPUTER_USE_TOKEN"]
 let STOPPED_STATUS: Int32 = 3
 // Stopped with only a button's release left: the click or the drag happened.
 let HAPPENED_STATUS: Int32 = 4
 
-func stopped() -> Bool { STOP_MARKER.map { access($0, F_OK) == 0 } ?? false }
+// Why this helper may post no more, or nil while it may: while the token can be opened for
+// reading and its folder can be written to and searched, so that Stop can remove the token.
+// Anything else counts as stopped, since the helper can't tell that the run wasn't;
+// device-ui.js and computer-use-overlay.swift read the token the same way. A helper given no
+// token, as on the click host, has no Stop to obey.
+func stopped() -> String? {
+    guard let token = CLICK_TOKEN else { return nil }
+    let folder = (token as NSString).deletingLastPathComponent
+    func cantTell(_ why: String) -> String {
+        "harness-computer-use can't tell that it wasn't stopped (\(why)), which counts as stopped: this run clicks no more"
+    }
+    if access(folder, W_OK | X_OK) != 0 {
+        return cantTell(errno == ENOENT ? "the token's folder \(folder) is gone"
+            : "the folder \(folder) can't be written to, so Stop couldn't remove the token")
+    }
+    let file = open(token, O_RDONLY)
+    if file >= 0 {
+        close(file)
+        return nil
+    }
+    return errno == ENOENT ? "harness-computer-use was stopped from its pill: this run clicks no more"
+        : cantTell("the token \(token) can't be read")
+}
 
 // The button-up event, while this helper holds the button. It is made before the button goes
 // down, when failing to make it leaves nothing held, so that whatever fails with the button
@@ -281,7 +303,7 @@ func requireOnTop(_ id: Int, _ point: CGPoint) {
     let deadline = Date().addingTimeInterval(NOTIFICATION_WAIT_SECONDS)
     var top = clickableWindows().first(where: { bounds($0).contains(point) })
     while let cover = top, isNotificationCover(cover), Date() < deadline {
-        if stopped() { halt() }
+        if let why = stopped() { halt(why) }
         usleep(250_000)
         top = clickableWindows().first(where: { bounds($0).contains(point) })
     }
@@ -331,30 +353,33 @@ func buttonUp(_ point: CGPoint) {
     return point
 }
 
-// Ends by a signal that was held back, now that the button is up: dies by it, or after a quit
+// Ends by a signal that was held back, once the button is up: dies by it, or after a quit
 // signal exits with the status a shell reports for that death. The system writes a crash
 // report for a program that dies by a quit signal, and a release that went as designed is no
 // crash (ADR-0012).
 func obeySignal() {
     guard signalled != 0 else { return }
+    release()
     if signalled == SIGQUIT { exit(128 + SIGQUIT) }
     signal(signalled, SIG_DFL)
     raise(signalled)
 }
 
-// Ends a helper that may post nothing more: by the signal held back, or else as stopped.
-func halt() -> Never {
+// Ends a helper that the run's stop, for the reason `why`, lets post nothing more: by a
+// signal held back, or else as stopped.
+func halt(_ why: String) -> Never {
     let released = release()
     obeySignal()
     let did = released.map { "released the button at \($0.x), \($0.y)" } ?? "held no button"
-    FileHandle.standardError.write(Data("\(STOPPED), and the helper \(did)\n".utf8))
+    FileHandle.standardError.write(Data("\(why), and the helper \(did)\n".utf8))
     exit(STOPPED_STATUS)
 }
 
 // The one function a hover's, a click's and a drag's events leave from, the button-up apart
 // (complete), so it checks Stop before each, as requireOnTop does while it waits.
 func post(_ type: CGEventType, _ point: CGPoint, moved: CGVector? = nil) {
-    if signalled != 0 || stopped() { halt() }
+    obeySignal()
+    if let why = stopped() { halt(why) }
     if type == .leftMouseDown {
         let up = mouseEvent(.leftMouseUp, point)
         // A signal the helper was started ignoring, as under nohup, stays ignored.
@@ -375,8 +400,8 @@ func post(_ type: CGEventType, _ point: CGPoint, moved: CGVector? = nil) {
 func complete(_ gesture: String, at point: CGPoint) {
     buttonUp(point)
     obeySignal()
-    guard stopped() else { return }
-    FileHandle.standardError.write(Data("\(STOPPED), and the helper released the button at \(point.x), \(point.y): the \(gesture) had happened\n".utf8))
+    guard let why = stopped() else { return }
+    FileHandle.standardError.write(Data("\(why), and the helper released the button at \(point.x), \(point.y): the \(gesture) had happened\n".utf8))
     exit(HAPPENED_STATUS)
 }
 
