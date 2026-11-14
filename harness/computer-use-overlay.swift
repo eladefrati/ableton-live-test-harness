@@ -226,7 +226,8 @@ final class Stopper: NSObject {
         if let killed {
             if Date() > killed.addingTimeInterval(KILLED_SECONDS) { finish(wasEnded) }
         } else if Date() > pressed.addingTimeInterval(END_SECONDS) {
-            if removed { finish("\(stopped), and is still running. The mouse is yours.") }
+            // A guard, which can't fall through: a run whose token is gone is never killed.
+            guard !removed else { finish("\(stopped), and is still running. The mouse is yours.") }
             kill(target, SIGKILL)
             killed = Date()
         }
