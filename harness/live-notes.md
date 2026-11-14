@@ -454,6 +454,16 @@ unexpected.
   starts), which is when the program prints `shown`; the run waits for that before its first
   click. A border started while the display sleeps makes its windows then, and draws them
   once the display wakes (remote Mac, macOS 26, 2026-11-13).
+- When the border's program couldn't be built (a copy of the harness with a line in
+  `computer-use-overlay.swift` that isn't Swift), a run on a machine told it wasn't the click
+  host warned that it couldn't show its border, giving the compiler's command and first
+  error, and then asked. The dialog, titled harness-computer-use, read "harness-computer-use
+  wants to click in Live on this Mac for <script>. It moves the pointer until the run ends.
+  Nothing on screen will show that it may take the pointer, and there will be no Stop.",
+  with Don't Allow, the default, and Allow (read through Accessibility, and captured). Don't
+  Allow refused the run's clicks and Allow let them, with no border's program started. With
+  the border built, the same dialog read "... It moves the pointer until the run ends, while
+  a purple glow shows around the screen." (remote Mac, macOS 26, 2026-11-14).
 - A mouse event posted as the last thing a program does is lost: a button-up posted just
   before exit left the button held in 3 of 3 runs, and with 100 ms between the post and the
   exit it came up in 2 of 2. `device-ui.swift` waits 100 ms after every button-up, a stopped
