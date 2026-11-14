@@ -12,7 +12,7 @@ const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 const readline = require("node:readline");
-const { execFileSync, spawn } = require("node:child_process");
+const { execFile, execFileSync, spawn } = require("node:child_process");
 const tools = require("../tools.js");
 const mac = require("../macos.js");
 const { hostname, readClickHost } = require("../device-ui.js");
@@ -79,6 +79,8 @@ const cantTell = (why) => `harness-computer-use can't tell that it wasn't stoppe
 const FOLDER_GONE = cantTell(`the token's folder ${FOLDER} is gone`);
 const FOLDER_UNWRITABLE = cantTell(`the folder ${FOLDER} can't be written to, so Stop couldn't remove the token`);
 const TOKEN_UNREADABLE = cantTell(`the token ${TOKEN} can't be read`);
+// What one says whose run has ended.
+const RUN_ENDED = "harness-computer-use's run has ended: this helper clicks no more";
 const literal = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 const stoppedError = (sentence = BY_STOP) => new RegExp(`^${literal(sentence)}, and the helper (held no button|released the button at [\\d.]+, [\\d.]+)$`);
 // How one exits that Stop caught with only its button's release left, and what it says of
@@ -112,7 +114,8 @@ const DRAGGED = { type: "drag", dx: 30, dy: -20 };
 // notification's banner shows first, and how long after the helper starts a second is posted
 // to keep the cover up, whether the run is stopped before the helper starts or how long
 // after, and by what if not by the token's removal, and the helper's command, if a helper
-// runs, given the target's window and its centre. A target that freezes the helper says when
+// runs, given the target's window and its centre, and whether a process that has ended
+// starts it, not the check's run. A target that freezes the helper says when
 // itself: the run is stopped once it has, and the helper goes on once the token is gone. Then
 // what must come of it: the helper's
 // exit status (the signal, if one ended it), its error, how soon it ended, the button events
@@ -198,6 +201,16 @@ const CASES = [
     stderr: stoppedError(sentence),
     events: () => [],
   })),
+  {
+    name: "a helper whose run had ended before it began, with process 1 for a parent from its start, posts nothing, and says that its run has ended",
+    target: RECT,
+    orphaned: true,
+    command: click,
+    status: STOPPED,
+    stderr: stoppedError(RUN_ENDED),
+    moves: () => [],
+    events: () => [],
+  },
   {
     name: "Stop while a click holds the button: the click completes, and the helper ends as stopped, saying the click had happened",
     target: [...RECT, "--stop", TOKEN],
@@ -550,6 +563,19 @@ function startRun(helper, deaf) {
   };
 }
 
+// Runs the helper with the token named in its environment, as a run does, but as the child of
+// a process that has ended before the helper begins (run-orphaned.swift), and resolves with
+// how it ended, as a run's helper does.
+function orphaned(binaries, args) {
+  return new Promise((resolve, reject) => {
+    const env = { ...process.env, HARNESS_COMPUTER_USE_TOKEN: TOKEN };
+    execFile(binaries.orphan, [binaries.helper, ...args.map(String)], { env }, (error, stdout, stderr) => {
+      if (error) reject(new Error(`run-orphaned failed: ${(stderr || error.message).trim()}`));
+      else resolve({ status: JSON.parse(stdout || "{}").status, stderr: stderr.trim() });
+    });
+  });
+}
+
 // Starts the overlay over the run `pid` and resolves once it says its windows are on screen:
 // { pid, said, end }. `said` resolves, once the overlay has ended and so taken its windows
 // down, with all it said as it did and when it began to ({ text, at }), or with null if it
@@ -638,7 +664,8 @@ async function failures(test, binaries) {
     const started = Date.now();
     let ended, took, printed;
     try {
-      ended = test.command ? await run.helper(test.command(target.window, x, y)) : null;
+      const command = test.command?.(target.window, x, y);
+      ended = command ? await (test.orphaned ? orphaned(binaries, command) : run.helper(command)) : null;
       took = Date.now() - started;
       await sleep(EVENT_WAIT_MS);
     } finally {
@@ -693,7 +720,9 @@ async function main() {
     throw new Error(`pointer-guards.js posts real mouse events, so it runs only on the click host ("clickHost" in harness/local.json), which ${hostname()} isn't. Nothing posted`);
   }
   const binaries = {};
-  const sources = { helper: "device-ui", target: "checks/pointer-target", overlay: "computer-use-overlay", press: "checks/press-stop" };
+  const sources = {
+    helper: "device-ui", target: "checks/pointer-target", overlay: "computer-use-overlay", press: "checks/press-stop", orphan: "checks/run-orphaned",
+  };
   for (const [name, source] of Object.entries(sources)) {
     binaries[name] = await tools.helperBinary(path.join(HARNESS, `${source}.swift`));
   }

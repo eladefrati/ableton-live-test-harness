@@ -258,6 +258,16 @@ unexpected.
   notification's cover was gone 0.12 s after its run was killed by SIGTERM and 0.28 s after
   SIGKILL, and posted nothing; the border went 0.55 s after the kill in both (remote Mac,
   Live 12.4.25b1, 2026-11-14).
+- A helper whose run had ended before the helper began has process 1 for a parent from its
+  first instruction, and no change of parent to go by. It counts its run as ended from
+  that: it posted nothing and exited with status 3, saying that its run had ended. With
+  that look taken out it clicked: two moves, the button down and up, and status 0.
+  `checks/run-orphaned.swift` starts the helper suspended (`POSIX_SPAWN_START_SUSPENDED`)
+  from a process that then ends, and lets it go on once process 1 is its parent. Only a
+  parent can wait for a process, so it reads the helper's exit status from the kernel's
+  event queue (`EVFILT_PROC` with `NOTE_EXITSTATUS`), which gave it for a process of the
+  same user that wasn't its child (`checks/pointer-guards.js`, remote Mac, macOS 26,
+  2026-11-14).
 - In Live, a token removed 4 and 5 ms after the button of `choose`'s opening click went down
   left that click to complete: the release was the one mouse event after, `choose` threw as
   stopped with `done`, the menu was closed and the chooser's value unchanged. A press

@@ -265,7 +265,11 @@ Node 18 or later. See [ADR-0001](../docs/adr/0001-fork-abletonosc.md) for the de
   button-down at the point, one drag event at its end with the whole distance in its delta
   fields, and one button-up, where the pointer then is; a helper started after Stop, which
   removes the token, posts nothing, and so does one whose token's folder is gone or can't be
-  written to, or whose token can't be read, each saying which; Stop while a click holds
+  written to, or whose token can't be read, each saying which; one whose run had ended
+  before it began, so that process 1 is its parent from its first instruction, posts
+  nothing either, and says that its run has ended (`checks/run-orphaned.swift` starts it
+  so, and reads its exit status from the kernel's event queue, since only a parent can
+  wait for a process); Stop while a click holds
   the button, or once a drag's move is posted, leaves the
   click or the drag to complete, and the helper exits 4, saying that it had happened; Stop
   while a drag holds the button, before its move, brings the button up and posts nothing
