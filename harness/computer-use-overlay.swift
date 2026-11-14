@@ -105,8 +105,20 @@ func breathe(_ layer: CALayer?, from: Double, to: Double, seconds: Double) {
     exit(0)
 }
 
+// Whether the process `run` has ended: it is gone, or it has exited and its parent hasn't
+// waited for it yet. Such a process stays in the process table and still answers signal 0,
+// so its state is read too.
+func ended(_ run: pid_t) -> Bool {
+    if kill(run, 0) != 0 { return true }
+    var info = kinfo_proc()
+    var size = MemoryLayout<kinfo_proc>.size
+    var name = [CTL_KERN, KERN_PROC, KERN_PROC_PID, run]
+    guard sysctl(&name, UInt32(name.count), &info, &size, nil, 0) == 0, size > 0 else { return false }
+    return info.kp_proc.p_stat == SZOMB
+}
+
 // How long a run that Stop signalled has to end by itself before it is killed, and how long
-// a killed run then has to be gone: one that nothing has reaped yet still answers signal 0.
+// a killed run then has to end.
 let END_SECONDS = 10.0
 let KILLED_SECONDS = 1.0
 
@@ -118,11 +130,11 @@ let KILLED_SECONDS = 1.0
 func endRun(_ run: pid_t) -> Bool {
     kill(run, SIGUSR2)
     let deadline = Date().addingTimeInterval(END_SECONDS)
-    while kill(run, 0) == 0 {
+    while !ended(run) {
         if Date() > deadline {
             kill(run, SIGKILL)
             let gone = Date().addingTimeInterval(KILLED_SECONDS)
-            while kill(run, 0) == 0, Date() < gone { usleep(50_000) }
+            while !ended(run), Date() < gone { usleep(50_000) }
             return false
         }
         usleep(50_000)
@@ -144,7 +156,7 @@ final class Stopper: NSObject {
         MainActor.assumeIsolated {
             // A run that has ended has nothing left to stop, whatever became of its token: it
             // removes the token's folder a moment before this program notices it has gone.
-            if kill(target, 0) != 0 { finish(RUN_ENDED) }
+            if ended(target) { finish(RUN_ENDED) }
             // Nothing is said, and the border stays, until a run that is signalled has ended.
             if gone || endRun(target) { finish("Stopped: \(name.isEmpty ? "the run" : name) won't click again. The mouse is yours.") }
             finish("\(name.isEmpty ? "The run" : name) was ended: its click token couldn't be removed. The mouse is yours.")
@@ -273,9 +285,9 @@ Timer.scheduledTimer(withTimeInterval: 0.05, repeats: true) { timer in
     }
 }
 
-// The run that holds the mouse is gone once signal 0 to it fails.
+// Looks every quarter of a second whether the run that holds the mouse has ended.
 Timer.scheduledTimer(withTimeInterval: 0.25, repeats: true) { _ in
-    guard kill(pid, 0) != 0 else { return }
+    guard ended(pid) else { return }
     MainActor.assumeIsolated { finish(RUN_ENDED) }
 }
 app.run()

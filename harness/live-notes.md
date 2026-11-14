@@ -360,6 +360,14 @@ unexpected.
   the same by itself, so a press that comes late proves nothing: with Stop's own look for
   the run taken out, a press started after the run's end said Stopped in 1 of 5, and one made
   as soon as the run had gone (`press-stop <pid> <run>`) in 5 of 5 (remote Mac, 2026-11-13).
+- A run that has ended and that its parent hasn't waited for stays in the process table (a
+  zombie: `ps` gives its state as `Z`) and still answers signal 0, which is how the overlay
+  looked for its run. Over such a run the overlay was still up 3 s after the run's end, and
+  with a token that Stop couldn't remove it went on waiting for a run that its own signal
+  had ended. `sysctl` gives such a process's state (5, `SZOMB`), where `proc_pidinfo` fails
+  with `ESRCH` as for one that is gone. The overlay now reads the state too, and said that
+  the run had ended, or Stopped, within 3 s (`checks/pointer-guards.js`, remote Mac,
+  macOS 26, 2026-11-14).
 - `Process.waitUntilExit()` runs the run loop while it waits. Waiting that way for its
   notification, an overlay whose Stop had just ended the run, or was pressed as the run
   ended, had its timer fire meanwhile and notified a second time that the run had ended. It

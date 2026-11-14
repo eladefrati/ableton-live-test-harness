@@ -5,7 +5,8 @@
 // computer-use-overlay.swift does, with real mouse events and no Live: each case shows a
 // window of its own (pointer-target.swift), runs the helper against it, and compares how the
 // helper ended with the mouse events the window received. First it starts the overlay with
-// the process ids it must refuse for a run. It takes the pointer, so it
+// the process ids it must refuse for a run, and last over a run that has ended and that
+// nothing has waited for. It takes the pointer, so it
 // refuses, posting nothing, anywhere but on the click host ("clickHost" in
 // harness/local.json). Exits 1 on failure.
 
@@ -453,6 +454,24 @@ const CASES = [
   },
 ];
 
+// The overlay over a run that has ended and that its parent hasn't waited for: such a run
+// stays in the process table, where it still answers signal 0. The run ends by a signal of
+// the check's own or, in Stop's last resort, by the signal Stop sends it. Each case: whether
+// Stop is pressed on the pill with a token that can't be removed, and all that the overlay
+// must say as it ends, within END_WAIT_MS of the run's end.
+const UNREAPED = [
+  {
+    name: "a run that has ended and that nothing has waited for, which still answers signal 0: the overlay says that the run has ended",
+    says: SAID_RUN_ENDED,
+  },
+  {
+    name: "Stop on the pill when the token can't be removed and the run ends at the signal, with nothing waiting for it: "
+      + "the overlay says Stopped, and doesn't wait to kill the run",
+    lastResort: true,
+    says: SAID_STOPPED,
+  },
+];
+
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 // The promise's value, or null if it takes longer than `ms`.
@@ -634,6 +653,63 @@ async function unrefused(binary, pid) {
   ].filter(Boolean);
 }
 
+// Starts a process that ends at the first signal, as the child of one that never waits for
+// it: { pid, state, end }. `state` is what ps says of it: "Z" once it has ended and stays
+// unreaped, nothing once it is gone. `end` ends it and the process that started it.
+async function startUnreaped() {
+  // The shell starts the process, says its id and becomes a sleep itself, which waits for
+  // nothing.
+  const parent = spawn("/bin/sh", ["-c", "sleep 600 & echo $!; exec sleep 600"], { stdio: ["ignore", "pipe", "inherit"] });
+  const ended = new Promise((resolve) => parent.on("exit", resolve));
+  const pid = Number(await linesOf(parent)());
+  if (!pid) {
+    parent.kill();
+    throw new Error("The unreaped run didn't start");
+  }
+  return {
+    pid,
+    state() {
+      try {
+        return execFileSync("ps", ["-o", "stat=", "-p", pid], { encoding: "utf8" }).trim();
+      } catch {
+        return "";
+      }
+    },
+    async end() {
+      try { process.kill(pid); } catch { /* it has ended */ }
+      parent.kill();
+      await ended;
+    },
+  };
+}
+
+// Runs one case of UNREAPED and resolves with what differed from what it expects, nothing if
+// it passed.
+async function unreapedFailures(test, binaries) {
+  fs.mkdirSync(FOLDER, { recursive: true });
+  fs.writeFileSync(TOKEN, "");
+  if (test.lastResort) execFileSync("chflags", ["uchg", TOKEN]);
+  const run = await startUnreaped();
+  let overlay = null;
+  try {
+    overlay = await showOverlay(binaries.overlay, run.pid);
+    let unpressed = "";
+    if (test.lastResort) await tools.run(binaries.press, [overlay.pid]).catch((error) => { unpressed = `: ${error.message}`; });
+    else process.kill(run.pid, "SIGTERM");
+    const said = await within(END_WAIT_MS, overlay.said());
+    const state = run.state();
+    return [
+      state !== "Z" && `the run wasn't left unreaped: ps gives its state as "${state}"`,
+      said === null && `the overlay was still up ${END_WAIT_MS} ms after the run ended${unpressed}`,
+      said !== null && !test.says.test(said.text) && `the overlay said ${JSON.stringify(said.text)}, not ${test.says}${unpressed}`,
+    ].filter(Boolean);
+  } finally {
+    if (overlay) await overlay.end();
+    await run.end();
+    unlockToken();
+  }
+}
+
 const sameEvents = (seen, expected) => seen.length === expected.length
   && expected.every((event, i) => Object.entries(event).every(([field, value]) => seen[i][field] === value));
 
@@ -759,6 +835,7 @@ async function main() {
       report(`the overlay refuses the process id ${pid} for its run: it says nothing, and exits 1 with its usage`, await unrefused(binaries.overlay, pid));
     }
     for (const test of CASES) report(test.name, await failures(test, binaries));
+    for (const test of UNREAPED) report(test.name, await unreapedFailures(test, binaries));
   } finally {
     display.stop();
   }
