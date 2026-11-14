@@ -1,12 +1,13 @@
 ---
 title: "ADR-0012: Show when the harness holds the mouse, and stop it from the pill whatever fails"
-status: Accepted
+status: Accepted; in decision 5, what Stop takes down and when it says that the mouse is free superseded by ADR-0015
 date: 2026-11-13
 ---
 
 # ADR-0012: Show when the harness holds the mouse, and stop it from the pill whatever fails
 
-**Status:** Accepted. Supersedes ADR-0009. Extends ADR-0006.
+**Status:** Accepted; in decision 5, what Stop takes down and when it says that the mouse is
+free superseded by ADR-0015. Supersedes ADR-0009. Extends ADR-0006.
 
 ## Context
 
