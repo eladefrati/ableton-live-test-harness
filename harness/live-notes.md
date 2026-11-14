@@ -183,9 +183,10 @@ unexpected.
   up at the press point and no drag event: each exited with status 3. One stopped while a
   click held the button posted the button up, so the click happened, and one stopped after
   its drag's move did too, so the drag happened: with only the release left, each exited
-  with status 0, its button-up reaching the check's window 77 and 81 ms after the marker was
-  made in the click, 51 and 57 ms in the drag (`checks/pointer-guards.js`, remote Mac,
-  2026-11-13). The run's next press then throws.
+  with status 4, saying that the click or the drag had happened, its button-up reaching the
+  check's window 71 and 78 ms after the marker was made in the click, 54 and 54 ms in the
+  drag (`checks/pointer-guards.js`, remote Mac, 2026-11-13). That press throws with `done`
+  on its error, and the run's next press throws too.
 - A run has one stop marker: every border it shows is given the same one, and the run names
   it to each helper it starts, in that helper's environment (`HARNESS_COMPUTER_USE_STOP`),
   and nowhere else. It used to write the name into its own environment, which every process

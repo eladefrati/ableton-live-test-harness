@@ -32,6 +32,10 @@ process.on("exit", () => fs.rmSync(path.dirname(MARKER), { recursive: true, forc
 // How a helper that Stop ends before its last event exits, and what it says.
 const STOPPED = 3;
 const STOPPED_ERROR = /^harness-computer-use was stopped from its pill: this run clicks no more, and the helper (held no button|released the button at [\d.]+, [\d.]+)$/;
+// How one exits that Stop caught with only its button's release left, and what it says of
+// the click or the drag.
+const HAPPENED = 4;
+const happened = (gesture) => new RegExp(`^harness-computer-use was stopped from its pill: this run clicks no more, and the helper released the button at [\\d.]+, [\\d.]+: the ${gesture} had happened$`);
 
 // How long the helper holds the button before a click's release, and after a drag's move
 // before its release (device-ui.swift).
@@ -49,11 +53,11 @@ const DRAGGED = { type: "drag", dx: 30, dy: -20 };
 // what must come of it: the helper's exit status (the signal, if one ended it), its error,
 // how soon it ended, and the button events the target's windows received, by the fields
 // named. In every case, once the run is stopped the target must receive no event but a
-// button-up, not a pointer's move either. A helper that ends as one that wasn't stopped looks
-// the same whether Stop came during its hold or never, so such a case also says how long
-// after the target made the marker the button-up must reach it: half the hold, which leaves
-// a loaded machine room. Under that, the marker may have come after the helper posted its
-// release, and the case fails as not shown.
+// button-up, not a pointer's move either. A helper that says its click or drag had happened
+// reads Stop after its release, so it says the same whether Stop came during its hold or just
+// after: such a case also says how long after the target made the marker the button-up must
+// reach it: half the hold, which leaves a loaded machine room. Under that, the marker may
+// have come after the helper posted its release, and the case fails as not shown.
 const CASES = [
   {
     name: "a click reaches the target",
@@ -103,10 +107,11 @@ const CASES = [
     events: () => [],
   },
   {
-    name: "Stop while a click holds the button: the click completes, and the helper ends as one that wasn't stopped",
+    name: "Stop while a click holds the button: the click completes, and the helper ends as stopped, saying the click had happened",
     target: [...RECT, "--stop", MARKER],
     command: click,
-    status: 0,
+    status: HAPPENED,
+    stderr: happened("click"),
     upAfterStopMs: CLICK_HOLD_MS / 2,
     events: (x, y) => [{ type: "down", x, y }, { type: "up", x, y }],
   },
@@ -119,10 +124,11 @@ const CASES = [
     events: (x, y) => [{ type: "down", x, y }, { type: "up", x, y }],
   },
   {
-    name: "Stop once a drag's move is posted: the drag completes, and the helper ends as one that wasn't stopped",
+    name: "Stop once a drag's move is posted: the drag completes, and the helper ends as stopped, saying the drag had happened",
     target: [...RECT, "--stop-at-drag", MARKER],
     command: drag,
-    status: 0,
+    status: HAPPENED,
+    stderr: happened("drag"),
     upAfterStopMs: DRAG_HOLD_MS / 2,
     events: (x, y) => [{ type: "down", x, y }, { ...DRAGGED, x: x + 30, y: y - 20 }, { type: "up", x: x + 30, y: y - 20 }],
   },

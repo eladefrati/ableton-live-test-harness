@@ -105,10 +105,11 @@ Node 18 or later. See [ADR-0001](../docs/adr/0001-fork-abletonosc.md) for the de
   breathing purple glow in from the screen's edges, with a pill naming the run, shows that the
   run may take the pointer; a notification says when it has ended (`computer-use-overlay.swift`,
   ADR-0012). Stop on the pill takes the mouse back: the press under way stops, with a button
-  it holds released, and throws `DeviceUiError`, unless only its release was left, when the
-  click or the drag has happened and the press resolves. The run's later presses throw, so a
-  check fails at the press that throws and still cleans up. A run whose border can't show, or
-  goes while the run goes
+  it holds released, and throws `DeviceUiError`, as do the run's later presses, so a
+  check fails at the press that throws and still cleans up. If only the press's release was
+  left, the click or the drag has happened: `error.done` is `true` on that press's error, and
+  set on no other, so a check that must undo what a click did reads it in its cleanup. A run
+  whose border can't show, or goes while the run goes
   on, says so on stderr in a line starting `warn harness-computer-use`, and clicks without
   it. The dialog, the pill and the
   notification name a check in `tests/live/` as
@@ -248,8 +249,9 @@ Node 18 or later. See [ADR-0001](../docs/adr/0001-fork-abletonosc.md) for the de
   button-down at the point, one drag event at its end with the whole distance in its delta
   fields, and one button-up, where the pointer then is; a helper started after Stop posts
   nothing; Stop while a click holds the button, or once a drag's move is posted, leaves the
-  click or the drag to complete, and the helper exits 0; Stop while a drag holds the button,
-  before its move, brings the button up and posts nothing more; SIGTERM or SIGQUIT while a
+  click or the drag to complete, and the helper exits 4, saying that it had happened; Stop
+  while a drag holds the button, before its move, brings the button up and posts nothing
+  more; SIGTERM or SIGQUIT while a
   drag holds the button brings it up before the helper dies by SIGTERM, or exits with status
   131 after SIGQUIT;
   Stop while the helper waits under a notification's banner ends the wait, for which the

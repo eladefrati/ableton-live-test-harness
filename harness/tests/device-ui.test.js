@@ -7,7 +7,7 @@ const os = require("node:os");
 const path = require("node:path");
 const {
   DeviceUiError, openDeviceUi, readControls, readPanelWidth, pointControls, controlPoint, findTitle, infoTitle, readClickHost, runName, runScript,
-  MEASURED_DEVICES, POINTER_CALLS, MACHINE_CALLS, stopped, stopMarker, buildComputerUse, showComputerUse,
+  MEASURED_DEVICES, POINTER_CALLS, MACHINE_CALLS, stopped, stopMarker, buildComputerUse, showComputerUse, liveWindows,
 } = require("../device-ui.js");
 
 const chunk = (tag, payload) => {
@@ -77,6 +77,10 @@ function stoppable(system) {
   Object.assign(system, { hostname: () => "another-mac", ask: async () => true });
   return () => { system.stopped = () => true; };
 }
+
+// The error of a click or a drag that Stop caught with only its release left (ADR-0012).
+const happened = () => Object.assign(new DeviceUiError("harness-computer-use was stopped from its pill: this run clicks no more"), { done: true });
+const isHappened = (error) => error instanceof DeviceUiError && error.done === true && /stopped from its pill/.test(error.message);
 
 // Runs `body` and resolves with what the harness warned meanwhile: its lines start "warn".
 async function warningsOf(body) {
@@ -303,6 +307,19 @@ test("Stop between a press's hover and its click stops the click", async () => {
   const ui = await open(system);
   await assert.rejects(ui.press("Button"), /stopped from its pill/);
   assert.equal(clicks(system).length, 0);
+});
+
+test("a press and a drag that Stop caught with only the release left reject with that error, which says done", async () => {
+  const system = fakeMachine();
+  system.click = system.drag = async () => { throw happened(); };
+  const ui = await open(system);
+  await assert.rejects(ui.press("Button"), isHappened);
+  await assert.rejects(ui.drag("Button", { up: 40 }), isHappened);
+  const editor = fakePluginMachine();
+  editor.clickEditor = editor.dragEditor = async () => { throw happened(); };
+  const window = await openPluginWindow(pluginLive(), PLUGIN, editor);
+  await assert.rejects(window.press("Button"), isHappened);
+  await assert.rejects(window.drag("Button", { up: 10 }), isHappened);
 });
 
 // The machine's calls that never move the pointer or press its button, so need no permit.
@@ -775,15 +792,37 @@ test("Stop while choose reads the menu types nothing once Live is no longer in f
   assert.equal(calls.includes("escape"), false);
 });
 
-test("Stop during choose's opening click, which resolves, leaves the item unclicked and closes the menu without bringing Live forward", async () => {
+test("Stop that catches choose's opening click with only its release left: the click throws done, and the menu it opened is closed without bringing Live forward", async () => {
   const system = menuMachine(MENU_ROWS);
   const stop = stoppable(system);
   const click = system.click;
-  system.click = async (...args) => { await click(...args); stop(); };
-  await assert.rejects((await openMenu(system)).choose("Menu", "Wander"), /stopped from its pill/);
+  system.click = async (...args) => { await click(...args); stop(); throw happened(); };
+  await assert.rejects((await openMenu(system)).choose("Menu", "Wander"), isHappened);
   assert.deepEqual(clicks(system).map((call) => call[1]), [7]);
   assert.equal(system.calls.at(-1), "typeEscape");
   assert.equal(system.calls.includes("escape"), false);
+});
+
+test("Stop that catches choose's click on the item with only its release left: the item was chosen and its menu has closed, so nothing is typed", async () => {
+  const system = menuMachine(MENU_ROWS);
+  const stop = stoppable(system);
+  const click = system.click;
+  system.click = async (id, ...at) => {
+    await click(id, ...at);
+    if (id !== 9) return;
+    stop();
+    throw happened();
+  };
+  await assert.rejects((await openMenu(system)).choose("Menu", "Wander"), isHappened);
+  assert.deepEqual(clicks(system).map((call) => call[1]), [7, 9]);
+  assert.equal(system.calls.includes("escape") || system.calls.includes("typeEscape"), false);
+});
+
+test("an opening click of choose that fails without done types nothing", async () => {
+  const system = menuMachine(MENU_ROWS);
+  system.click = async () => { throw new DeviceUiError("The window at the point is Finder 3, not 7"); };
+  await assert.rejects((await openMenu(system)).choose("Menu", "Wander"), (error) => /Finder 3/.test(error.message) && !("done" in error));
+  assert.equal(system.calls.includes("escape") || system.calls.includes("typeEscape"), false);
 });
 
 test("choose keeps its failure, with a warning, when Escape fails too", async () => {
@@ -810,6 +849,7 @@ test("Stop between choose's Info View check and its opening click stops the clic
 });
 
 const tools = require("../tools.js");
+const mac = require("../macos.js");
 
 // Runs `body` with the build of the Swift source named `failing` failing, and every other
 // build resolving with its source's name. Resolves with what was warned meanwhile.
@@ -896,6 +936,30 @@ test("showComputerUse leaves this process's environment as it was", async () => 
   const before = { ...process.env };
   await showComputerUse(standIn("echo shown", STAYS));
   assert.deepEqual({ ...process.env }, before);
+});
+
+// The error a call of the machine rejects with when its helper, a stand-in, writes `said` to
+// stderr and exits with `status`.
+async function helperEnding(status, said) {
+  const [build, wake] = [tools.helperBinary, mac.wakeDisplay];
+  tools.helperBinary = async () => standIn(`echo "${said}" >&2`, `exit ${status}`);
+  mac.wakeDisplay = async () => {};
+  try {
+    return await liveWindows().then(() => assert.fail("the helper's failure didn't reject"), (error) => error);
+  } finally {
+    [tools.helperBinary, mac.wakeDisplay] = [build, wake];
+  }
+}
+
+test("a helper that exits 4, stopped with only a button's release left, rejects with done; one that exits 3 or 1 doesn't", async () => {
+  const error = await helperEnding(4, "harness-computer-use was stopped from its pill: this run clicks no more, and the click had happened");
+  assert.equal(isHappened(error), true);
+  assert.match(error.message, /the click had happened$/);
+  for (const status of [3, 1]) {
+    const other = await helperEnding(status, "said");
+    assert.equal(other instanceof DeviceUiError, true);
+    assert.equal("done" in other, false);
+  }
 });
 
 // A run of its own, started with `env` added to its environment, whose helper is a stand-in

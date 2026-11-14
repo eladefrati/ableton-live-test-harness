@@ -43,6 +43,8 @@ const tools = require("./tools.js");
 const { patcherChunk } = require("./amxd.js");
 const { checkLocation } = require("./run-log.js");
 
+// `done` is true on the error of a press that was stopped (ADR-0012) with only its button's
+// release left: it throws as any stopped press does, and the click or the drag happened.
 class DeviceUiError extends Error {}
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -205,8 +207,15 @@ const helperBinary = () => tools.helperBinary(HELPER_SOURCE).catch((e) => {
   throw new DeviceUiError(e.message, { cause: e });
 });
 
+// How the helper exits when Stop caught it with only a button's release left
+// (device-ui.swift): the click or the drag happened, and the error says so with `done`.
+const HAPPENED_STATUS = 4;
+
 async function helper(...args) {
-  return exec(await helperBinary(), args, { env: helperEnvironment() });
+  return exec(await helperBinary(), args, { env: helperEnvironment() }).catch((error) => {
+    if (error.cause?.cause?.code === HAPPENED_STATUS) error.done = true;
+    throw error;
+  });
 }
 
 // The one machine clicks are allowed on without asking: "clickHost" in harness/local.json,
@@ -583,13 +592,26 @@ class DeviceUi {
   // Opens the menu `name` and clicks its item `item`, confirmed by its text (ADR-0014): the
   // menu's own window is read, and exactly one row must read `item`. Whatever fails once the
   // menu's control was clicked, the menu is closed with Escape (after Stop, only while Live
-  // is still in front) and nothing more is clicked.
+  // is still in front) and nothing more is clicked. A click that Stop caught with only its
+  // release left throws, and happened all the same (its error says `done`): on the control
+  // it opened the menu, which is closed; on the item it chose it, and the menu has closed.
   async choose(name, item) {
     if (typeof item !== "string" || !item) throw new DeviceUiError(`Choosing from ${name} needs the item's text. Not clicked`);
     const { window, x, y } = await this.aim(name);
     const before = new Set((await this.system.windows()).map((w) => w.id));
-    await this.system.click(window, x, y);
+    // Whether the menu is open: from the click on its control until the click on an item.
+    let open = false;
+    const click = async (opens, ...at) => {
+      try {
+        await this.system.click(...at);
+      } catch (error) {
+        if (error.done) open = opens;
+        throw error;
+      }
+      open = opens;
+    };
     try {
+      await click(true, window, x, y);
       let menu;
       for (const deadline = Date.now() + MENU_WAIT_MS; !menu; await sleep(150)) {
         menu = (await this.system.windows()).find((w) => !before.has(w.id) && w.layer > 0);
@@ -602,10 +624,12 @@ class DeviceUi {
         throw new DeviceUiError(`The menu over ${name} has ${rows.length} items reading "${item}" (it reads: ${lines.map((l) => l.text).join(", ")}). Not chosen`);
       }
       const row = rows[0];
-      await this.system.click(menu.id, menu.x + menu.w / 2, menu.y + (row.y + row.h / 2) / scale);
+      await click(false, menu.id, menu.x + menu.w / 2, menu.y + (row.y + row.h / 2) / scale);
     } catch (error) {
       // The failure thrown is the one that stopped the choice, not Escape's.
-      await this.system.escape().catch((failed) => console.error(`warn harness-computer-use couldn't close the menu over ${name}: ${failed.message}`));
+      if (open) {
+        await this.system.escape().catch((failed) => console.error(`warn harness-computer-use couldn't close the menu over ${name}: ${failed.message}`));
+      }
       throw error;
     }
   }

@@ -35,9 +35,9 @@
 // Once the run is stopped (ADR-0012: the file named in HARNESS_COMPUTER_USE_STOP exists),
 // hover, click and drag post nothing but the release of a button this helper holds, and exit
 // 3 saying so. A click or a drag with only that release left has happened: the helper posts
-// it and exits 0. A helper that fails, or is sent SIGINT, SIGQUIT, SIGTERM or SIGHUP, while it
-// holds the button releases it before it ends: by that signal, or with status 131 after
-// SIGQUIT.
+// it and exits 4, saying that too. A helper that fails, or is sent SIGINT, SIGQUIT, SIGTERM
+// or SIGHUP, while it holds the button releases it before it ends: by that signal, or with
+// status 131 after SIGQUIT.
 
 import ApplicationServices
 import Foundation
@@ -46,7 +46,10 @@ import Vision
 // Stop (ADR-0012). The run names its stop marker in HARNESS_COMPUTER_USE_STOP, and the pill's
 // Stop creates that file.
 let STOP_MARKER = ProcessInfo.processInfo.environment["HARNESS_COMPUTER_USE_STOP"]
+let STOPPED = "harness-computer-use was stopped from its pill: this run clicks no more"
 let STOPPED_STATUS: Int32 = 3
+// Stopped with only a button's release left: the click or the drag happened.
+let HAPPENED_STATUS: Int32 = 4
 
 func stopped() -> Bool { STOP_MARKER.map { access($0, F_OK) == 0 } ?? false }
 
@@ -344,18 +347,15 @@ func halt() -> Never {
     let released = release()
     obeySignal()
     let did = released.map { "released the button at \($0.x), \($0.y)" } ?? "held no button"
-    FileHandle.standardError.write(Data("harness-computer-use was stopped from its pill: this run clicks no more, and the helper \(did)\n".utf8))
+    FileHandle.standardError.write(Data("\(STOPPED), and the helper \(did)\n".utf8))
     exit(STOPPED_STATUS)
 }
 
-// The one function a hover's, a click's and a drag's events leave from, so it checks Stop
-// before each, as requireOnTop does while it waits. Not before a button-up: the click or the
-// drag it ends has happened by then, so a helper stopped there ends as one that did it, where
-// status 3 would report it as not done.
+// The one function a hover's, a click's and a drag's events leave from, the button-up apart
+// (complete), so it checks Stop before each, as requireOnTop does while it waits.
 func post(_ type: CGEventType, _ point: CGPoint, moved: CGVector? = nil) {
-    if type != .leftMouseUp && (signalled != 0 || stopped()) { halt() }
-    switch type {
-    case .leftMouseDown:
+    if signalled != 0 || stopped() { halt() }
+    if type == .leftMouseDown {
         let up = mouseEvent(.leftMouseUp, point)
         // A signal the helper was started ignoring, as under nohup, stays ignored.
         for number in ENDING_SIGNALS {
@@ -363,12 +363,21 @@ func post(_ type: CGEventType, _ point: CGPoint, moved: CGVector? = nil) {
         }
         emit(type, point)
         held = up
-    case .leftMouseUp:
-        buttonUp(point)
-        obeySignal()
-    default:
+    } else {
         emit(type, point, moved: moved)
     }
+}
+
+// The button-up that completes a click or a drag, posted whether or not the run is stopped:
+// the click or the drag has happened by then. A helper stopped by then ends as stopped all
+// the same, with a status of its own and saying what happened, so that the run can clear up
+// what the click did (ADR-0012). A signal held back comes first.
+func complete(_ gesture: String, at point: CGPoint) {
+    buttonUp(point)
+    obeySignal()
+    guard stopped() else { return }
+    FileHandle.standardError.write(Data("\(STOPPED), and the helper released the button at \(point.x), \(point.y): the \(gesture) had happened\n".utf8))
+    exit(HAPPENED_STATUS)
 }
 
 // The longest drag either way, in points (ADR-0013).
@@ -402,13 +411,13 @@ func drag(_ point: CGPoint, by delta: CGVector) {
     usleep(50_000)
     // Live has moved the pointer back to the press point by now after a move with a vertical
     // part; after any other, and on other controls, it is at the end.
-    post(.leftMouseUp, CGEvent(source: nil)?.location ?? end)
+    complete("drag", at: CGEvent(source: nil)?.location ?? end)
 }
 
 func press(_ point: CGPoint) {
     post(.leftMouseDown, point)
     usleep(70_000)
-    post(.leftMouseUp, point)
+    complete("click", at: point)
 }
 
 // Within this of a size counts as that size: Accessibility reports whole points.
