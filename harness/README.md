@@ -106,7 +106,9 @@ Node 18 or later. See [ADR-0001](../docs/adr/0001-fork-abletonosc.md) for the de
   run may take the pointer; a notification says when it has ended (`computer-use-overlay.swift`,
   ADR-0009). Stop on the pill takes the mouse back: the press under way stops, with a button
   it holds released, and it and the run's later presses throw `DeviceUiError`, so a check
-  fails there and still cleans up. The dialog, the pill and the
+  fails there and still cleans up. A run whose border can't show, or goes while the run goes
+  on, says so on stderr in a line starting `warn harness-computer-use`, and clicks without
+  it. The dialog, the pill and the
   notification name a check in `tests/live/` as
   `tests/live/<check>.js`, another script by its file, and code run with `node -e` or given
   on stdin not at all.

@@ -7,6 +7,10 @@
 //
 //   computer-use-overlay <pid> <stop-marker> [<run>]
 //
+// Prints "shown" once the window server lists its windows. If they can't show (no desktop
+// session, no screen, or not listed within SHOWN_SECONDS), it says why on stderr and exits 1,
+// so the run can warn that it clicks with no border.
+//
 // device-ui.swift's click guard skips the glow's windows, titled OVERLAY_TITLE, that this
 // program owns. It doesn't skip the pill, which takes clicks.
 
@@ -34,6 +38,11 @@ let arguments = CommandLine.arguments
 guard (3...4).contains(arguments.count), let pid = pid_t(arguments[1]) else { fail("usage: computer-use-overlay <pid> <stop-marker> [<run>]") }
 let marker = arguments[2]
 let run = arguments.count == 4 ? arguments[3] : ""
+// The run may be gone, with its end of the pipes, when this writes to them.
+signal(SIGPIPE, SIG_IGN)
+// With no window server a program gets no session, no screens and windows that never show,
+// and no error (live-notes.md).
+if CGSessionCopyCurrentDictionary() == nil { fail("this process has no desktop session") }
 
 // A soft glow inward from every edge: one-point rings whose opacity falls off with the distance
 // from the edge, with no line where it starts or ends. Drawn once into the view's layer.
@@ -177,9 +186,11 @@ func pill(on screen: NSScreen) -> NSPanel {
 
 let app = NSApplication.shared
 app.setActivationPolicy(.accessory)
+if NSScreen.screens.isEmpty { fail("there is no screen to show on") }
 
 // One glow window per screen, above everything but the cursor, on every Space; the pill above
 // the glow on the main screen.
+var windows: [NSWindow] = []
 for screen in NSScreen.screens {
     let window = NSWindow(contentRect: screen.frame, styleMask: .borderless, backing: .buffered, defer: false)
     window.title = OVERLAY_TITLE
@@ -193,8 +204,25 @@ for screen in NSScreen.screens {
     glow.wantsLayer = true
     breathe(glow.layer, from: 1, to: 0.55, seconds: 2.2)
     window.contentView = glow
-    window.orderFrontRegardless()
-    if screen == NSScreen.main { pill(on: screen).orderFrontRegardless() }
+    windows.append(window)
+    if screen == NSScreen.main { windows.append(pill(on: screen)) }
+}
+windows.forEach { $0.orderFrontRegardless() }
+
+// Says "shown" once the window server lists every window: NSWindow.isVisible is true even
+// with no window server.
+let SHOWN_SECONDS = 2.0
+let started = Date()
+Timer.scheduledTimer(withTimeInterval: 0.05, repeats: true) { timer in
+    let list = CGWindowListCopyWindowInfo([.optionOnScreenOnly], kCGNullWindowID) as? [[String: Any]] ?? []
+    let listed = Set(list.compactMap { $0[kCGWindowNumber as String] as? Int })
+    if MainActor.assumeIsolated({ windows.allSatisfy { listed.contains($0.windowNumber) } }) {
+        timer.invalidate()
+        print("shown")
+        fflush(stdout)
+    } else if Date().timeIntervalSince(started) > SHOWN_SECONDS {
+        fail("its windows weren't on screen after \(Int(SHOWN_SECONDS)) s")
+    }
 }
 
 // The run that holds the mouse is gone once signal 0 to it fails.

@@ -283,7 +283,12 @@ const OVERLAY_SOURCE = path.join(__dirname, "computer-use-overlay.swift");
 const STOP_MARKER = "HARNESS_COMPUTER_USE_STOP";
 const stopped = () => Boolean(process.env[STOP_MARKER]) && fs.existsSync(process.env[STOP_MARKER]);
 
-const warnNoBorder = (reason) => console.error(`warn harness-computer-use couldn't show its border: ${reason}`);
+// One line, whatever the reason: a failed build's is the compiler's whole output.
+const warnNoBorder = (reason) => console.error(`warn harness-computer-use couldn't show its border: ${reason.split("\n")[0]}. The run clicks without it`);
+
+// How long the overlay has to say that its windows are on screen. By itself it gives up
+// after 2 s.
+const OVERLAY_SHOWN_MS = 5000;
 
 // Builds the helper and the overlay, ahead of the dialog: the wait for a build comes before
 // the person is asked, and the border shows as soon as they allow. Resolves with the
@@ -296,15 +301,46 @@ async function buildComputerUse() {
   });
 }
 
-async function showComputerUse(binary) {
+// Starts the overlay and resolves once it says its windows are on screen. Rejects with the
+// reason the overlay gives if it ends before that, and ends it and rejects if it says nothing
+// for `shownMs`. One that goes later, other than as it ends by itself, is warned of: the
+// person has lost the pill and its Stop. Nothing of the overlay keeps this process running.
+async function showComputerUse(binary, { shownMs = OVERLAY_SHOWN_MS } = {}) {
   // Not in the harness's temp folder, which relaunch.js and quit.js empty.
   const folder = fs.mkdtempSync(path.join(os.tmpdir(), "harness-computer-use-"));
   process.on("exit", () => fs.rmSync(folder, { recursive: true, force: true }));
   process.env[STOP_MARKER] = path.join(folder, "stopped");
   const run = runName();
-  const overlay = spawn(binary, [String(process.pid), process.env[STOP_MARKER], ...(run ? [run] : [])], { detached: true, stdio: "ignore" });
-  overlay.on("error", (error) => warnNoBorder(error.message));
-  overlay.unref();
+  const overlay = spawn(binary, [String(process.pid), process.env[STOP_MARKER], ...(run ? [run] : [])], { detached: true, stdio: ["ignore", "pipe", "pipe"] });
+  let [said, complained] = ["", ""];
+  overlay.stderr.on("data", (data) => { complained += data; });
+  let timer;
+  try {
+    await new Promise((resolve, reject) => {
+      timer = setTimeout(() => {
+        overlay.kill();
+        reject(new Error(`it didn't show within ${shownMs} ms`));
+      }, shownMs);
+      overlay.stdout.on("data", (data) => {
+        said += data;
+        if (/^shown$/m.test(said)) resolve();
+      });
+      overlay.on("error", reject);
+      // The overlay's reason is the last thing it writes.
+      overlay.on("close", (code, signal) => reject(new Error(complained.trim().split("\n").pop() || `it ended with ${signal ?? `status ${code}`}`)));
+    });
+  } finally {
+    clearTimeout(timer);
+    overlay.stdout.destroy();
+    overlay.stderr.destroy();
+    overlay.unref();
+  }
+  const gone = (code, signal) => {
+    if (code !== 0) console.error(`warn harness-computer-use's border has gone (${signal ?? `status ${code}`}). The run clicks without it`);
+  };
+  // It may have ended already, its exit known here before its last words were read.
+  if (overlay.exitCode !== null || overlay.signalCode !== null) gone(overlay.exitCode, overlay.signalCode);
+  else overlay.on("exit", gone);
 }
 
 const machine = {

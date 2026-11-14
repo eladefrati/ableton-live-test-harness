@@ -78,6 +78,19 @@ function stoppable(system) {
   return () => { system.stopped = () => true; };
 }
 
+// Runs `body` and resolves with what the harness warned meanwhile: its lines start "warn".
+async function warningsOf(body) {
+  const error = console.error;
+  const warnings = [];
+  console.error = (...said) => (String(said[0]).startsWith("warn ") ? warnings.push(said[0]) : error(...said));
+  try {
+    await body();
+  } finally {
+    console.error = error;
+  }
+  return warnings;
+}
+
 const fakeLive = (className = "MxDeviceAudioEffect") => ({
   send: () => {},
   sync: async () => {},
@@ -325,13 +338,8 @@ test("the click host shows no border, and a border that fails to show doesn't st
   assert.equal(host.calls.includes("border"), false);
   const other = fakeMachine();
   Object.assign(other, { hostname: () => "another-mac", ask: async () => true, showComputerUse: async () => { throw new Error("no window server"); } });
-  const warn = console.error;
-  console.error = () => {};
-  try {
-    await (await open(other)).press("Button");
-  } finally {
-    console.error = warn;
-  }
+  const warnings = await warningsOf(async () => (await open(other)).press("Button"));
+  assert.deepEqual(warnings, ["warn harness-computer-use couldn't show its border: no window server. The run clicks without it"]);
   assert.equal(clicks(other).length, 1);
 });
 
@@ -798,7 +806,7 @@ async function withBuilds(failing, body) {
   const [build, warn] = [tools.helperBinary, console.error];
   const warnings = [];
   tools.helperBinary = async (source) => {
-    if (path.basename(source) === failing) throw new Error(`swiftc failed on ${failing}`);
+    if (path.basename(source) === failing) throw new Error(`swiftc failed on ${failing}\n  error: the rest of what the compiler said`);
     return path.basename(source, ".swift");
   };
   console.error = (message) => warnings.push(message);
@@ -817,8 +825,7 @@ test("buildComputerUse resolves with the border's binary once the helper and the
 
 test("buildComputerUse warns and resolves with no border when only the border can't be built", async () => {
   const warnings = await withBuilds("computer-use-overlay.swift", async () => assert.equal(await machine.buildComputerUse(), null));
-  assert.equal(warnings.length, 1);
-  assert.match(warnings[0], /^warn harness-computer-use couldn't show its border: swiftc failed on computer-use-overlay\.swift/);
+  assert.deepEqual(warnings, ["warn harness-computer-use couldn't show its border: swiftc failed on computer-use-overlay.swift. The run clicks without it"]);
 });
 
 test("buildComputerUse rejects when the helper can't be built", async () => {
@@ -826,6 +833,82 @@ test("buildComputerUse rejects when the helper can't be built", async () => {
     await assert.rejects(machine.buildComputerUse(), (error) => error instanceof DeviceUiError && /swiftc failed on device-ui\.swift/.test(error.message));
   });
   assert.deepEqual(warnings, []);
+});
+
+// A stand-in for the overlay: a shell script of `lines`, run with the overlay's arguments,
+// that first writes its pid beside itself. Returns its path.
+const STAND_INS = fs.mkdtempSync(path.join(os.tmpdir(), "device-ui-test-"));
+process.on("exit", () => fs.rmSync(STAND_INS, { recursive: true, force: true }));
+let standIns = 0;
+function standIn(...lines) {
+  const file = path.join(STAND_INS, `overlay-${standIns++}`);
+  fs.writeFileSync(file, ["#!/bin/sh", 'echo $$ > "$0.pid"', ...lines, ""].join("\n"), { mode: 0o755 });
+  return file;
+}
+// Stays until the run it was given, its first argument, has gone, as the overlay does.
+const STAYS = 'while kill -0 "$1" 2>/dev/null; do sleep 0.1; done';
+
+const pause = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+async function until(done) {
+  for (const deadline = Date.now() + 3000; !done(); await pause(20)) {
+    if (Date.now() > deadline) throw new Error("Not within 3 s");
+  }
+}
+const gone = (file) => {
+  const pid = Number(fs.readFileSync(`${file}.pid`, "utf8"));
+  try { process.kill(pid, 0); return false; } catch { return true; }
+};
+
+test("showComputerUse resolves once the border says it has shown, having given it the stop marker the run reads", async () => {
+  const slow = standIn("sleep 0.3", ': > "$0.shown"', "echo shown", ': > "$2"', STAYS);
+  try {
+    const warnings = await warningsOf(async () => {
+      await machine.showComputerUse(slow);
+      assert.equal(fs.existsSync(`${slow}.shown`), true);
+      await until(() => machine.stopped());
+    });
+    assert.deepEqual(warnings, []);
+  } finally {
+    delete process.env.HARNESS_COMPUTER_USE_STOP;
+  }
+});
+
+test("showComputerUse rejects with the reason a border gives as it ends, or else with how it ended", async () => {
+  const sessionless = standIn("echo a line from the system >&2", "echo this process has no desktop session >&2", "exit 1");
+  await assert.rejects(machine.showComputerUse(sessionless), { message: "this process has no desktop session" });
+  await assert.rejects(machine.showComputerUse(standIn("exit 1")), { message: "it ended with status 1" });
+  await assert.rejects(machine.showComputerUse(standIn("kill -9 $$")), { message: "it ended with SIGKILL" });
+});
+
+test("showComputerUse ends a border that says nothing in time, and rejects", async () => {
+  const silent = standIn("exec sleep 30");
+  await assert.rejects(machine.showComputerUse(silent, { shownMs: 500 }), { message: "it didn't show within 500 ms" });
+  await until(() => gone(silent));
+});
+
+test("a border that goes after it has shown is warned of once, unless it ended as it does by itself", async () => {
+  for (const [ends, warning] of [
+    [["sleep 0.2", "exit 1"], "warn harness-computer-use's border has gone (status 1). The run clicks without it"],
+    [["exit 1"], "warn harness-computer-use's border has gone (status 1). The run clicks without it"],
+    [["sleep 0.2", "kill -9 $$"], "warn harness-computer-use's border has gone (SIGKILL). The run clicks without it"],
+    [["sleep 0.2", "exit 0"], null],
+  ]) {
+    const shown = standIn("echo shown", ...ends);
+    const warnings = await warningsOf(async () => {
+      await machine.showComputerUse(shown);
+      await until(() => gone(shown));
+      await pause(100);
+    });
+    assert.deepEqual(warnings, warning ? [warning] : []);
+  }
+});
+
+test("a run that has shown its border still ends by itself", async () => {
+  const run = `require(${JSON.stringify(path.join(__dirname, "..", "device-ui.js"))}).machine.showComputerUse(process.argv[1]).then(() => console.log("shown"))`;
+  const printed = await new Promise((resolve, reject) => {
+    require("node:child_process").execFile(process.execPath, ["-e", run, standIn("echo shown", STAYS)], { timeout: 10000 }, (error, stdout) => (error ? reject(error) : resolve(stdout)));
+  });
+  assert.equal(printed, "shown\n");
 });
 
 const hasDeveloperTools = (() => {

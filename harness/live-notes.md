@@ -179,6 +179,17 @@ unexpected.
   stopped while a drag held the button, before its move, posted the button up at the press
   point and no drag event. Each exited with status 3 (`checks/pointer-guards.js`, remote Mac,
   2026-11-13).
+- With no window server, as for a process with no desktop session, a program gets no session
+  (`CGSessionCopyCurrentDictionary()` is nil), no screens, and windows that say they are
+  visible and never show, all with no error; `display dialog` fails there with -1713, "No
+  user interaction allowed". So a run there is refused at the dialog (ADR-0006), and
+  `computer-use-overlay.swift` checks the session and ends with the reason, 0.4 s after it
+  started (the window server's service denied with `sandbox-exec`; remote Mac, macOS 26,
+  2026-11-13).
+- The window server lists the border's windows 0.6 to 1.4 s after its program starts (14
+  starts), which is when the program prints `shown`; the run waits for that before its first
+  click. A border started while the display sleeps makes its windows then, and draws them
+  once the display wakes (remote Mac, macOS 26, 2026-11-13).
 - A mouse event posted as the last thing a program does is lost: a button-up posted just
   before exit left the button held in 3 of 3 runs, and with 100 ms between the post and the
   exit it came up in 2 of 2. `device-ui.swift` waits 100 ms after every button-up, a stopped
