@@ -38,7 +38,12 @@ test("run rejects with the reason a command couldn't start", async () => {
   await assert.rejects(run("/no/such/command"), /^Error: \/no\/such\/command failed: .*ENOENT/);
 });
 
-test("helperBinary deletes the builds not used for 7 days, counting from their last use, never the one it returns", async (t) => {
+// Builds real helpers with swiftc.
+const hasDeveloperTools = (() => {
+  try { require("node:child_process").execFileSync("xcode-select", ["-p"], { stdio: "ignore" }); return true; } catch { return false; }
+})();
+test("helperBinary deletes the builds not used for 7 days, counting from their last use, never the one it returns",
+  { skip: !hasDeveloperTools && "no developer tools", timeout: 300000 }, async (t) => {
   const folder = fs.mkdtempSync(path.join(os.tmpdir(), "tools-test-"));
   t.after(() => fs.rmSync(folder, { recursive: true, force: true }));
   const cache = path.join(folder, "cache");
