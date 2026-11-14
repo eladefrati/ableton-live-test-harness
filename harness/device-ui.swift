@@ -384,19 +384,19 @@ func requireDrag(_ point: CGPoint, _ delta: CGVector) {
 
 // Button down at `point`, one drag event at the end of `delta`, button up where the pointer
 // then is. One event, not a path of steps: for every drag event, a knob of one of Live's
-// devices adds how far that event is from the press point and moves the pointer back there,
-// so a path measured from the press point is counted again at each step (live-notes.md). A
-// control that reads where the pointer is ends at the same value either way. The event
-// carries the whole distance in its delta fields too, for controls that read how far the
-// mouse moved.
+// devices adds how far that event is from the press point and, when the event has a vertical
+// part, moves the pointer back there, so a path measured from the press point is counted
+// again at each step (live-notes.md). A control that reads where the pointer is ends at the
+// same value either way. The event carries the whole distance in its delta fields too, for
+// controls that read how far the mouse moved.
 func drag(_ point: CGPoint, by delta: CGVector) {
     let end = CGPoint(x: point.x + delta.dx, y: point.y + delta.dy)
     post(.leftMouseDown, point)
     usleep(70_000)
     post(.leftMouseDragged, end, moved: delta)
     usleep(50_000)
-    // Live has moved the pointer back to the press point by now; other controls left it at
-    // the end.
+    // Live has moved the pointer back to the press point by now after a move with a vertical
+    // part; after any other, and on other controls, it is at the end.
     post(.leftMouseUp, CGEvent(source: nil)?.location ?? end)
 }
 

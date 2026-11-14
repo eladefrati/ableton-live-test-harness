@@ -12,7 +12,8 @@
 // fields, and when it was received, in ms. With
 // --cover it shows a second window over the panel when the pointer first moves in it. With
 // --return it moves the pointer back to where the button went down at every drag event, as a
-// knob of one of Live's devices does. When the button goes down, with --stop it creates <file>,
+// knob of one of Live's devices does after an event with a vertical part. When the button goes
+// down, with --stop it creates <file>,
 // as Stop on harness-computer-use's pill creates a run's stop marker, and with --signal it
 // sends the signal of that name to the process that posted the event. With --stop-at-drag it
 // creates <file> at a drag event. Having created <file>, it prints {"stopped": <when, in ms>},

@@ -26,11 +26,12 @@ the mouse exercises.
    plug-in's window, and Stop, ADR-0009), then the button goes down, the pointer moves the
    distance given in one move, to the end, and the button comes up where the pointer then
    is. One move, not a path of steps: for every drag event, a knob of one of Live's own
-   devices adds that event's distance from the press point and moves the pointer back
-   there, so a path measured from the press point is counted again at each step, and the
-   knob turns further the more events the drag has (`harness/live-notes.md`). By the time
-   the button comes up, Live has moved the pointer back to the press point; other controls
-   leave it at the end.
+   devices adds that event's distance from the press point and, when the event has a
+   vertical part, moves the pointer back there, so a path measured from the press point is
+   counted again at each step, and the knob turns further the more events the drag has
+   (`harness/live-notes.md`). By the time the button comes up, Live has moved the pointer
+   back to the press point after a move with a vertical part; after any other, and on other
+   controls, it is at the end.
 2. **The distance is given in points, not as a value.** How far a control turns per point is
    up to each device and plug-in, so the harness doesn't aim at a value. Up and right are
    positive.

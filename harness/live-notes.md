@@ -88,21 +88,22 @@ unexpected.
   from the nearest step: from 0.5, 62 points up gave 0.9921 and 63 gave 1.0, and from 0, 126
   gave 1.0 (Auto Filter's Frequency, Resonance and Dry/Wet). The knob reads one thing from a
   drag event, its position in whole points against the point where the button went down:
-  for every drag event it adds the vertical part of that distance to the value and moves
-  the pointer back to the press point. It reads neither the delta fields (10 events at the
-  press point, each with a delta of 1 up, turned nothing, and a path turned the same with
-  its delta fields zeroed) nor the sideways part (20 right turned nothing). A half point
-  rounds toward the bottom of the screen: from a press point ending in .5, 0.4 of a point up
-  turned a whole step, so a drag is given in whole points and a fraction is refused (remote
-  Mac, Live 12.4.25b1, 2026-11-13).
+  for every drag event it adds the vertical part of that distance to the value and, when
+  the event has a vertical part, moves the pointer back to the press point (it did after
+  none of the 20 events of a drag to the right). It reads neither the delta fields (10
+  events at the press point, each with a delta of 1 up, turned nothing, and a path turned
+  the same with its delta fields zeroed) nor the sideways part (20 right turned nothing). A
+  half point rounds toward the bottom of the screen: from a press point ending in .5, 0.4 of
+  a point up turned a whole step, so a drag is given in whole points and a fraction is
+  refused (remote Mac, Live 12.4.25b1, 2026-11-13).
 - So a path of drag events, each measured from the press point, over-turns Live's knob: 10
   up as 10 events a point apart turned 1 + 2 + ... + 10 = 55 steps, and 60 left and 10 up, as
   60 events, turned it from 0.5 to the top. That is how 40 points had taken Frequency to the
   ends of its range. One drag event at the end turned the knob by the distance: 10 up 10
   steps, 60 left and 10 up 10 steps, 40 up 40 steps. `device-ui.swift` posts that one event,
   with the whole distance in its delta fields, and releases the button where the pointer
-  then is: the press point on Live's knob, the end on the controls below (remote Mac, Live
-  12.4.25b1, 2026-11-13).
+  then is: the press point on Live's knob after a move with a vertical part, the end after
+  any other and on the controls below (remote Mac, Live 12.4.25b1, 2026-11-13).
 - Controls that read where the pointer is ended at the same value for a path and for one
   event: a JUCE editor's horizontal slider (100 left took it from 1.0 to 0.3388, with 30 up
   too), the Dry/Wet Mix slider of AUDelay's editor (10 right, 0.5 to 0.7145) and a Max for
