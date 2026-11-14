@@ -470,13 +470,13 @@ const machine = {
       fs.rmSync(folder, { recursive: true, force: true });
     }
   },
-  // Crops a capture of the window to [x, y, w, h], in pixels.
-  async captureCrop(windowId, [x, y, w, h], file) {
+  // Crops a capture of the window to [x, y, w, h], in pixels, which must lie inside it.
+  async captureCrop(windowId, rect, file) {
     const folder = mac.tempFolder("device-ui-");
     try {
       const image = path.join(folder, "window.png");
       await machine.capture(windowId, image);
-      await exec("sips", ["-c", h, w, "--cropOffset", y, x, image, "--out", file]);
+      await helper("crop", image, ...rect, file);
     } finally {
       fs.rmSync(folder, { recursive: true, force: true });
     }
