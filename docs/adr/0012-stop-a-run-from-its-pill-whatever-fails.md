@@ -46,7 +46,9 @@ Stop could fail, leaving a run that still clicked.
    mouse is free. The helper posts a mouse event only while it can tell that the run wasn't
    stopped: the token can be read, and its folder can be written to, so that Stop can remove
    it. Anything else counts as stopped: a token that is gone or can't be read, a folder that
-   is gone or can't be written to. The run reads the token the same way before each press. If
+   is gone or can't be written to. The run reads the token the same way before each press.
+   The helper also posts only while the run that started it lives: a run that a signal
+   killed leaves its token behind, and the border then says that the mouse is free. If
    the token can still be read after Stop tried to remove it, Stop ends the run's helper and
    the run itself by signal: stopping comes before the run's cleanup. Stop has no outcome in
    which the run still clicks.
@@ -96,6 +98,8 @@ Stop could fail, leaving a run that still clicked.
   move is a click on the control: the button went down at the press point and came up where
   the pointer then was. Its error doesn't say `done`, since the drag didn't happen.
 - A run ended by Stop's last resort leaves its tracks in Live.
+- A helper outlives its run only to release a button it holds: a press that hadn't reached
+  its click when the run was killed doesn't click.
 - An interrupt, quit, hangup or termination signal that reaches the helper while it holds the
   button, such as Ctrl-C or Ctrl-\ on the run, is held back until the helper has released the
   button, which it then does at once. It then dies by that signal, except after a quit
