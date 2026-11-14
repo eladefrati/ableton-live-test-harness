@@ -49,9 +49,11 @@ Stop could fail, leaving a run that still clicked.
    is gone or can't be written to. The run reads the token the same way before each press.
    The helper also posts only while the run that started it lives: a run that a signal
    killed leaves its token behind, and the border then says that the mouse is free. If
-   the token can still be read after Stop tried to remove it, Stop ends the run's helper and
-   the run itself by signal: stopping comes before the run's cleanup. Stop has no outcome in
-   which the run still clicks.
+   the token is still there after Stop tried to remove it, Stop ends the run's helper and
+   the run itself by signal, also when the run reads as stopped just then, as with a folder
+   that can't be written to: what made it so may pass, and the token would let the run
+   click again. Stopping comes before the run's cleanup. Stop has no outcome in which the
+   run still clicks.
 6. **A stopped press throws, and says what it had done.** Once the run is stopped the helper
    posts nothing but the release of a button it holds: a press under way stops before its
    hover, before its click or before a drag's move, and a drag stopped before its move ends
