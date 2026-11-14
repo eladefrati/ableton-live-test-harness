@@ -132,7 +132,8 @@ Node 18 or later. See [ADR-0001](../docs/adr/0001-fork-abletonosc.md) for the de
   `.amxd`; `ui.press(name)` or `ui.press(tabName, item)` clicks, `ui.drag(name, {up, right})`
   turns a control by dragging it that many whole points with the button down, in one move
   (ADR-0013; a fraction of a point throws `DeviceUiError`; Auto Filter's knobs turn one of
-  their 126 steps per point up, `live-notes.md`),
+  their 126 steps per point up, and a Max for Live number box in 2-point steps, with the
+  distances to drag it by, `live-notes.md`),
   `ui.choose(name, item)` opens the menu a control opens (a chooser) and clicks the one row
   that reads `item`, closing the menu with Escape if none or two do or anything else fails once the menu's control was clicked (ADR-0014), and `ui.text([x, y, w, h])`
   resolves with the lines shown in that part of the panel, in device units. A press looks

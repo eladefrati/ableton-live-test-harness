@@ -91,11 +91,12 @@ Stop could fail, leaving a run that still clicked.
   ends a run that doesn't handle it.
 - **A shorter or a longer wait before the kill.** It is how long a run that doesn't act on
   the signal can still click, so it is as short as a stopped run's end allows. A press
-  gives up its reads of Live's window at once on Stop, but a stopped run otherwise first
-  finishes the step it is in, since it throws at its next click: `choose` reads its open
-  menu to the end, which took 2.4 s, and a run stopped as that read began ended about 3 s
-  after Stop, the 0.3 s of deleting its tracks included. 5 s left too little room for a
-  check with more to undo; 10 s is about three times what was measured.
+  gives up its reads of Live's window at once on Stop, but the run's process ends only when
+  the read it left running does, measured at 1.8 to 3.4 s after Stop. A stopped
+  run otherwise first finishes the step it is in, since it throws at its next click:
+  `choose` reads its open menu to the end, which took 2.4 s, and a run stopped as that read
+  began ended about 3 s after Stop, the 0.3 s of deleting its tracks included. 5 s left too
+  little room for a check with more to undo; 10 s is about three times what was measured.
 
 ## Consequences
 
