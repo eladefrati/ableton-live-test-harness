@@ -822,8 +822,7 @@ async function failures(test, binaries) {
     let unpressed = "";
     // When the run was stopped, on the clock the target's events carry. For Stop pressed on
     // the pill, when the token went. Where it stays, in Stop's last resort, when the press
-    // was started: it returns only once the overlay has ended or, in its last resort, kept
-    // the press waiting for 1.5 s.
+    // was started, a moment before the overlay signals the run.
     let stoppedAt;
     const pressStop = async (...after) => {
       stoppedAt = Date.now();

@@ -272,10 +272,14 @@ Node 18 or later. See [ADR-0001](../docs/adr/0001-fork-abletonosc.md) for the de
   and compares the helper's exit status and error and the events the window
   received: a click reaches the window, under harness-computer-use's border too; a window
   that comes over the point during a click's
-  hover gets no click; a point under harness-computer-use's pill is refused; a drag is one
+  hover gets no click, and during a drag's no button event; a point under
+  harness-computer-use's pill is refused, for a click and for a drag; a drag by a fraction
+  of a point, or one that would end off the screen, is refused before the pointer moves; a
+  drag is one
   button-down at the point, one drag event at its end with the whole distance in its delta
   fields, and one button-up, where the pointer then is; a helper started after Stop, which
-  removes the token, posts nothing, and so does one whose token's folder is gone or can't be
+  removes the token, posts nothing, for a click or for a drag, and so does one whose token's
+  folder is gone or can't be
   written to, or whose token can't be read, each saying which; one whose run had ended
   before it began, so that process 1 is its parent from its first instruction, posts
   nothing either, and says that its run has ended (`checks/run-orphaned.swift` starts it
@@ -295,22 +299,30 @@ Node 18 or later. See [ADR-0001](../docs/adr/0001-fork-abletonosc.md) for the de
   signal sent to it alone (the overlay then says that the run has ended), for which the
   check posts a notification, whose banner must show. Stop is also pressed on the pill
   itself, through Accessibility (`checks/press-stop.swift`): the overlay removes the token,
-  says Stopped and goes; when the
+  takes the border down and keeps the pill up, its button reading Stopping, while the run
+  goes on (`checks/overlay-state.swift` reads the overlay's windows and that button), and
+  says Stopped only once the run has ended, which the check's run does when the check ends
+  it; when the
   token can't be removed, it signals the check's run, which passes the signal on to its
   helper as a run does: the helper stops as after Stop, the run ends by itself, and only
   then does the overlay say Stopped, as it does when the token's folder can't be written
-  to, where the run reads as stopped already; a run that ignores the signal is killed 10 s
+  to, where the run reads as stopped already; a run that ignores the signal keeps the
+  border up with the pill, is killed 10 s
   after Stop, not sooner, and only then does the overlay say that the run was ended;
   pressed as the run ends, it says
-  that the run has ended. Stop is pressed on the pill during a gesture too, and the overlay
-  says Stopped and goes: at the first move of a click's hover, after which the helper posts
+  that the run has ended. Stop is pressed on the pill during a gesture too, where the pill
+  reads Stopping and the overlay
+  says Stopped once the run has ended: at the first move of a click's hover, after which the helper posts
   nothing more and exits 3; with a click's button down, where the click completes and the
   helper exits 4; and with a drag's button down, before its move, where the button comes up
   and nothing more is posted. The press takes about 0.1 s to remove the token, longer than
   the helper holds a button, so for these three the window suspends the helper at that
   event (SIGSTOP), and the check lets it go on (SIGCONT) once the token is gone. First of
   all the overlay is started with the process id 0, and with -1, for its run: it must
-  refuse, saying nothing and exiting 1 with its usage. In every case
+  refuse, saying nothing and exiting 1 with its usage. Last of all it is started over a run
+  that has ended and that nothing has waited for, which still answers signal 0: it must say
+  that the run has ended, and, after Stop in its last resort, where such a run ends at the
+  signal, Stopped, without waiting to kill it. In every case
   the window may receive
   nothing but a button-up once the run is stopped: where Stop on the pill removed the token,
   from the moment the token went, which is its folder's modification time. Where a stopped
@@ -320,7 +332,7 @@ Node 18 or later. See [ADR-0001](../docs/adr/0001-fork-abletonosc.md) for the de
   suspended with the button down, not before the token went: under that the case fails,
   as it hasn't shown that Stop came before the release. The cases that end under a
   notification's banner come last, each waiting for the banner of the case before to go,
-  and the check takes about 110 s. It takes the
+  and the check takes about 125 s. It takes the
   pointer, so it runs only on the click host and refuses on any other machine, posting
   nothing. A case that leaves the button held releases it and fails.
 

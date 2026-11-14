@@ -34,7 +34,7 @@ thread, for up to 11 s, so the pill could show nothing of it.
    the run has ended.
 5. **The border's program waits for the run's end without holding up its main thread,** in
    the last resort too: it looks for the run on a timer, so the light keeps moving and the
-   pointer over the pill shows no wait cursor.
+   program still answers Accessibility, which it didn't while it waited.
 
 ## Considered
 

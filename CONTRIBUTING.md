@@ -13,8 +13,8 @@ Before a commit that changes anything other than Markdown files, run
 `harness/device-ui.swift` or `harness/computer-use-overlay.swift`, also run
 `node harness/checks/pointer-guards.js` on the click host (Live not needed): the unit tests
 run the helper's callers on fakes, and the helper only where it refuses a drag for its
-distance, so only this check sees what the helper posts, what else it refuses, and what
-Stop on the overlay's pill does.
+distance and where it crops a picture, so only this check sees what the helper posts, what
+else it refuses, and what Stop on the overlay's pill does.
 A commit that changes how Live behaves
 under the harness, or what the harness refuses, adds it to `harness/live-notes.md` in the same commit: the next reader reads that file, not
 code comments or commit messages.

@@ -430,7 +430,7 @@ async function showComputerUse(binary, { shownMs = OVERLAY_SHOWN_MS } = {}) {
     overlay.stderr.destroy();
     overlay.unref();
   }
-  // Not after Stop, when the border goes by itself and the run clicks no more.
+  // Not after Stop, when the run clicks no more.
   const gone = (code, signal) => {
     if (!stopped()) console.error(`warn harness-computer-use's border has gone (${signal ?? `status ${code}`}). The run clicks without it`);
   };
