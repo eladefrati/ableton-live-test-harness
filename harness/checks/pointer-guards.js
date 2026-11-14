@@ -6,7 +6,10 @@
 // window of its own (pointer-target.swift), runs the helper against it, and compares how the
 // helper ended with the mouse events the window received. First it starts the overlay with
 // the process ids it must refuse for a run, and last over a run that has ended and that
-// nothing has waited for. It takes the pointer, so it
+// nothing has waited for. The helper's click and drag at a window are run. Its click-editor
+// and drag-editor aren't: they take only a window of Live's, whose editor they read from
+// Live through Accessibility. Nor is any command run with the screen locked. It takes the
+// pointer, so it
 // refuses, posting nothing, anywhere but on the click host ("clickHost" in
 // harness/local.json). Exits 1 on failure.
 
@@ -120,6 +123,8 @@ const firstMove = (x, y) => ({ x: x - 15, y: y - 10 });
 // A drag 30 points right and 20 up, and the one drag event it posts.
 const drag = (window, x, y) => ["drag", window, x, y, 30, -20];
 const DRAGGED = { type: "drag", dx: 30, dy: -20 };
+// A drag by another distance: one the helper must refuse for it.
+const dragBy = (dx, dy) => (window, x, y) => ["drag", window, x, y, dx, dy];
 
 // Each case: the target's options, whether harness-computer-use's overlay runs, whether the
 // token can't be removed, whether the run ignores the signal of Stop's last resort, whether a
@@ -177,6 +182,44 @@ const CASES = [
     status: 0,
     events: (x, y) => [{ type: "down", x, y }, { type: "up", x, y }],
   },
+  // What a click is refused for, a drag is too: each command calls the helper's guards
+  // itself (device-ui.swift), so each is run against them.
+  {
+    name: "a window that comes over the point during a drag's hover gets no button event, and the helper names it",
+    target: [...RECT, "--cover"],
+    command: drag,
+    status: 1,
+    stderr: /^The window at the point is pointer-target\S* \d+, not \d+$/,
+    events: () => [],
+  },
+  {
+    name: "a drag from a point under harness-computer-use's pill is refused, naming the pill",
+    overlay: true,
+    target: ["--under", PILL_TITLE],
+    command: drag,
+    status: 1,
+    stderr: /^The point is under harness-computer-use's pill$/,
+    events: () => [],
+  },
+  {
+    name: "a drag by a fraction of a point is refused before the pointer moves",
+    target: RECT,
+    command: dragBy(0.5, 0),
+    status: 1,
+    stderr: /^A drag moves whole points, at least 1 on its longer axis and at most 400 on either, not 0\.5, 0\.0$/,
+    moves: () => [],
+    events: () => [],
+  },
+  // 400 points up from the target's centre is above the top of the screen with the menu bar.
+  {
+    name: "a drag that would end off the screen is refused before the pointer moves",
+    target: RECT,
+    command: dragBy(0, -400),
+    status: 1,
+    stderr: /^A drag to \(.+\) ends off screen$/,
+    moves: () => [],
+    events: () => [],
+  },
   {
     name: "a drag's events: one down at the point, one drag at the end with the whole distance, one up",
     target: RECT,
@@ -196,6 +239,15 @@ const CASES = [
     target: RECT,
     stopped: true,
     command: click,
+    status: STOPPED,
+    stderr: stoppedError(),
+    events: () => [],
+  },
+  {
+    name: "a helper started after Stop for a drag posts nothing",
+    target: RECT,
+    stopped: true,
+    command: drag,
     status: STOPPED,
     stderr: stoppedError(),
     events: () => [],
