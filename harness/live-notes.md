@@ -444,6 +444,17 @@ unexpected.
   2 of 2 (remote Mac, Live 12.4.25b1, 2026-11-14).
 - While the remote Mac's display sleeps, `screencapture -l` fails with "could not create image from
   window", and the session reports the screen locked until the display wakes.
+- `ui.capture` crops its capture of Live's window with the helper's `crop`, as a capture of
+  a plug-in's editor does, no longer with `sips`. The helper's crop gave its PNG no
+  resolution, which reads as 72 dpi, where the capture has 144 and a crop by `sips` kept
+  it: a plug-in's editor came out 888 x 160 px at 72 dpi, and Auto Filter's panel, cropped
+  by `sips`, 900 x 384 px at 144. The crop now gives its PNG the capture's resolution, and
+  both came out at 144 dpi, the same sizes in pixels (`sips -g dpiWidth`; remote Mac, Live
+  12.4.25b1, 2026-11-14). It takes its rectangle in points and rounds each edge to a pixel:
+  with the left edge and the width each rounded, a rectangle inside the image could end a
+  pixel past its edge and be refused. A device whose frame isn't wholly inside Live's
+  window is refused before anything is captured, with an error that names it and says to
+  bring it into view (unit tests; not made to happen in Live).
 - A Live started while the display slept never redrew its window: with the LOM at 2 tracks,
   captures of the window and of the whole screen showed the 1 track it opened with, and
   waking the display, bringing Live to the front and resizing its window changed nothing.

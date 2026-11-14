@@ -64,7 +64,7 @@ function fakeMachine({ info = "Button", titles = [line(`> ${TITLE}`, 1800, 1400)
     focus: async () => { calls.push("focus"); onFocus(calls); },
     window: async () => WINDOW,
     read: async () => ({ width: 2880, lines: [line(info, 26, 1400), ...titles, line("text", 2000, 1560)] }),
-    captureCrop: async (id, rect, file) => { calls.push(["crop", id, rect, file]); },
+    captureRect: async (id, width, rect, file) => { calls.push(["capture", id, width, rect, file]); },
     hover: async (id, x, y) => { calls.push(["hover", id, x, y]); },
     click: async (id, x, y) => { calls.push(["click", id, x, y]); },
     drag: async (id, x, y, dx, dy) => { calls.push(["drag", id, x, y, dx, dy]); },
@@ -436,7 +436,7 @@ test("a press and a drag that Stop caught with only the release left reject with
 
 // The machine's calls that never move the pointer or press its button, so need no permit.
 const OTHER_CALLS = [
-  "hostname", "clickHost", "ask", "buildComputerUse", "showComputerUse", "stopped", "wake", "focus", "window", "windows", "capture", "read", "captureCrop",
+  "hostname", "clickHost", "ask", "buildComputerUse", "showComputerUse", "stopped", "wake", "focus", "window", "windows", "capture", "read",
   "pluginWindow", "editor", "frontmost", "escape", "escapeIfInFront", "giveBack", "captureRect",
 ];
 
@@ -621,21 +621,44 @@ test("with neither build nor controls, a device the harness hasn't measured is r
   await assert.rejects(openDeviceUi(fakeLive("Compressor2"), { track: 1, device: 1 }, fakeMachine()), /no measured points for .* \(Compressor2\)/);
 });
 
-test("capture crops the window to the device's frame, in pixels, its width from the build", async () => {
-  const system = fakeMachine();
+// A device's title `x`, `y` pixels into the window's capture, and where its frame then starts,
+// in points from the window's top. The device the other tests press is too low in the window
+// for a capture: its frame, 192 points high, ends 11 points below the window.
+const titleAt = (x, y) => ({ titles: [line(`> ${TITLE}`, x, y)] });
+const frameTop = (y) => y / 2 + 14 - 20;
+
+test("capture crops the window to the device's frame, in points from the window's corner, its width from the build", async () => {
+  const system = fakeMachine(titleAt(1800, 1300));
   const ui = await open(system);
   await ui.capture("/out/device.png");
-  const rect = [PANEL.x - 5, PANEL.y - 25 - 20, 260 + 22, 192].map((points) => String(Math.round(points * 2)));
-  assert.deepEqual(system.calls, [["crop", 7, rect, "/out/device.png"]]);
+  assert.deepEqual(system.calls, [["capture", 7, 1440, [PANEL.x - 5, frameTop(1300), 260 + 22, 192], "/out/device.png"]]);
 });
 
 test("capture uses the width given, and refuses a device whose width isn't known", async () => {
-  const system = fakeMachine();
+  const system = fakeMachine(titleAt(1800, 1300));
   const given = await openDeviceUi(fakeLive(), { track: 1, device: 1, controls: {}, width: 300 }, system);
   await given.capture("/out/device.png");
-  assert.equal(system.calls[0][2][2], String((300 + 22) * 2));
+  assert.equal(system.calls[0][3][2], 300 + 22);
   const unknown = await openDeviceUi(fakeLive(), { track: 1, device: 1, controls: {} }, system);
   await assert.rejects(unknown.capture("/out/device.png"), /give openDeviceUi a width/);
+});
+
+test("capture takes a device whose frame ends at the window's edge", async () => {
+  // The frame's bottom at 875 points, the window's height.
+  const system = fakeMachine(titleAt(1800, 1378));
+  await (await open(system)).capture("/out/device.png");
+  assert.deepEqual(system.calls.map((call) => call[3][1] + call[3][3]), [875]);
+});
+
+test("capture refuses a device whose frame isn't wholly inside Live's window, naming it and saying to bring it into view, and captures nothing", async () => {
+  // Below the window's bottom edge, past its right edge, and above its top.
+  for (const where of [titleAt(1800, 1400), titleAt(2400, 1300), titleAt(1800, 10)]) {
+    const system = fakeMachine(where);
+    const ui = await open(system);
+    await assert.rejects(ui.capture("/out/device.png"), (error) => error instanceof DeviceUiError
+      && error.message === `${TITLE} isn't wholly inside Live's window: bring the whole device into view. Not captured`);
+    assert.deepEqual(system.calls, []);
+  }
 });
 
 const pluginLive = (className = "AuPluginDevice") => ({
@@ -1413,4 +1436,63 @@ test("the helper refuses a drag under 1 point or by a fraction of a point", { sk
   for (const [dx, dy] of [[0, -1e-15], [0, -0.4], [0.9, 0], [0.5, -0.5], [0, -1.4], [0, -10.5], [7.5, -3]]) {
     await assert.rejects(tools.run(helper, ["drag", -1, 100, 100, dx, dy]), /whole points, at least 1 on its longer axis and at most 400 on either/);
   }
+});
+
+// A PNG's chunk, and a grey PNG `width` x `height` pixels that gives its resolution as
+// `perMetre` pixels, both ways.
+function pngChunk(type, data) {
+  const body = Buffer.concat([Buffer.from(type), data]);
+  let crc = 0xffffffff;
+  for (const byte of body) {
+    crc ^= byte;
+    for (let bit = 0; bit < 8; bit++) crc = (crc >>> 1) ^ (crc & 1 ? 0xedb88320 : 0);
+  }
+  const [length, check] = [Buffer.alloc(4), Buffer.alloc(4)];
+  length.writeUInt32BE(data.length);
+  check.writeUInt32BE((crc ^ 0xffffffff) >>> 0);
+  return Buffer.concat([length, body, check]);
+}
+function png(width, height, perMetre) {
+  const [header, resolution] = [Buffer.alloc(13), Buffer.alloc(9)];
+  header.writeUInt32BE(width, 0);
+  header.writeUInt32BE(height, 4);
+  header[8] = 8; // bits per pixel, of the one grey channel
+  resolution.writeUInt32BE(perMetre, 0);
+  resolution.writeUInt32BE(perMetre, 4);
+  resolution[8] = 1; // per metre
+  const rows = require("node:zlib").deflateSync(Buffer.alloc(height * (1 + width), 0x80));
+  return Buffer.concat([
+    Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+    pngChunk("IHDR", header), pngChunk("pHYs", resolution), pngChunk("IDAT", rows), pngChunk("IEND", Buffer.alloc(0)),
+  ]);
+}
+
+// A PNG file's size in pixels and the resolution it gives, in pixels per metre, null if it
+// gives none.
+function pngSize(file) {
+  const bytes = fs.readFileSync(file);
+  const size = { width: bytes.readUInt32BE(16), height: bytes.readUInt32BE(20), perMetre: null };
+  for (let at = 8; at < bytes.length; at += 12 + bytes.readUInt32BE(at)) {
+    if (bytes.toString("latin1", at + 4, at + 8) === "pHYs") size.perMetre = bytes.readUInt32BE(at + 8);
+  }
+  return size;
+}
+
+// Runs the real helper on a 20 x 10 pixel image at 144 dpi, 5669 pixels per metre, as a
+// capture of a window 10 points wide on a display with 2 pixels per point.
+test("the helper's crop keeps the image's resolution, takes the rectangle in points and rounds each of its edges to a pixel", {
+  skip: !hasDeveloperTools && "no developer tools", timeout: 300000,
+}, async (t) => {
+  const helper = await tools.helperBinary(path.join(__dirname, "..", "device-ui.swift"));
+  const folder = fs.mkdtempSync(path.join(os.tmpdir(), "device-ui-test-"));
+  t.after(() => fs.rmSync(folder, { recursive: true, force: true }));
+  const [image, out] = [path.join(folder, "image.png"), path.join(folder, "out.png")];
+  fs.writeFileSync(image, png(20, 10, 5669));
+  await tools.run(helper, ["crop", image, 10, 2, 1, 6, 3, out]);
+  assert.deepEqual(pngSize(out), { width: 12, height: 6, perMetre: 5669 });
+  // Inside the image, from pixel 0.5 to pixel 20: pixels 1 to 20, 19 wide. Its width rounded
+  // by itself is 20 pixels, which from pixel 1 would end one past the image's edge.
+  await tools.run(helper, ["crop", image, 10, 0.25, 0, 9.75, 5, out]);
+  assert.deepEqual(pngSize(out), { width: 19, height: 10, perMetre: 5669 });
+  await assert.rejects(tools.run(helper, ["crop", image, 10, 5, 0, 6, 5, out]), /isn't inside the 10(\.0)? x 5(\.0)? point image/);
 });

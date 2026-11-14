@@ -11,8 +11,10 @@
 //                                     {"id", "x", "y", "w", "h", "editor": {"x", "y", "w", "h"}}
 //   device-ui text <png>              the text in an image, in pixels: {"width", "lines":
 //                                     [{"text", "x", "y", "w", "h", "words": [{"text", "x"}]}]}
-//   device-ui crop <png> <x> <y> <w> <h> <out>
-//                                     saves the rectangle of the image, in pixels, as a PNG
+//   device-ui crop <png> <width> <x> <y> <w> <h> <out>
+//                                     saves the rectangle of the image as a PNG of the image's
+//                                     resolution: <x> <y> <w> <h> in points of an image that
+//                                     is <width> points wide, as a window's capture is
 //   device-ui hover <window> <x> <y>  moves the pointer to a point on the screen, in points
 //   device-ui click <window> <x> <y>  moves the pointer there, presses and releases
 //   device-ui click-editor <title> <x> <y> <w> <h>
@@ -261,17 +263,29 @@ func text(in path: String) {
     printJSON(["width": image.width, "lines": lines])
 }
 
+// Saves the rectangle `rect` of an image as a PNG: in points of an image `width` points
+// wide, as a capture of a window is of its window. Each edge is rounded to a pixel by
+// itself, so that a rectangle inside the image in points is inside it in pixels: its size
+// rounded by itself could end it a pixel past the edge. The PNG is given the image's
+// resolution, which a capture carries (144 dpi on a display of 2 pixels per point): a PNG
+// that gives none reads as 72 dpi, twice the size.
 // sips can't do this: it leaves an image whole, with no error, when the rectangle starts
 // below the top and reaches the bottom edge, as a plug-in's editor does in its window
 // (sips-316, macOS 26).
-func crop(_ path: String, _ rect: CGRect, to out: String) {
+func crop(_ path: String, width: Double, _ rect: CGRect, to out: String) {
     guard let source = CGImageSourceCreateWithURL(URL(fileURLWithPath: path) as CFURL, nil),
           let image = CGImageSourceCreateImageAtIndex(source, 0, nil) else { fail("Cannot read \(path)") }
-    guard CGRect(x: 0, y: 0, width: image.width, height: image.height).contains(rect), let part = image.cropping(to: rect)
-    else { fail("\(rect) isn't inside the \(image.width) x \(image.height) image \(path)") }
+    let scale = Double(image.width) / width
+    let (left, top) = ((rect.minX * scale).rounded(), (rect.minY * scale).rounded())
+    let pixels = CGRect(x: left, y: top, width: (rect.maxX * scale).rounded() - left, height: (rect.maxY * scale).rounded() - top)
+    guard pixels.width >= 1, pixels.height >= 1, CGRect(x: 0, y: 0, width: image.width, height: image.height).contains(pixels),
+          let part = image.cropping(to: pixels)
+    else { fail("\(rect) isn't inside the \(width) x \(Double(image.height) / scale) point image \(path)") }
     guard let destination = CGImageDestinationCreateWithURL(URL(fileURLWithPath: out) as CFURL, "public.png" as CFString, 1, nil)
     else { fail("Cannot write \(out)") }
-    CGImageDestinationAddImage(destination, part, nil)
+    let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any] ?? [:]
+    let resolution = properties.filter { $0.key == kCGImagePropertyDPIWidth || $0.key == kCGImagePropertyDPIHeight }
+    CGImageDestinationAddImage(destination, part, resolution as CFDictionary)
     if !CGImageDestinationFinalize(destination) { fail("Cannot write \(out)") }
 }
 
@@ -516,9 +530,9 @@ case "text":
     guard arguments.count == 3 else { fail("usage: device-ui text <png>") }
     text(in: arguments[2])
 case "crop":
-    let numbers = arguments.dropFirst(3).prefix(4).compactMap { Double($0) }
-    guard arguments.count == 8, numbers.count == 4 else { fail("usage: device-ui crop <png> <x> <y> <w> <h> <out>") }
-    crop(arguments[2], CGRect(x: numbers[0], y: numbers[1], width: numbers[2], height: numbers[3]), to: arguments[7])
+    let numbers = arguments.dropFirst(3).prefix(5).compactMap { Double($0) }
+    guard arguments.count == 9, numbers.count == 5, numbers[0] > 0 else { fail("usage: device-ui crop <png> <width> <x> <y> <w> <h> <out>") }
+    crop(arguments[2], width: numbers[0], CGRect(x: numbers[1], y: numbers[2], width: numbers[3], height: numbers[4]), to: arguments[8])
 case "hover":
     let (id, point) = pointer()
     requireUnlocked()
@@ -562,7 +576,7 @@ case "drag":
     aim(id, point)
     drag(point, by: delta)
 default:
-    fail("usage: device-ui window | windows | text <png> | crop <png> <x> <y> <w> <h> <out> | hover <window> <x> <y> | click <window> <x> <y> | "
+    fail("usage: device-ui window | windows | text <png> | crop <png> <width> <x> <y> <w> <h> <out> | hover <window> <x> <y> | click <window> <x> <y> | "
         + "plugin-window state|open|close <device> | plugin-editor <title> | click-editor <title> <x> <y> <w> <h> | "
         + "drag <window> <x> <y> <dx> <dy> | drag-editor <title> <x> <y> <w> <h> <dx> <dy>")
 }

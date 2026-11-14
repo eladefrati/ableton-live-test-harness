@@ -154,7 +154,9 @@ Node 18 or later. See [ADR-0001](../docs/adr/0001-fork-abletonosc.md) for the de
   come from the harness's own measurements (`MEASURED_DEVICES`, by class name): Auto Filter's
   knobs, named as its parameters (`Frequency`, `Resonance`, `Dry/Wet` and the others).
   `ui.capture(file)` saves a PNG of the device, title bar and frame included, from a capture
-  of Live's window; its width comes from the build, the measured device or `width`.
+  of Live's window; its width comes from the build, the measured device or `width`. A device
+  whose frame isn't wholly inside Live's window throws `DeviceUiError`, which says to bring
+  it into view.
   A plug-in's own window, where its editor opens (ADR-0008):
   `openPluginWindow(live, {track, device, size, controls})` selects the device and opens the
   window if it isn't open (through Accessibility, no pointer), and resolves with an object

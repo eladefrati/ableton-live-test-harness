@@ -472,17 +472,6 @@ const machine = {
       fs.rmSync(folder, { recursive: true, force: true });
     }
   },
-  // Crops a capture of the window to [x, y, w, h], in pixels.
-  async captureCrop(windowId, [x, y, w, h], file) {
-    const folder = mac.tempFolder("device-ui-");
-    try {
-      const image = path.join(folder, "window.png");
-      await machine.capture(windowId, image);
-      await exec("sips", ["-c", h, w, "--cropOffset", y, x, image, "--out", file]);
-    } finally {
-      fs.rmSync(folder, { recursive: true, force: true });
-    }
-  },
   hover: (windowId, x, y) => helper("hover", windowId, x, y),
   click: (windowId, x, y) => helper("click", windowId, x, y),
   drag: (windowId, x, y, dx, dy) => helper("drag", windowId, x, y, dx, dy),
@@ -499,15 +488,14 @@ const machine = {
   escape: (refuse) => mac.typeInLive("key code 53", { refuse }),
   escapeIfInFront: () => mac.typeIfLiveInFront("key code 53"),
   giveBack: (id) => mac.giveBackFront(id),
-  // Crops a capture of the window, `width` points wide, to [x, y, w, h] in points.
+  // Crops a capture of the window, `width` points wide, to [x, y, w, h] in points from its
+  // top left, which must lie inside it. The helper crops, at the capture's resolution.
   async captureRect(windowId, width, rect, file) {
     const folder = mac.tempFolder("device-ui-");
     try {
       const image = path.join(folder, "window.png");
       await machine.capture(windowId, image);
-      const pixels = Number(/pixelWidth: (\d+)/.exec(await exec("sips", ["-g", "pixelWidth", image]))?.[1]);
-      if (!pixels) throw new DeviceUiError(`Could not read the width of ${image}`);
-      await helper("crop", image, ...rect.map((points) => Math.round((points * pixels) / width)), file);
+      await helper("crop", image, width, ...rect, file);
     } finally {
       fs.rmSync(folder, { recursive: true, force: true });
     }
@@ -792,17 +780,18 @@ class DeviceUi {
   }
 
   // Saves a picture of the device, its title bar and frame included, to `file` (PNG). Like
-  // ui.text, it rests on the device being selected and its title unique on screen.
+  // ui.text, it rests on the device being selected and its title unique on screen. A device
+  // whose frame isn't wholly inside Live's window is refused before anything is captured:
+  // its picture would be cut off.
   async capture(file) {
     if (!this.width) throw new DeviceUiError(`The width of ${this.title}'s panel isn't known: give openDeviceUi a width`);
     const at = await this.locate();
-    const rect = [
-      at.x - at.window.x - FRAME.left,
-      at.y - at.window.y - FRAME.top,
-      this.width + FRAME.left + FRAME.right,
-      FRAME.height,
-    ].map((points) => String(Math.round(points * at.scale)));
-    await this.system.captureCrop(at.window.id, rect, file);
+    const [x, y] = [at.x - at.window.x - FRAME.left, at.y - at.window.y - FRAME.top];
+    const [w, h] = [this.width + FRAME.left + FRAME.right, FRAME.height];
+    if (x < 0 || y < 0 || x + w > at.window.w || y + h > at.window.h) {
+      throw new DeviceUiError(`${this.title} isn't wholly inside Live's window: bring the whole device into view. Not captured`);
+    }
+    await this.system.captureRect(at.window.id, at.window.w, [x, y, w, h], file);
   }
 }
 
