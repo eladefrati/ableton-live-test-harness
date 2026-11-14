@@ -23,7 +23,7 @@
 //                                     as click and click-editor, but with the button down
 //                                     moves the pointer by <dx>, <dy> whole points (right,
 //                                     down) in one move, and releases the button where the
-//                                     pointer then is (ADR-0010)
+//                                     pointer then is (ADR-0013)
 //
 // hover, click and drag refuse, posting nothing, unless the screen is unlocked and <window> is
 // the topmost window at the point, which a click and a drag check again after their hover,
@@ -32,7 +32,7 @@
 // 1 on its longer axis and at most MAX_DRAG on either, and ends on a screen. Exits 1 with the
 // reason on stderr if anything fails.
 //
-// Once the run is stopped (ADR-0009: the file named in HARNESS_COMPUTER_USE_STOP exists),
+// Once the run is stopped (ADR-0012: the file named in HARNESS_COMPUTER_USE_STOP exists),
 // hover, click and drag post nothing but the release of a button this helper holds, and exit
 // 3 saying so. A click or a drag with only that release left has happened: the helper posts
 // it and exits 0. A helper that fails, or is sent SIGINT, SIGQUIT, SIGTERM or SIGHUP, while it
@@ -42,7 +42,7 @@ import ApplicationServices
 import Foundation
 import Vision
 
-// Stop (ADR-0009). The run names its stop marker in HARNESS_COMPUTER_USE_STOP, and the pill's
+// Stop (ADR-0012). The run names its stop marker in HARNESS_COMPUTER_USE_STOP, and the pill's
 // Stop creates that file.
 let STOP_MARKER = ProcessInfo.processInfo.environment["HARNESS_COMPUTER_USE_STOP"]
 let STOPPED_STATUS: Int32 = 3
@@ -242,7 +242,7 @@ func requireUnlocked() {
 // Every window on screen that can take a click, front to back: all layers, since a floating
 // window (a plug-in's, layer 3) or the menu bar covers Live's main window, but none from the
 // cursor's layer up, as the cursor is a window too and sits on the point after a hover. Nor
-// harness-computer-use's own overlay (computer-use-overlay.swift, ADR-0009), which covers the
+// harness-computer-use's own overlay (computer-use-overlay.swift, ADR-0012), which covers the
 // screen and lets every click through: its title, and its program's name, cut short as macOS
 // reports it.
 func clickableWindows() -> [[String: Any]] {
@@ -257,7 +257,7 @@ func isOverlay(_ window: [String: Any]) -> Bool {
         && (window[kCGWindowOwnerName as String] as? String ?? "").hasPrefix("computer-use-overlay")
 }
 
-// harness-computer-use's pill (ADR-0009), which takes clicks, so the guard doesn't skip it.
+// harness-computer-use's pill (ADR-0012), which takes clicks, so the guard doesn't skip it.
 func isPill(_ window: [String: Any]) -> Bool {
     (window[kCGWindowName as String] as? String) == "harness-computer-use pill"
         && (window[kCGWindowOwnerName as String] as? String ?? "").hasPrefix("computer-use-overlay")
@@ -366,7 +366,7 @@ func post(_ type: CGEventType, _ point: CGPoint, moved: CGVector? = nil) {
     }
 }
 
-// The longest drag either way, in points (ADR-0010).
+// The longest drag either way, in points (ADR-0013).
 let MAX_DRAG = 400.0
 
 // Refuses a drag from `point` by `delta`, before any event is posted, unless it moves whole

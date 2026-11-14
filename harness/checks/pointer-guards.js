@@ -25,7 +25,7 @@ const EVENT_WAIT_MS = 300;
 // How long Notification Center takes to cover the screen once a notification is posted.
 const BANNER_WAIT_MS = 1000;
 
-// The stop marker every helper here is given, as a run's helpers are (ADR-0009). Each case
+// The stop marker every helper here is given, as a run's helpers are (ADR-0012). Each case
 // starts without it.
 const MARKER = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "pointer-guards-")), "stopped");
 process.on("exit", () => fs.rmSync(path.dirname(MARKER), { recursive: true, force: true }));

@@ -1,4 +1,4 @@
-// Shows that harness-computer-use holds the mouse (ADR-0009): a breathing purple glow in from
+// Shows that harness-computer-use holds the mouse (ADR-0012): a breathing purple glow in from
 // the edges of every screen and a pill naming the run, until the process <pid> exits, then a
 // notification that the mouse is free again. The pill's Stop creates the file <stop-marker>,
 // after which the run and its helper post nothing but the release of a button the helper

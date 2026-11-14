@@ -10,8 +10,8 @@
 //   const ui = await openDeviceUi(live, { track, device, build: "/path/to/Device.amxd" });
 //   await ui.press("Button");
 //   await ui.press("Tab", "B");            // one item of a live.tab
-//   await ui.drag("Knob", { up: 40 });     // turns a control: whole points with the button down (ADR-0010)
-//   await ui.choose("Menu", "Item");       // an item of the menu a control opens (ADR-0011)
+//   await ui.drag("Knob", { up: 40 });     // turns a control: whole points with the button down (ADR-0013)
+//   await ui.choose("Menu", "Item");       // an item of the menu a control opens (ADR-0014)
 //   await ui.text([0, 0, 200, 100]);       // the text shown in part of the panel, device units
 //   await ui.capture("/path/to/device.png"); // the device, title bar and frame included
 //
@@ -271,12 +271,12 @@ async function askToClick(script) {
   return /button returned:Allow/.test(answer) && !/gave up:true/.test(answer);
 }
 
-// harness-computer-use's overlay (ADR-0009): a purple border around the screen until this
+// harness-computer-use's overlay (ADR-0012): a purple border around the screen until this
 // process ends, then a notification. It watches this process itself, so it goes also when the
 // run is killed.
 const OVERLAY_SOURCE = path.join(__dirname, "computer-use-overlay.swift");
 
-// The run's stop marker (ADR-0009), the file the pill's Stop creates: one for the run, named
+// The run's stop marker (ADR-0012), the file the pill's Stop creates: one for the run, named
 // when first needed and kept here, so that Stop on any pill the run shows stops it. Exported
 // for the tests: creating the file can only stop a run.
 let stopMarkerPath = null;
@@ -443,9 +443,9 @@ const allowed = new WeakSet();
 
 // Before a run's first hover: on the click host at once, on any other machine after the
 // person at it allows the run's clicks (ADR-0006). The answer holds for the rest of the run,
-// and while it does a purple border shows there (ADR-0009), built before the person is asked.
+// and while it does a purple border shows there (ADR-0012), built before the person is asked.
 // The border only informs: a run that can't show it still clicks, with a warning. After Stop
-// on the pill (ADR-0009) it throws: the run goes on, so a check fails there and still cleans
+// on the pill (ADR-0012) it throws: the run goes on, so a check fails there and still cleans
 // up.
 async function permit(system) {
   if (!allowed.has(system)) {
@@ -512,7 +512,7 @@ function rowsReading(lines, item, tolerance) {
   });
 }
 
-// The longest drag either way, in points (ADR-0010); device-ui.swift holds the same limit.
+// The longest drag either way, in points (ADR-0013); device-ui.swift holds the same limit.
 const MAX_DRAG = 400;
 
 // { up, right } in whole points as the helper's [dx, dy] (right, down), refused before
@@ -573,14 +573,14 @@ class DeviceUi {
   }
 
   // Drags a control by { up, right } whole points with the button down, after the same checks
-  // as a press (ADR-0010): a knob turns with up, a horizontal slider with right.
+  // as a press (ADR-0013): a knob turns with up, a horizontal slider with right.
   async drag(name, distance) {
     const [dx, dy] = dragDistance(distance);
     const { window, x, y } = await this.aim(name);
     await this.system.drag(window, x, y, dx, dy);
   }
 
-  // Opens the menu `name` and clicks its item `item`, confirmed by its text (ADR-0011): the
+  // Opens the menu `name` and clicks its item `item`, confirmed by its text (ADR-0014): the
   // menu's own window is read, and exactly one row must read `item`. Whatever fails once the
   // menu's control was clicked, the menu is closed with Escape (after Stop, only while Live
   // is still in front) and nothing more is clicked.
@@ -732,7 +732,7 @@ class PluginWindow {
     await this.system.clickEditor(this.title, x, y, this.size);
   }
 
-  // Drags a control by { up, right } whole points with the button down (ADR-0010). The helper
+  // Drags a control by { up, right } whole points with the button down (ADR-0013). The helper
   // checks the start as for a click.
   async drag(name, distance) {
     const [dx, dy] = dragDistance(distance);
