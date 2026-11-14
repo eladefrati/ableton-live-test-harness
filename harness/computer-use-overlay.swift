@@ -2,7 +2,7 @@
 // the edges of every screen and a pill naming the run, until the process <pid> exits, then a
 // notification that the mouse is free again. The pill's Stop removes the file <click-token>,
 // without which the run and its helper post nothing but the release of a button the helper
-// holds, and takes all of this down at once. If the token can still be read after that, Stop
+// holds, and takes all of this down at once. If the token is still there after that, Stop
 // ends the run's helpers and the run by signal instead. The glow lets every click through;
 // nothing here takes the front.
 //
@@ -98,15 +98,6 @@ func notify(_ message: String) {
     exit(0)
 }
 
-// Whether the run may still click, as device-ui.swift and device-ui.js read it (ADR-0012):
-// its token can be opened for reading, and the token's folder written to and searched.
-func mayClick(_ token: String) -> Bool {
-    guard access((token as NSString).deletingLastPathComponent, W_OK | X_OK) == 0 else { return false }
-    let file = open(token, O_RDONLY)
-    if file >= 0 { close(file) }
-    return file >= 0
-}
-
 // Sends SIGTERM to the helpers the run has started: its child processes named as tools.js
 // names device-ui.swift's binary. A helper that holds the button releases it first.
 func endHelpers(of run: pid_t) {
@@ -122,8 +113,8 @@ func endHelpers(of run: pid_t) {
 // How long the run has to die by SIGTERM before it is killed.
 let TERMINATE_SECONDS = 2.0
 
-// Stop's last resort (ADR-0012), for a run that could still click after Stop tried to remove
-// its token: ends the run's helpers and the run by signal. The run is suspended while its
+// Stop's last resort (ADR-0012), for a run whose token is still there after Stop tried to
+// remove it: ends the run's helpers and the run by signal. The run is suspended while its
 // helpers are found, so that it starts none meanwhile, and again before it is killed, as one
 // that outlives SIGTERM may have started more.
 func endRun(_ run: pid_t) {
@@ -150,13 +141,16 @@ final class Stopper: NSObject {
     init(target: pid_t, token: String, name: String) { (self.target, self.token, self.name) = (target, token, name) }
     @objc func stop() {
         // The token first: once it is gone the run's helper posts nothing but a release, so
-        // the notification is true when it shows.
-        unlink(token)
+        // the notification is true when it shows. It is gone if this removed it, or if it or
+        // its folder had gone already. Whether the run can read it doesn't count: with a
+        // folder that can't be written to the run reads as stopped, but what made it so may
+        // pass, and the token would let the run click again.
+        let gone = unlink(token) == 0 || errno == ENOENT
         MainActor.assumeIsolated {
             // A run that has ended has nothing left to stop, whatever became of its token: it
             // removes the token's folder a moment before this program notices it has gone.
             if kill(target, 0) != 0 { finish(RUN_ENDED) }
-            if !mayClick(token) { finish("Stopped: \(name.isEmpty ? "the run" : name) won't click again. The mouse is yours.") }
+            if gone { finish("Stopped: \(name.isEmpty ? "the run" : name) won't click again. The mouse is yours.") }
             endRun(target)
             finish("\(name.isEmpty ? "The run" : name) was ended: its click token couldn't be removed. The mouse is yours.")
         }

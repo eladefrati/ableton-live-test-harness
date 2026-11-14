@@ -308,8 +308,8 @@ function clickToken() {
 // Why the run may click no more, or null while it may: while its token can be opened for
 // reading and the token's folder can be written to and searched, so that Stop can remove the
 // token. Anything else counts as stopped, since the run can't tell that it wasn't;
-// device-ui.swift and computer-use-overlay.swift read the token the same way. A run with no
-// token, one that showed no border, has no Stop to obey.
+// device-ui.swift reads the token the same way. A run with no token, one that showed no
+// border, has no Stop to obey.
 function stopped(token = clickTokenPath) {
   if (token === null) return null;
   const folder = path.dirname(token);

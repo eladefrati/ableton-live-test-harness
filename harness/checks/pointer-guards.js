@@ -245,19 +245,16 @@ const CASES = [
     events: () => [],
   },
   {
-    name: "the token's folder made unwritable while the helper waits for a notification's cover to go: it leaves the wait, and Stop on the pill, "
-      + "which can't remove the token, says Stopped and takes the border down",
-    overlay: true,
+    name: "the token's folder made unwritable while the helper waits for a notification's cover to go: it leaves the wait, posting nothing",
     banner: true,
     target: RECT,
     stopAfterMs: 1000,
-    loss: (the) => { folderUnwritable(); return the.pressStop(); },
+    loss: folderUnwritable,
     command: click,
     status: STOPPED,
     stderr: stoppedError(FOLDER_UNWRITABLE),
     withinMs: 2500,
     events: () => [],
-    says: SAID_STOPPED,
   },
   {
     name: "the run killed while the helper waits for a notification's cover to go: the helper leaves the wait and ends, posting nothing, "
@@ -312,6 +309,17 @@ const CASES = [
     events: () => [],
     says: SAID_ENDED_RUN,
     run: "SIGKILL",
+  },
+  {
+    name: "Stop on the pill when the token's folder can't be written to, where the run reads as stopped already: "
+      + "the overlay ends the run all the same, and says so",
+    overlay: true,
+    target: RECT,
+    stopped: true,
+    loss: (the) => { folderUnwritable(); return the.pressStop(); },
+    events: () => [],
+    says: SAID_ENDED_RUN,
+    run: "SIGTERM",
   },
   {
     name: "Stop on the pill once the run has ended says that the run has ended, not Stopped",

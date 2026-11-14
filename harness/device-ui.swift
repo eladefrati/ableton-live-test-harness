@@ -60,9 +60,9 @@ let RUN = getppid()
 // Why this helper may post no more, or nil while it may: while the run that started it is
 // still its parent, and the token can be opened for reading and its folder can be written to
 // and searched, so that Stop can remove the token. Anything else counts as stopped, since the
-// helper can't tell that the run wasn't; device-ui.js and computer-use-overlay.swift read the
-// token the same way. A helper given no token, as on the click host, has no Stop to obey, and
-// still posts no more once its run has ended.
+// helper can't tell that the run wasn't; device-ui.js reads the token the same way. A helper
+// given no token, as on the click host, has no Stop to obey, and still posts no more once its
+// run has ended.
 func stopped() -> String? {
     // Process 1 from the start is a run that ended before the helper got going.
     if RUN == 1 || getppid() != RUN { return "harness-computer-use's run has ended: this helper clicks no more" }

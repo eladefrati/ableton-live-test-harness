@@ -270,20 +270,22 @@ Node 18 or later. See [ADR-0001](../docs/adr/0001-fork-abletonosc.md) for the de
   drag holds the button brings it up before the helper dies by SIGTERM, or exits with status
   131 after SIGQUIT;
   Stop while the helper waits under a notification's banner ends the wait, and so does the
-  loss of the token's folder, and so does the run killed, by a signal sent to it alone (the
-  overlay then says that the run has ended), for which the
+  loss of the token's folder, removed or made unwritable, and so does the run killed, by a
+  signal sent to it alone (the overlay then says that the run has ended), for which the
   check posts a notification, whose banner must show. Stop is also pressed on the pill
   itself, through Accessibility (`checks/press-stop.swift`): the overlay removes the token,
-  says Stopped and goes, as it does when the token's folder can't be written to; when the
+  says Stopped and goes; when the
   token can't be removed, it ends the helper and the run by signal, and kills a run that
-  outlives SIGTERM; pressed as the run ends, it says that the run has ended. In every case
+  outlives SIGTERM; when the token's folder can't be written to, where the run reads as
+  stopped already, it ends the run by signal all the same; pressed as the run ends, it says
+  that the run has ended. In every case
   the window may receive
   nothing but a button-up once the run is stopped. Where a stopped click or drag must
   complete, the button-up must reach the window at least half the helper's hold after the
   token was removed (35 ms in a click, 25 ms after a drag's move): under that the case fails,
   as it hasn't shown that Stop came before the release. The cases that end under a
   notification's banner come last, each waiting for the banner of the case before to go,
-  and the check takes about 75 s. It takes the
+  and the check takes about 80 s. It takes the
   pointer, so it runs only on the click host and refuses on any other machine, posting
   nothing. A case that leaves the button held releases it and fails.
 

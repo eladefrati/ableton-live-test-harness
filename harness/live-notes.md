@@ -199,9 +199,16 @@ unexpected.
   `checks/press-stop.swift` does) was taken as a click on it: the overlay removed the token,
   said Stopped 0.09 s after the press was started and was gone 0.3 s later, once its
   notification was posted. The press itself returned -25204 (cannot complete) in 2 of 2, as
-  the overlay ended before it answered. With the folder unwritable, where Stop couldn't
-  remove the token, the overlay said Stopped all the same, the run being stopped already
-  (remote Mac, macOS 26, 2026-11-13).
+  the overlay ended before it answered (remote Mac, macOS 26, 2026-11-13).
+- With the token's folder unwritable (mode 500), where Stop couldn't remove the token, the
+  overlay said Stopped all the same, the run reading as stopped just then (remote Mac,
+  macOS 26, 2026-11-13). It said so 0.07 s after the press was started and left the token
+  and the run in place, where the token would let the run click again once the folder
+  could be written to. Stop now goes by whether the token went, removed by it or gone
+  already, with its folder or without, not by whether the run can read it: with the folder
+  unwritable the run had died by SIGTERM 0.07 to 0.08 s after the press was started, and
+  the overlay said that the run was ended 0.05 s later, in three runs
+  (`checks/pointer-guards.js`, remote Mac, 2026-11-14).
 - A real click posted on the pill's Stop, the button down and up as mouse events at its
   place, stops the run as the Accessibility press does: the token went 5 and 15 ms after
   the button came up, and a press that waited under a notification's cover threw 208 and
@@ -227,8 +234,8 @@ unexpected.
   stopped with `done`, the menu was closed and the chooser's value unchanged. A press
   stopped while it waited for the Info View, with another app in front by then, threw
   without bringing Live forward (remote Mac, Live 12.4.25b1, 2026-11-13).
-- When the token can't be removed and can still be read (the user-immutable flag on it,
-  `chflags uchg`), Stop ends the run's helper and the run by signal. With a helper waiting
+- When the token is still there after Stop tried to remove it (the user-immutable flag on
+  it, `chflags uchg`), Stop ends the run's helper and the run by signal. With a helper waiting
   under a notification's cover, the run had died by SIGTERM and its helper was gone 0.10 to
   0.11 s after the press was started, with no mouse event posted, and the overlay said that
   the run was ended 0.05 to 0.06 s later, in three runs. A run that outlives SIGTERM was
