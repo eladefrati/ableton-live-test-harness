@@ -82,7 +82,9 @@ func breathe(_ layer: CALayer?, from: Double, to: Double, seconds: Double) {
 
 // Waits for the notification without running the run loop, as waitUntilExit would: the timer
 // that watches the run would fire meanwhile and say a second time that the run has ended.
-func notify(_ message: String) {
+// @Sendable, which the compiler asks of a function that finish, isolated to the main actor,
+// calls: it captures nothing.
+@Sendable func notify(_ message: String) {
     let script = Process()
     script.executableURL = URL(fileURLWithPath: "/usr/bin/osascript")
     script.arguments = ["-e", "on run argv", "-e",
