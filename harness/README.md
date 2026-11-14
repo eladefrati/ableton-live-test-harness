@@ -178,6 +178,28 @@ Node 18 or later. See [ADR-0001](../docs/adr/0001-fork-abletonosc.md) for the de
   points when the editor isn't scaled, or from that picture: its pixels are points times the
   display's scale, its width in pixels divided by `editor.w`. Then press each control once and
   check that the parameter Live reads is the one meant, as a check does.
+- `video.js`: a video of Live, for proof of something that changes over time (ADR-0016); a
+  fixed state needs a still (`captureWindow`, `ui.capture`). `recordVideo(file, {window,
+  screen, seconds})` records Live's main window, another of Live's windows by its id (from
+  `liveWindows`), or with `screen` the whole main display, to `file` (a `.mov`; its folder is
+  made, a file there replaced), and resolves once the recording has started with `{file,
+  pid, stop(), done()}`: `pid` is the recording helper's, `stop()` ends the recording now and
+  `done()` waits for it to end by itself, both resolving with `{file, seconds, bytes}`, the
+  video's length and size. A window is recorded alone, as `captureWindow` captures it: behind
+  other windows, without harness-computer-use's border and pill; the screen with everything
+  on it, the border, the pill and other apps included. The pointer shows in both. It records
+  H.264 at up to 30 frames a second, about 0.1 MB a second for Live's window on a 2x display,
+  more when much moves. It wakes the display first and keeps it on while it records: a
+  display that sleeps leaves the video on its last picture. The recording stops after
+  `seconds` (10 minutes if not given), on `stop()`, or when the run's process ends, however
+  it ends, and the file is whole each time: a run that fails or is killed still leaves the
+  video up to then, and need not wait for it. A plug-in's own window shows only while Live is
+  in front (ADR-0008), so recording it needs Live in front throughout.
+  `videoFrame(file, seconds, png)` saves the frame the video shows at that time and resolves
+  with `{file, at, w, h}`: how an agent, which can't watch a video, sees what it shows.
+  Both need macOS 15 or later, refused below with that reason, and Screen Recording for the
+  terminal app; the helper (`video.swift`) is built with `swiftc` on first use, as the click
+  helper is.
 - `doctor.js`: read-only check that Live is ready to be driven; run it first. What it
   checks and what to do about each line: the
   [`verify-ableton` skill](../skills/verify-ableton/SKILL.md).
@@ -232,7 +254,7 @@ Node 18 or later. See [ADR-0001](../docs/adr/0001-fork-abletonosc.md) for the de
   (`{at, level, text}`) Live logged from `since` (ms timestamp or Date) on: take the time
   before a run and read them after it, to see why a device that loaded and answers OSC
   does nothing.
-- `cli.js`: `node harness/cli.js ping | reload | query <address> [args] | send <address> [args] | notes <track> <clip> [--arrangement] | song-notes <track> | max-log [since] | windows | capture <png> [--window <id>] | plugin-window <track> <device> <png>`.
+- `cli.js`: `node harness/cli.js ping | reload | query <address> [args] | send <address> [args] | notes <track> <clip> [--arrangement] | song-notes <track> | max-log [since] | windows | capture <png> [--window <id>] | plugin-window <track> <device> <png> | video <file.mov> [--seconds <n>] [--window <id> | --screen] [-- <command...>] | video-frame <file.mov> <seconds> <png>`.
   `max-log` reads Live's log, not OSC, so it runs beside a check; `since` is ms or a local
   time such as `2026-10-31T11:18`, and defaults to Live's start. `windows` lists Live's
   windows on screen with their layer (`liveWindows` in `device-ui.js`): a dialog or a panel
@@ -242,7 +264,15 @@ Node 18 or later. See [ADR-0001](../docs/adr/0001-fork-abletonosc.md) for the de
   Recording for the terminal app, and Automation for System Events: they wake the display
   first, as `macos.js` does. `plugin-window` opens a plug-in's own window if it isn't open
   and saves a picture of its editor (`openPluginWindow`), bringing Live to the front while it
-  captures; it also needs Accessibility.
+  captures; it also needs Accessibility. `video` records Live's main window, a window from
+  `windows` with `--window <id>`, or the main display with `--screen` (`recordVideo`), until the
+  command after `--` ends, the `--seconds` given, Ctrl-C or SIGTERM, 10 minutes at most
+  without `--seconds`, and prints `{file, seconds, bytes}`; with a command, Ctrl-C or SIGTERM
+  goes on to the command, the recording stops once it has ended, and `video` exits with the
+  command's status, adding it as `status`. It needs no OSC, so it runs beside a check, or
+  around one: `node harness/cli.js video tests/live/captures/run.mov -- node
+  tests/live/<check>.js`. `video-frame` saves the frame a video shows at a time, in seconds
+  (`videoFrame`).
 - `checks/record-roundtrip.js`: checks the recording path itself. It adds two tracks,
   records one's clip into the other through MIDI routing, compares, and deletes them.
 - `checks/plugin-record.js [--keep]`: checks the plug-in path on Apple's AUDelay, which
@@ -367,6 +397,16 @@ Node 18 or later. See [ADR-0001](../docs/adr/0001-fork-abletonosc.md) for the de
   editor with other than one group in its window. It takes the pointer, so it runs only
   on the click host, with Live open; it brings Live to the front, deletes its track at the
   end, and takes about 80 s.
+- `checks/video-record.js [--out <folder>]`: checks `video.js` and its helper in Live. With
+  Live playing, so its window changes, it records Live's main window and the main display
+  for 4 s, a video around a command that runs 3 s and exits 3 (the status must come back),
+  one that `cli.js video` stops on SIGTERM after 3 s (it must exit 0 and finish the file),
+  and one whose run is killed after 3 s (its helper must end within 15 s, the file whole).
+  Each video must be within 0.6 s of its length (the one around the command within 1.2 s
+  over it), a window's frames the window's size at the display's scale, and each must have
+  a frame at two times, saved beside it. The frames are for looking at: with `--out` the
+  videos and frames are kept in that folder, otherwise deleted. Leaves the transport
+  stopped; takes about 40 s.
 
 Project checks live in each project's repo, in `tests/live/`, and use this folder as a
 library by path. Checks of a MIDI device run on `device-checks.js`; checks of audio or a
@@ -384,6 +424,7 @@ node harness/checks/plugin-record.js      # the plug-in path, on AUDelay (replac
 node harness/checks/plugin-set.js <name>  # a plug-in's built set against Live's own (replaces a set the harness opened)
 node harness/checks/pointer-guards.js     # what the click helper posts and refuses (Live not needed; on the click host only)
 node harness/checks/editor-guards.js      # what the click helper refuses in a plug-in's editor, on AUDelay (on the click host only)
+node harness/checks/video-record.js       # video recordings of Live, and their frames
 node ~/dev/<repo>/tests/live/<check>.js              # a project's checks
 node ~/dev/<repo>/tests/live/<check>.js --keep       # leave its test tracks
 node ~/dev/<repo>/tests/live/<check>.js --tempo 97   # at another tempo (left so)
@@ -424,8 +465,12 @@ name your own only if the agent may take it from you (ADR-0005); any other machi
 the same values. The remote's own `.venv`, `node_modules` and `__pycache__` are not copied or deleted: a
 project that needs them installs them there over ssh. A check's logs are not copied or
 deleted either: `remote.sh` moves them to this Mac after the command, after a failure too,
-and logs it can't move come back after the next run. There is no lock; the slot rule below
-is what keeps two runs apart.
+and logs it can't move come back after the next run. Stills and videos taken on the remote
+come back the same way from `tests/live/captures/` in `~/dev/<repo>` there: give
+`cli.js capture`, `video` and `video-frame` a path in that folder, relative to the repo, as
+the command runs there. They are evidence for the task at hand, not part of the project: a
+project keeps `tests/live/captures/` out of git with a line in its own `.gitignore`, as this
+repo does. There is no lock; the slot rule below is what keeps two runs apart.
 
 The remote only runs checks. Its copies are mirrors, replaced on every run, `.git` included:
 never edit or commit in them, since the next run discards the work. Changes are made and
@@ -458,6 +503,8 @@ must stay off there: waking doesn't reliably dismiss it.
 - For `device-ui.js` and `cli.js windows` and `capture`: Screen Recording for the terminal
   app, to capture Live's window; the two `cli.js` commands also need the Automation
   permission above.
+- For `video.js` and `cli.js video` and `video-frame`: macOS 15 or later, and Screen
+  Recording for the terminal app, as above.
 - For a plug-in's own window (`openPluginWindow`, `cli.js plugin-window`): Accessibility for
   the terminal app too, and a Live that names its device view over Accessibility, as Live
   12.4 does (seen in 12.4.25b1; earlier versions not tried). Without it the window isn't

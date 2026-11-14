@@ -19,7 +19,10 @@ else it refuses, and what Stop on the overlay's pill does. Before a commit that 
 `harness/checks/event-tap.swift` or `harness/checks/pointer-target.swift`, also run `node harness/checks/editor-guards.js` on the
 click host, with Live open: `pointer-guards.js` can't run the helper's `click-editor` and
 `drag-editor`, which take only a plug-in window of Live's, so only this check sees what
-those two refuse.
+those two refuse. Before a commit that changes `harness/video.swift`, `harness/video.js` or
+`harness/checks/video-record.js`, also run `node harness/checks/video-record.js` with Live
+open: the unit tests run `video.js` on a stand-in for its helper, and the helper only where
+it refuses its arguments or a video it can't read, so only this check records.
 A commit that changes how Live behaves
 under the harness, or what the harness refuses, adds it to `harness/live-notes.md` in the same commit: the next reader reads that file, not
 code comments or commit messages.
