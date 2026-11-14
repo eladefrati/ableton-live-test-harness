@@ -325,6 +325,48 @@ test("Stop between a press's hover and its click stops the click, and Live isn't
   assert.equal(system.calls.at(-1)[0], "hover");
 });
 
+test("Stop while a press finds the device stops it at once, before the hover", async () => {
+  const system = fakeMachine();
+  const stop = stoppable(system);
+  const ui = await open(system);
+  await ui.press("Button");
+  const read = system.read;
+  // The read that finds the device's title, about as long as one in Live, with Stop 50 ms into it.
+  system.read = async (...args) => {
+    setTimeout(stop, 50);
+    await new Promise((resolve) => setTimeout(resolve, 3000));
+    return read(...args);
+  };
+  const before = system.calls.length;
+  const start = Date.now();
+  await assert.rejects(ui.press("Button"), { message: `${STOPPED}. Not clicked` });
+  const ms = Date.now() - start;
+  assert.ok(ms < 1000, `the press threw ${ms} ms after it started`);
+  assert.deepEqual(system.calls.slice(before), ["focus"]);
+});
+
+test("Stop during a press's Info View read stops the press at once, not when the read ends", async () => {
+  const system = fakeMachine();
+  const stop = stoppable(system);
+  const [hover, read] = [system.hover, system.read];
+  let hovered = false;
+  system.hover = async (...args) => { await hover(...args); hovered = true; };
+  // The read after the hover, about as long as one in Live, with Stop 50 ms into it.
+  system.read = async (...args) => {
+    if (hovered) {
+      setTimeout(stop, 50);
+      await new Promise((resolve) => setTimeout(resolve, 3000));
+    }
+    return read(...args);
+  };
+  const ui = await open(system);
+  const start = Date.now();
+  await assert.rejects(ui.press("Button"), { message: `${STOPPED}. Not clicked` });
+  const ms = Date.now() - start;
+  assert.ok(ms < 1000, `the press threw ${ms} ms after it started`);
+  assert.equal(clicks(system).length, 0);
+});
+
 test("Stop that comes while a press brings Live forward is seen by the function the machine is handed, which it calls before it activates Live", async () => {
   const system = fakeMachine();
   const stop = stoppable(system);

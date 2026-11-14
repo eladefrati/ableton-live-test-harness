@@ -64,6 +64,8 @@ const INFO_VIEW_RIGHT = 240; // points from the window's left edge
 const ROW_TOLERANCE = 4; // points
 // Long enough for Live to show the control under the pointer in the Info View.
 const INFO_VIEW_SETTLE_MS = 350;
+// How often a press looks for Stop while it waits on a read of Live's window.
+const STOP_POLL_MS = 100;
 // A device's frame around its panel, in points at 100% zoom: left of and above the panel's
 // corner (the title bar), right of the panel, and the whole height (measured on the remote
 // Mac, 2026-11-11).
@@ -540,6 +542,27 @@ async function permit(system) {
   if (why) throw new DeviceUiError(`${why}. Not clicked`);
 }
 
+// Resolves as `reading` does, a read of Live's window, unless `system`'s run is stopped
+// (ADR-0012) before it ends: then rejects within STOP_POLL_MS. A read takes seconds and
+// posts nothing, so it is left to end on its own, and what it ends with is dropped.
+async function readUnlessStopped(system, reading) {
+  let timer;
+  const stopped = new Promise((resolve, reject) => {
+    const look = () => {
+      const why = system.stopped();
+      if (why) reject(new DeviceUiError(`${why}. Not clicked`));
+      else timer = setTimeout(look, STOP_POLL_MS);
+    };
+    look();
+  });
+  reading.catch(() => {});
+  try {
+    return await Promise.race([reading, stopped]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 // The system as DeviceUi and PluginWindow hold it: each call that moves the pointer passes
 // permit first, so none can skip the dialog or Stop. `permit` asks ahead of such a call.
 // After Stop the run takes nothing more from the person, the front included: Escape is typed
@@ -650,13 +673,14 @@ class DeviceUi {
   }
 
   // Where the panel is now. Every press looks again: selecting a device can scroll the view.
-  async locate() {
+  // `read` reads Live's window: a press's gives up on Stop.
+  async locate(read = (id) => this.system.read(id)) {
     await this.system.wake();
     this.live.send("/live/view/set/selected_track", this.track);
     this.live.send("/live/view/set/selected_device", this.track, this.device);
     await this.live.sync();
     const window = await this.system.window();
-    const { width, lines } = await this.system.read(window.id);
+    const { width, lines } = await read(window.id);
     const scale = width / window.w; // pixels per point
     const title = findTitle(lines, this.title, INFO_VIEW_RIGHT * scale);
     return {
@@ -725,7 +749,8 @@ class DeviceUi {
   }
 
   // Puts the pointer on a control once the Info View names it, with Live in front, and
-  // resolves with the window and the point, for the click or the drag that follows.
+  // resolves with the window and the point, for the click or the drag that follows. Stop
+  // during either read of Live's window rejects at once, not when the read ends.
   async aim(name, item) {
     const control = this.controls.get(name);
     if (!control) throw new DeviceUiError(`${this.title} has no control named ${name}`);
@@ -734,11 +759,12 @@ class DeviceUi {
 
     await this.system.permit();
     await this.system.focus();
-    const at = await this.locate();
+    const read = (id) => readUnlessStopped(this.system, this.system.read(id));
+    const at = await this.locate(read);
     const [x, y] = [at.x + ux, at.y + uy];
     await this.system.hover(at.window.id, x, y);
     await sleep(this.system.settleMs ?? INFO_VIEW_SETTLE_MS);
-    const { lines } = await this.system.read(at.window.id);
+    const { lines } = await read(at.window.id);
     const shown = infoTitle(lines, at.title, at.scale);
     if (normalized(shown) !== normalized(control.info)) {
       throw new DeviceUiError(`The Info View reads "${shown}" over ${name}, expected "${control.info}" (is it visible?). Not clicked`);

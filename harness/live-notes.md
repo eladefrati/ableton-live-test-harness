@@ -306,6 +306,13 @@ unexpected.
   2.3 and 2.4 s over the read, and ended 4.2 and 4.6 s after Stop, 1.5 and 1.8 s of which
   were a wait the proof had added; 5 s left too little room for its clean-up (remote Mac,
   Live 12.4.25b1, 2026-11-14).
+- A press no longer waits for its reads of Live's window to end once stopped: Stop during
+  the read that finds the device, or the Info View's after the hover, rejects the press
+  within 0.1 s, and the read, which posts nothing, ends on its own. In Live, a press stopped
+  during the Info View read threw 1.54 s after Stop, as the 2.6 s read ended; with the
+  change, 40 and 67 ms after Stop during that read and 24 ms during the one that finds the
+  device, with the reads ending 1.8 to 3.4 s later and no mouse event after Stop (remote
+  Mac, Live 12.4.25b1, 2026-11-14). `choose`'s read of its open menu still ends first.
 - In Live, with a real click posted on Stop and the token's folder unwritable, a run whose
   click waited under a notification's cover threw as stopped from its pill, deleted its
   track and ended by itself, with status 0, 0.42 and 0.49 s after the click, and no mouse
