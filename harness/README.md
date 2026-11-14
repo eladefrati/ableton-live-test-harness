@@ -57,7 +57,7 @@ Node 18 or later. See [ADR-0001](../docs/adr/0001-fork-abletonosc.md) for the de
   `/Library/Audio/Plug-Ins/Components` and `/System/Library/Components` (exactly one
   effect, or it refuses; `AUDelay` works with no plug-in of your own), reads its parameters
   from the AU itself, in its `ParameterList` order (`au-parameters.swift`, built with
-  `swiftc` on first use and kept in the system temp folder's `ableton-harness-tools`),
+  `swiftc` on first use and kept in the system temp folder's `ableton-harness-tools` until it goes 7 days unused),
   has `auval -v` validate it, and starts each parameter at its default, the plug-in with
   no saved state.
   `checkPluginLoaded(live, name, parameters)` checks that Live lists them all and runs the
