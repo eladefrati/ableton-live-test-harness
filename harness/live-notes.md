@@ -172,7 +172,10 @@ unexpected.
   short to 32 characters, so the guard matches the start of it with the border's title.
   A click's hover takes about 240 ms, and a window shown over the point in that time took the
   click, so every click and drag checks again after its hover, before the button goes down
-  (remote Mac, 2026-11-13).
+  (remote Mac, 2026-11-13). A window that reports no layer counts among them, as a normal
+  window (layer 0): the guard had taken it for one at the cursor's layer and left it out, so
+  that one over the point would have gone unseen. No window was seen to report no layer, and
+  none could be made to (not reproduced).
 - While a notification banner shows, from any app, Notification Center holds a transparent
   window the size of the screen at layer 21, gone about 4 s after the banner appeared; the
   click guard read it as covering the point and refused (main Mac, macOS 26, 2026-11-13). The

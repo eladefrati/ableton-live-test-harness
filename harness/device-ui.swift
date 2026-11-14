@@ -290,12 +290,13 @@ func requireUnlocked() {
 // cursor's layer up, as the cursor is a window too and sits on the point after a hover. Nor
 // harness-computer-use's own overlay (computer-use-overlay.swift, ADR-0012), which covers the
 // screen and lets every click through: its title, and its program's name, cut short as macOS
-// reports it.
+// reports it. A window that reports no layer counts as a normal one (layer 0): left out, it
+// could cover the point unseen.
 func clickableWindows() -> [[String: Any]] {
     let cursor = Int(CGWindowLevelForKey(.cursorWindow))
     let list = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID)
         as? [[String: Any]] ?? []
-    return list.filter { ($0[kCGWindowLayer as String] as? Int ?? cursor) < cursor && !isOverlay($0) }
+    return list.filter { ($0[kCGWindowLayer as String] as? Int ?? 0) < cursor && !isOverlay($0) }
 }
 
 func isOverlay(_ window: [String: Any]) -> Bool {
