@@ -32,19 +32,22 @@ const HELPER_CACHE = path.join(os.tmpdir(), "ableton-harness-tools");
 // How long a build stays in the cache unused. A build's last use is the later of its access
 // and modification times: this module sets both when a process first finds the build, and an
 // older checkout of the harness, which sets neither, still updates the access time by
-// running it. An unchanged source keeps its hash, and its build, for weeks.
+// running it. An unchanged source keeps its hash, and its build, for weeks. An older
+// checkout's build that it has found but not yet run can still be deleted under it, which
+// nothing here can prevent.
 const UNUSED_DAYS = 7;
 // The builds this process has marked used.
 const marked = new Set();
 
 // The path of the compiled helper for the Swift file `source`, built with swiftc if this
 // version of the source hasn't been. It is built under a name of its own and renamed into
-// place, so a run never finds half a binary. After a build, the call deletes whatever in
-// `cache` no process has used for UNUSED_DAYS. Marking and deleting are best effort: neither
-// fails the call.
+// place, so a run never finds half a binary. After a build, the call deletes the same
+// helper's other builds in `cache` that no process has used for UNUSED_DAYS. Marking and
+// deleting are best effort: neither fails the call.
 async function helperBinary(source, cache = HELPER_CACHE) {
   const hash = crypto.createHash("sha256").update(fs.readFileSync(source)).digest("hex").slice(0, 16);
-  const binary = path.join(cache, `${path.basename(source, ".swift")}-${hash}`);
+  const name = path.basename(source, ".swift");
+  const binary = path.join(cache, `${name}-${hash}`);
   if (marked.has(binary) ? fs.existsSync(binary) : markUsed(binary)) return binary;
   // xcode-select fails without developer tools; swiftc would open the install dialog.
   await run("xcode-select", ["-p"]).catch(() => {
@@ -59,7 +62,7 @@ async function helperBinary(source, cache = HELPER_CACHE) {
     fs.rmSync(partial, { force: true });
   }
   marked.add(binary);
-  pruneUnused(cache);
+  pruneUnused(cache, name);
   return binary;
 }
 
@@ -77,17 +80,20 @@ function markUsed(binary) {
   return true;
 }
 
-// Deletes what in `cache` was last used more than UNUSED_DAYS ago, leftover partial builds
-// included; a build under way, or just made, is newer. What can't be read or deleted, as
-// what another process deleted first, is left.
-function pruneUnused(cache) {
+// Deletes the builds of the helper `name` in `cache` last used more than UNUSED_DAYS ago,
+// leftover partial builds included; a build under way, or just made, is newer. Other
+// helpers' builds, and anything else, are left, as is what can't be read or deleted, or what
+// another process deleted first.
+function pruneUnused(cache, name) {
   const before = Date.now() - UNUSED_DAYS * 24 * 60 * 60 * 1000;
-  let names = [];
+  // `name`, a hash, and for a partial build its process and time (helperBinary).
+  const isBuild = (entry) => entry.startsWith(`${name}-`) && /^[0-9a-f]{16}(\.\d+\.\d+)?$/.test(entry.slice(name.length + 1));
+  let entries = [];
   try {
-    names = fs.readdirSync(cache);
+    entries = fs.readdirSync(cache).filter(isBuild);
   } catch {}
-  for (const name of names) {
-    const file = path.join(cache, name);
+  for (const entry of entries) {
+    const file = path.join(cache, entry);
     try {
       const { atimeMs, mtimeMs } = fs.lstatSync(file);
       if (Math.max(atimeMs, mtimeMs) < before) fs.rmSync(file, { recursive: true, force: true });

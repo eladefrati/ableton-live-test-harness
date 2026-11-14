@@ -58,7 +58,7 @@ Node 18 or later. See [ADR-0001](../docs/adr/0001-fork-abletonosc.md) for the de
   effect, or it refuses; `AUDelay` works with no plug-in of your own), reads its parameters
   from the AU itself, in its `ParameterList` order (`au-parameters.swift`, built with
   `swiftc` on first use and kept in the system temp folder's `ableton-harness-tools`, where
-  `helperBinary` deletes any helper's build that no process has used for 7 days),
+  each new build of a helper deletes that helper's builds unused for 7 days),
   has `auval -v` validate it, and starts each parameter at its default, the plug-in with
   no saved state.
   `checkPluginLoaded(live, name, parameters)` checks that Live lists them all and runs the
@@ -209,8 +209,10 @@ Node 18 or later. See [ADR-0001](../docs/adr/0001-fork-abletonosc.md) for the de
   one is given, for a caller that may have to signal it,
   `helperBinary(source)` compiles a Swift helper once per version of its source into
   `ableton-harness-tools` in the system temp folder and, after each build it makes, deletes
-  every helper's build there that no process has used for 7 days (the later of its access
-  and modification times),
+  that helper's other builds there unused for 7 days (not found by a process of this
+  checkout, which marks a build when it first finds it, nor run, by the later of its access
+  and modification times; an older checkout of the harness doesn't mark the builds it finds,
+  so one it has found but not yet run can be deleted under it),
   `escapeXml(text)`; `patcherChunk(bytes)` finds the patcher in an `.amxd`.
 - `settings.js`: Live's settings, read from `Preferences.cfg` without touching Live's
   window. `recordBitDepth()` resolves with `{bits, float}` (16, 24, or 32 and float);
