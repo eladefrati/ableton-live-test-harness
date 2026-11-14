@@ -7,7 +7,7 @@ const os = require("node:os");
 const path = require("node:path");
 const {
   DeviceUiError, openDeviceUi, readControls, readPanelWidth, pointControls, controlPoint, findTitle, infoTitle, readClickHost, runName, runScript,
-  MEASURED_DEVICES, POINTER_CALLS, MACHINE_CALLS, stopped, buildComputerUse, showComputerUse,
+  MEASURED_DEVICES, POINTER_CALLS, MACHINE_CALLS, stopped, stopMarker, buildComputerUse, showComputerUse,
 } = require("../device-ui.js");
 
 const chunk = (tag, payload) => {
@@ -321,20 +321,14 @@ test("the module exports nothing that carries a call that takes the pointer, whi
   }
 });
 
-test("the run is stopped once the file named as its stop marker exists", () => {
-  const folder = fs.mkdtempSync(path.join(os.tmpdir(), "device-ui-test-"));
-  const before = process.env.HARNESS_COMPUTER_USE_STOP;
+test("the run is stopped once its stop marker exists", () => {
+  const marker = stopMarker();
   try {
-    delete process.env.HARNESS_COMPUTER_USE_STOP;
     assert.equal(stopped(), false);
-    process.env.HARNESS_COMPUTER_USE_STOP = path.join(folder, "stopped");
-    assert.equal(stopped(), false);
-    fs.writeFileSync(process.env.HARNESS_COMPUTER_USE_STOP, "");
+    fs.writeFileSync(marker, "");
     assert.equal(stopped(), true);
   } finally {
-    if (before === undefined) delete process.env.HARNESS_COMPUTER_USE_STOP;
-    else process.env.HARNESS_COMPUTER_USE_STOP = before;
-    fs.rmSync(folder, { recursive: true, force: true });
+    fs.rmSync(marker, { force: true });
   }
 });
 
@@ -886,8 +880,66 @@ test("showComputerUse resolves once the border says it has shown, having given i
     });
     assert.deepEqual(warnings, []);
   } finally {
-    delete process.env.HARNESS_COMPUTER_USE_STOP;
+    fs.rmSync(stopMarker(), { force: true });
   }
+});
+
+test("every border the run shows is given the run's one stop marker, so Stop on any of their pills stops it", async () => {
+  const borders = [1, 2].map(() => standIn('echo "$2" > "$0.marker"', "echo shown", STAYS));
+  for (const border of borders) await showComputerUse(border);
+  const [first, second] = borders.map((border) => fs.readFileSync(`${border}.marker`, "utf8").trim());
+  assert.equal(second, first);
+  assert.equal(first, stopMarker());
+});
+
+test("showComputerUse leaves this process's environment as it was", async () => {
+  const before = { ...process.env };
+  await showComputerUse(standIn("echo shown", STAYS));
+  assert.deepEqual({ ...process.env }, before);
+});
+
+// A run of its own, started with `env` added to its environment, whose helper is a stand-in
+// that answers `windows` with the stop marker its own environment names. Resolves with
+// whether the run is stopped, the marker its helper was given ("" for none) and, with
+// `marked`, the run's own marker, which it then makes first.
+function runStartedWith(env, marked = false) {
+  const helper = standIn(`printf '[{"title":"%s"}]' "$HARNESS_COMPUTER_USE_STOP"`);
+  const run = `
+    const [tools, mac, ui] = ["tools", "macos", "device-ui"].map((name) => require(${JSON.stringify(path.join(__dirname, ".."))} + "/" + name + ".js"));
+    tools.helperBinary = async () => process.argv[1];
+    mac.wakeDisplay = async () => {};
+    const marker = process.argv[2] ? ui.stopMarker() : null;
+    ui.liveWindows().then(([window]) => console.log(JSON.stringify({ stopped: ui.stopped(), given: window.title, marker })));`;
+  return new Promise((resolve, reject) => {
+    require("node:child_process").execFile(process.execPath, ["-e", run, helper, ...(marked ? ["marked"] : [])], { env: { ...process.env, ...env }, timeout: 10000 },
+      (error, stdout) => (error ? reject(error) : resolve(JSON.parse(stdout))));
+  });
+}
+
+// As a run started by another run would be, were the other's marker named in its environment.
+async function withInheritedMarker(body) {
+  const folder = fs.mkdtempSync(path.join(os.tmpdir(), "device-ui-test-"));
+  const inherited = path.join(folder, "stopped");
+  fs.writeFileSync(inherited, "");
+  try {
+    await body(inherited);
+  } finally {
+    fs.rmSync(folder, { recursive: true, force: true });
+  }
+}
+
+test("a stop marker named in the environment a run starts with, which exists, neither stops the run nor reaches its helper", async () => {
+  await withInheritedMarker(async (inherited) => {
+    assert.deepEqual(await runStartedWith({ HARNESS_COMPUTER_USE_STOP: inherited }), { stopped: false, given: "", marker: null });
+  });
+});
+
+test("the helper is given the run's own stop marker, whatever marker the run's environment names", async () => {
+  await withInheritedMarker(async (inherited) => {
+    const run = await runStartedWith({ HARNESS_COMPUTER_USE_STOP: inherited }, true);
+    assert.notEqual(run.marker, inherited);
+    assert.deepEqual(run, { stopped: false, given: run.marker, marker: run.marker });
+  });
 });
 
 test("showComputerUse rejects with the reason a border gives as it ends, or else with how it ended", async () => {

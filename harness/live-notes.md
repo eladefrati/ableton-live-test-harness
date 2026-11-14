@@ -184,6 +184,14 @@ unexpected.
   with status 0, its button-up reaching the check's window 77 and 81 ms after the marker was
   made in the click, 51 and 57 ms in the drag (`checks/pointer-guards.js`, remote Mac,
   2026-11-13). The run's next press then throws.
+- A run has one stop marker: every border it shows is given the same one, and the run names
+  it to each helper it starts, in that helper's environment (`HARNESS_COMPUTER_USE_STOP`),
+  and nowhere else. It used to write the name into its own environment, which every process
+  it started inherited: a run started with the variable naming a file that existed read
+  itself as stopped and gave that marker to its helper, and a second border in one run was
+  given a marker of its own, after which the run no longer read the first (unit tests, remote
+  Mac, 2026-11-13). A marker named in the environment a run starts with now neither stops
+  the run nor reaches its helper.
 - With no window server, as for a process with no desktop session, a program gets no session
   (`CGSessionCopyCurrentDictionary()` is nil), no screens, and windows that say they are
   visible and never show, all with no error; `display dialog` fails there with -1713, "No

@@ -8,6 +8,17 @@ test("run resolves with stdout, taking arguments that aren't strings", async () 
   assert.equal(await run("/bin/echo", ["a b", 3]), "a b 3\n");
 });
 
+test("run gives the command the environment it is given, in place of this process's", async () => {
+  process.env.HARNESS_TEST_INHERITED = "inherited";
+  try {
+    const said = (options) => run("/bin/sh", ["-c", "echo ${HARNESS_TEST_INHERITED:-none} ${HARNESS_TEST_GIVEN:-none}"], options);
+    assert.equal(await said(), "inherited none\n");
+    assert.equal(await said({ env: { HARNESS_TEST_GIVEN: "given" } }), "none given\n");
+  } finally {
+    delete process.env.HARNESS_TEST_INHERITED;
+  }
+});
+
 test("run rejects with the command and its stderr", async () => {
   await assert.rejects(run("/bin/sh", ["-c", "echo why >&2; exit 3"]), (error) => {
     assert.equal(error.message, "/bin/sh -c echo why >&2; exit 3 failed: why");

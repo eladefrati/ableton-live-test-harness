@@ -197,7 +197,7 @@ function infoTitle(lines, title, scale) {
 
 const HELPER_SOURCE = path.join(__dirname, "device-ui.swift");
 
-const exec = (cmd, args) => tools.run(cmd, args).catch((e) => {
+const exec = (cmd, args, options) => tools.run(cmd, args, options).catch((e) => {
   throw new DeviceUiError(e.message, { cause: e });
 });
 
@@ -206,7 +206,7 @@ const helperBinary = () => tools.helperBinary(HELPER_SOURCE).catch((e) => {
 });
 
 async function helper(...args) {
-  return exec(await helperBinary(), args);
+  return exec(await helperBinary(), args, { env: helperEnvironment() });
 }
 
 // The one machine clicks are allowed on without asking: "clickHost" in harness/local.json,
@@ -276,12 +276,32 @@ async function askToClick(script) {
 // run is killed.
 const OVERLAY_SOURCE = path.join(__dirname, "computer-use-overlay.swift");
 
-// The variable that names the run's stop marker (ADR-0009), the file the pill's Stop creates,
-// so that every helper the run starts reads it too (device-ui.swift). The click host is never
-// read from the environment (ADR-0005), where a variable could lift a guard; this one can
-// only stop a run.
+// The run's stop marker (ADR-0009), the file the pill's Stop creates: one for the run, named
+// when first needed and kept here, so that Stop on any pill the run shows stops it. Exported
+// for the tests: creating the file can only stop a run.
+let stopMarkerPath = null;
+function stopMarker() {
+  if (!stopMarkerPath) {
+    // Not in the harness's temp folder, which relaunch.js and quit.js empty.
+    const folder = fs.mkdtempSync(path.join(os.tmpdir(), "harness-computer-use-"));
+    process.on("exit", () => fs.rmSync(folder, { recursive: true, force: true }));
+    stopMarkerPath = path.join(folder, "stopped");
+  }
+  return stopMarkerPath;
+}
+const stopped = () => stopMarkerPath !== null && fs.existsSync(stopMarkerPath);
+
+// The variable that names the run's stop marker to a helper (device-ui.swift), and to nothing
+// else. This process's own environment is neither read nor written: a marker named there
+// belongs to the run that started this one, whose Stop isn't this run's, and one written
+// there would reach every process this run starts.
 const STOP_MARKER = "HARNESS_COMPUTER_USE_STOP";
-const stopped = () => Boolean(process.env[STOP_MARKER]) && fs.existsSync(process.env[STOP_MARKER]);
+function helperEnvironment() {
+  const env = { ...process.env };
+  if (stopMarkerPath) env[STOP_MARKER] = stopMarkerPath;
+  else delete env[STOP_MARKER];
+  return env;
+}
 
 // One line, whatever the reason: a failed build's is the compiler's whole output.
 const warnNoBorder = (reason) => console.error(`warn harness-computer-use couldn't show its border: ${reason.split("\n")[0]}. The run clicks without it`);
@@ -306,12 +326,8 @@ async function buildComputerUse() {
 // for `shownMs`. One that goes later, other than as it ends by itself, is warned of: the
 // person has lost the pill and its Stop. Nothing of the overlay keeps this process running.
 async function showComputerUse(binary, { shownMs = OVERLAY_SHOWN_MS } = {}) {
-  // Not in the harness's temp folder, which relaunch.js and quit.js empty.
-  const folder = fs.mkdtempSync(path.join(os.tmpdir(), "harness-computer-use-"));
-  process.on("exit", () => fs.rmSync(folder, { recursive: true, force: true }));
-  process.env[STOP_MARKER] = path.join(folder, "stopped");
   const run = runName();
-  const overlay = spawn(binary, [String(process.pid), process.env[STOP_MARKER], ...(run ? [run] : [])], { detached: true, stdio: ["ignore", "pipe", "pipe"] });
+  const overlay = spawn(binary, [String(process.pid), stopMarker(), ...(run ? [run] : [])], { detached: true, stdio: ["ignore", "pipe", "pipe"] });
   let [said, complained] = ["", ""];
   overlay.stderr.on("data", (data) => { complained += data; });
   let timer;
@@ -429,8 +445,8 @@ const allowed = new WeakSet();
 // person at it allows the run's clicks (ADR-0006). The answer holds for the rest of the run,
 // and while it does a purple border shows there (ADR-0009), built before the person is asked.
 // The border only informs: a run that can't show it still clicks, with a warning. After Stop
-// on the pill (ADR-0009) it throws, as the helper does in a press under way: the run goes
-// on, so a check fails there and still cleans up.
+// on the pill (ADR-0009) it throws: the run goes on, so a check fails there and still cleans
+// up.
 async function permit(system) {
   if (!allowed.has(system)) {
     const host = system.hostname();
@@ -775,5 +791,5 @@ async function openPluginWindow(live, { track, device, size, controls = {} }, sy
 module.exports = {
   DeviceUiError, openDeviceUi, openPluginWindow, captureWindow, liveWindows, readControls, readPanelWidth, pointControls, controlPoint,
   findTitle, infoTitle, readClickHost, hostname, runName, runScript, MEASURED_DEVICES, POINTER_CALLS, MACHINE_CALLS,
-  stopped, buildComputerUse, showComputerUse,
+  stopped, stopMarker, buildComputerUse, showComputerUse,
 };

@@ -9,13 +9,13 @@ const os = require("node:os");
 const path = require("node:path");
 const { execFile } = require("node:child_process");
 
-// Runs `cmd args` and resolves with its stdout. A failure rejects with its stderr, or else
-// the reason it couldn't run; the error's `cause` is execFile's own, whose `code` is the
-// exit status.
-function run(cmd, args = []) {
+// Runs `cmd args` and resolves with its stdout, in the environment `env` if one is given and
+// in this process's if not. A failure rejects with its stderr, or else the reason it couldn't
+// run; the error's `cause` is execFile's own, whose `code` is the exit status.
+function run(cmd, args = [], { env } = {}) {
   const words = args.map(String);
   return new Promise((resolve, reject) => {
-    execFile(cmd, words, { maxBuffer: 16 * 1024 * 1024 }, (error, stdout, stderr) => {
+    execFile(cmd, words, { maxBuffer: 16 * 1024 * 1024, env }, (error, stdout, stderr) => {
       if (error) reject(new Error(`${[cmd, ...words].join(" ")} failed: ${(stderr || error.message).trim()}`, { cause: error }));
       else resolve(stdout);
     });
