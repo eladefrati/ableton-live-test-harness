@@ -29,11 +29,15 @@ at the Mac doesn't know when the mouse is theirs again.
    ADR-0008) leaves out windows with the border's title owned by its program, and nothing else.
 4. **It only informs.** A run that can't show it warns and clicks anyway: the person allowed the
    clicks, not the border.
-5. **Stop on the pill takes the mouse back.** It sends the run SIGUSR2 and takes the border
-   down; from then on every press of the run is refused, before its hover and again before its
-   click. The run isn't killed: a check fails at its next press and still runs its cleanup,
-   where a kill would leave its tracks in Live. The pill is a window of its own that takes
-   clicks, so the click guard refuses a point under it.
+5. **Stop on the pill takes the mouse back.** It creates the run's stop marker, a file the run
+   named when it started the border, takes the border down, and then says the mouse is free.
+   The helper that posts the mouse events checks the marker before every event. Once the
+   marker exists it posts nothing but the release of a button it holds: a press under way
+   stops before its hover, before its click or before a drag's move, and a drag stopped
+   before its move ends with the button up at the press point. The press under way and every
+   later press of the run throw. The run isn't killed: a check fails at that press and still
+   runs its cleanup, where a kill would leave its tracks in Live. The pill is a window of its
+   own that takes clicks, so the click guard refuses a point under it.
 
 ## Consequences
 
@@ -43,3 +47,10 @@ at the Mac doesn't know when the mouse is theirs again.
 - A window given the border's title by a program whose name starts like the border's would be
   skipped too: the guard stops accidents, as ADR-0006's dialog does, not a program set on
   clicking.
+- Stop needs nothing from the run: the helper reads the marker itself, so a run busy in its
+  own code is stopped as fast as an idle one.
+- A click whose button was down when Stop came completes, since its release is the one event
+  still posted, and so does a drag whose move was already posted. A drag stopped before its
+  move is a click on the control: the button went down and came up at the press point.
+- A signal that would end the helper while it holds the button, such as Ctrl-C on the run, is
+  held back until the helper has released the button, which it then does at once.
