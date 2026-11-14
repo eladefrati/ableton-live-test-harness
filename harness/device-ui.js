@@ -542,22 +542,28 @@ async function permit(system) {
   if (why) throw new DeviceUiError(`${why}. Not clicked`);
 }
 
-// Resolves as `reading` does, a read of Live's window, unless `system`'s run is stopped
-// (ADR-0012) before it ends: then rejects within STOP_POLL_MS. A read takes seconds and
-// posts nothing, so it is left to end on its own, and what it ends with is dropped.
-async function readUnlessStopped(system, reading) {
+// Starts `read`, a read of Live's window, and resolves as it does, unless `system`'s run is
+// stopped (ADR-0012): before the read, it starts none and rejects; during it, it rejects
+// within STOP_POLL_MS. A read takes seconds and posts nothing, so it is left to end on its
+// own, and what it ends with is dropped.
+async function readUnlessStopped(system, read) {
+  const refusal = () => {
+    const why = system.stopped();
+    return why ? new DeviceUiError(`${why}. Not clicked`) : null;
+  };
+  const before = refusal();
+  if (before) throw before;
   let timer;
-  const stopped = new Promise((resolve, reject) => {
+  const onStop = new Promise((resolve, reject) => {
     const look = () => {
-      const why = system.stopped();
-      if (why) reject(new DeviceUiError(`${why}. Not clicked`));
+      const error = refusal();
+      if (error) reject(error);
       else timer = setTimeout(look, STOP_POLL_MS);
     };
-    look();
+    timer = setTimeout(look, STOP_POLL_MS);
   });
-  reading.catch(() => {});
   try {
-    return await Promise.race([reading, stopped]);
+    return await Promise.race([read(), onStop]);
   } finally {
     clearTimeout(timer);
   }
@@ -759,7 +765,7 @@ class DeviceUi {
 
     await this.system.permit();
     await this.system.focus();
-    const read = (id) => readUnlessStopped(this.system, this.system.read(id));
+    const read = (id) => readUnlessStopped(this.system, () => this.system.read(id));
     const at = await this.locate(read);
     const [x, y] = [at.x + ux, at.y + uy];
     await this.system.hover(at.window.id, x, y);

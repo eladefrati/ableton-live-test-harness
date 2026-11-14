@@ -325,45 +325,68 @@ test("Stop between a press's hover and its click stops the click, and Live isn't
   assert.equal(system.calls.at(-1)[0], "hover");
 });
 
-test("Stop while a press finds the device stops it at once, before the hover", async () => {
+// A machine whose read of Live's window, once `slow()` says so, waits until the test ends it,
+// with Stop 50 ms into it. `reading` is that read; `finish` ends it as a read in Live would.
+function slowRead(system, stop, slow) {
+  const read = system.read;
+  const held = { reading: null, finish: null };
+  system.read = (...args) => {
+    if (!slow() || held.reading) return read(...args);
+    setTimeout(stop, 50);
+    held.reading = new Promise((resolve) => { held.finish = resolve; }).then(() => read(...args));
+    return held.reading;
+  };
+  return held;
+}
+
+test("Stop while a press finds the device stops it at once, before the hover, and the read's end does nothing", async () => {
   const system = fakeMachine();
   const stop = stoppable(system);
   const ui = await open(system);
   await ui.press("Button");
-  const read = system.read;
-  // The read that finds the device's title, about as long as one in Live, with Stop 50 ms into it.
-  system.read = async (...args) => {
-    setTimeout(stop, 50);
-    await new Promise((resolve) => setTimeout(resolve, 3000));
-    return read(...args);
-  };
+  const held = slowRead(system, stop, () => true);
   const before = system.calls.length;
   const start = Date.now();
   await assert.rejects(ui.press("Button"), { message: `${STOPPED}. Not clicked` });
   const ms = Date.now() - start;
   assert.ok(ms < 1000, `the press threw ${ms} ms after it started`);
+  held.finish();
+  await held.reading;
+  await new Promise(setImmediate);
   assert.deepEqual(system.calls.slice(before), ["focus"]);
 });
 
-test("Stop during a press's Info View read stops the press at once, not when the read ends", async () => {
+test("Stop during a press's Info View read stops the press at once, not when the read ends, and the read's end does nothing", async () => {
   const system = fakeMachine();
   const stop = stoppable(system);
-  const [hover, read] = [system.hover, system.read];
+  const hover = system.hover;
   let hovered = false;
   system.hover = async (...args) => { await hover(...args); hovered = true; };
-  // The read after the hover, about as long as one in Live, with Stop 50 ms into it.
-  system.read = async (...args) => {
-    if (hovered) {
-      setTimeout(stop, 50);
-      await new Promise((resolve) => setTimeout(resolve, 3000));
-    }
-    return read(...args);
-  };
+  const held = slowRead(system, stop, () => hovered);
   const ui = await open(system);
   const start = Date.now();
   await assert.rejects(ui.press("Button"), { message: `${STOPPED}. Not clicked` });
   const ms = Date.now() - start;
   assert.ok(ms < 1000, `the press threw ${ms} ms after it started`);
+  const before = system.calls.length;
+  held.finish();
+  await held.reading;
+  await new Promise(setImmediate);
+  assert.equal(system.calls.length, before);
+  assert.equal(clicks(system).length, 0);
+  assert.equal(system.calls.at(-1)[0], "hover");
+});
+
+test("a press stopped before its Info View read starts none", async () => {
+  const system = fakeMachine();
+  const stop = stoppable(system);
+  const [hover, read] = [system.hover, system.read];
+  let reads = 0;
+  system.hover = async (...args) => { await hover(...args); stop(); };
+  system.read = (...args) => { reads += 1; return read(...args); };
+  const ui = await open(system);
+  await assert.rejects(ui.press("Button"), { message: `${STOPPED}. Not clicked` });
+  assert.equal(reads, 1);
   assert.equal(clicks(system).length, 0);
 });
 
