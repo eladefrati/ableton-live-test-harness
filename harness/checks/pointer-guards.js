@@ -14,7 +14,7 @@ const readline = require("node:readline");
 const { execFile, spawn } = require("node:child_process");
 const tools = require("../tools.js");
 const mac = require("../macos.js");
-const { machine } = require("../device-ui.js");
+const { hostname, readClickHost } = require("../device-ui.js");
 
 const HARNESS = path.join(__dirname, "..");
 const PILL_TITLE = "harness-computer-use pill";
@@ -236,8 +236,8 @@ async function failures(test, binaries) {
 }
 
 async function main() {
-  if (machine.hostname() !== machine.clickHost()) {
-    throw new Error(`pointer-guards.js posts real mouse events, so it runs only on the click host ("clickHost" in harness/local.json), which ${machine.hostname()} isn't. Nothing posted`);
+  if (hostname() !== readClickHost()) {
+    throw new Error(`pointer-guards.js posts real mouse events, so it runs only on the click host ("clickHost" in harness/local.json), which ${hostname()} isn't. Nothing posted`);
   }
   const binaries = {};
   for (const [name, source] of Object.entries({ helper: "device-ui", target: "checks/pointer-target", overlay: "computer-use-overlay" })) {

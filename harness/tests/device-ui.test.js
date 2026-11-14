@@ -7,7 +7,7 @@ const os = require("node:os");
 const path = require("node:path");
 const {
   DeviceUiError, openDeviceUi, readControls, readPanelWidth, pointControls, controlPoint, findTitle, infoTitle, readClickHost, runName, runScript,
-  MEASURED_DEVICES, machine, POINTER_CALLS,
+  MEASURED_DEVICES, POINTER_CALLS, MACHINE_CALLS, stopped, buildComputerUse, showComputerUse,
 } = require("../device-ui.js");
 
 const chunk = (tag, payload) => {
@@ -312,7 +312,13 @@ const OTHER_CALLS = [
 ];
 
 test("every call of the machine is either one that takes the pointer, which passes permit, or listed as one that never does", () => {
-  assert.deepEqual(Object.keys(machine).sort(), [...POINTER_CALLS, ...OTHER_CALLS].sort());
+  assert.deepEqual([...MACHINE_CALLS].sort(), [...POINTER_CALLS, ...OTHER_CALLS].sort());
+});
+
+test("the module exports nothing that carries a call that takes the pointer, which would skip permit", () => {
+  for (const [name, exported] of Object.entries(require("../device-ui.js"))) {
+    for (const call of POINTER_CALLS) assert.equal(call in Object(exported), false, `${name}.${call}`);
+  }
 });
 
 test("the run is stopped once the file named as its stop marker exists", () => {
@@ -320,11 +326,11 @@ test("the run is stopped once the file named as its stop marker exists", () => {
   const before = process.env.HARNESS_COMPUTER_USE_STOP;
   try {
     delete process.env.HARNESS_COMPUTER_USE_STOP;
-    assert.equal(machine.stopped(), false);
+    assert.equal(stopped(), false);
     process.env.HARNESS_COMPUTER_USE_STOP = path.join(folder, "stopped");
-    assert.equal(machine.stopped(), false);
+    assert.equal(stopped(), false);
     fs.writeFileSync(process.env.HARNESS_COMPUTER_USE_STOP, "");
-    assert.equal(machine.stopped(), true);
+    assert.equal(stopped(), true);
   } finally {
     if (before === undefined) delete process.env.HARNESS_COMPUTER_USE_STOP;
     else process.env.HARNESS_COMPUTER_USE_STOP = before;
@@ -830,18 +836,18 @@ async function withBuilds(failing, body) {
 }
 
 test("buildComputerUse resolves with the border's binary once the helper and the border are built", async () => {
-  const warnings = await withBuilds(null, async () => assert.equal(await machine.buildComputerUse(), "computer-use-overlay"));
+  const warnings = await withBuilds(null, async () => assert.equal(await buildComputerUse(), "computer-use-overlay"));
   assert.deepEqual(warnings, []);
 });
 
 test("buildComputerUse warns and resolves with no border when only the border can't be built", async () => {
-  const warnings = await withBuilds("computer-use-overlay.swift", async () => assert.equal(await machine.buildComputerUse(), null));
+  const warnings = await withBuilds("computer-use-overlay.swift", async () => assert.equal(await buildComputerUse(), null));
   assert.deepEqual(warnings, ["warn harness-computer-use couldn't show its border: swiftc failed on computer-use-overlay.swift. The run clicks without it"]);
 });
 
 test("buildComputerUse rejects when the helper can't be built", async () => {
   const warnings = await withBuilds("device-ui.swift", async () => {
-    await assert.rejects(machine.buildComputerUse(), (error) => error instanceof DeviceUiError && /swiftc failed on device-ui\.swift/.test(error.message));
+    await assert.rejects(buildComputerUse(), (error) => error instanceof DeviceUiError && /swiftc failed on device-ui\.swift/.test(error.message));
   });
   assert.deepEqual(warnings, []);
 });
@@ -874,9 +880,9 @@ test("showComputerUse resolves once the border says it has shown, having given i
   const slow = standIn("sleep 0.3", ': > "$0.shown"', "echo shown", ': > "$2"', STAYS);
   try {
     const warnings = await warningsOf(async () => {
-      await machine.showComputerUse(slow);
+      await showComputerUse(slow);
       assert.equal(fs.existsSync(`${slow}.shown`), true);
-      await until(() => machine.stopped());
+      await until(() => stopped());
     });
     assert.deepEqual(warnings, []);
   } finally {
@@ -886,14 +892,14 @@ test("showComputerUse resolves once the border says it has shown, having given i
 
 test("showComputerUse rejects with the reason a border gives as it ends, or else with how it ended", async () => {
   const sessionless = standIn("echo a line from the system >&2", "echo this process has no desktop session >&2", "exit 1");
-  await assert.rejects(machine.showComputerUse(sessionless), { message: "this process has no desktop session" });
-  await assert.rejects(machine.showComputerUse(standIn("exit 1")), { message: "it ended with status 1" });
-  await assert.rejects(machine.showComputerUse(standIn("kill -9 $$")), { message: "it ended with SIGKILL" });
+  await assert.rejects(showComputerUse(sessionless), { message: "this process has no desktop session" });
+  await assert.rejects(showComputerUse(standIn("exit 1")), { message: "it ended with status 1" });
+  await assert.rejects(showComputerUse(standIn("kill -9 $$")), { message: "it ended with SIGKILL" });
 });
 
 test("showComputerUse ends a border that says nothing in time, and rejects", async () => {
   const silent = standIn("exec sleep 30");
-  await assert.rejects(machine.showComputerUse(silent, { shownMs: 500 }), { message: "it didn't show within 500 ms" });
+  await assert.rejects(showComputerUse(silent, { shownMs: 500 }), { message: "it didn't show within 500 ms" });
   await until(() => gone(silent));
 });
 
@@ -906,7 +912,7 @@ test("a border that goes after it has shown is warned of once, unless it ended a
   ]) {
     const shown = standIn("echo shown", ...ends);
     const warnings = await warningsOf(async () => {
-      await machine.showComputerUse(shown);
+      await showComputerUse(shown);
       await until(() => gone(shown));
       await pause(100);
     });
@@ -915,7 +921,7 @@ test("a border that goes after it has shown is warned of once, unless it ended a
 });
 
 test("a run that has shown its border still ends by itself", async () => {
-  const run = `require(${JSON.stringify(path.join(__dirname, "..", "device-ui.js"))}).machine.showComputerUse(process.argv[1]).then(() => console.log("shown"))`;
+  const run = `require(${JSON.stringify(path.join(__dirname, "..", "device-ui.js"))}).showComputerUse(process.argv[1]).then(() => console.log("shown"))`;
   const printed = await new Promise((resolve, reject) => {
     require("node:child_process").execFile(process.execPath, ["-e", run, standIn("echo shown", STAYS)], { timeout: 10000 }, (error, stdout) => (error ? reject(error) : resolve(stdout)));
   });

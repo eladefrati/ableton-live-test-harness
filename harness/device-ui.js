@@ -343,8 +343,12 @@ async function showComputerUse(binary, { shownMs = OVERLAY_SHOWN_MS } = {}) {
   else overlay.on("exit", gone);
 }
 
+// This machine's name, as "clickHost" gives one.
+const hostname = () => os.hostname().replace(/\.local$/, "");
+
+// Not exported: its pointer calls skip the dialog, the Info View check and Stop.
 const machine = {
-  hostname: () => os.hostname().replace(/\.local$/, ""),
+  hostname,
   clickHost: () => readClickHost(),
   ask: () => askToClick(runName()),
   buildComputerUse,
@@ -415,6 +419,8 @@ const machine = {
 
 // The system's calls that move the pointer or press its button.
 const POINTER_CALLS = ["hover", "click", "drag", "clickEditor", "dragEditor"];
+// Every call of the machine, by name: a test requires each to be classified.
+const MACHINE_CALLS = Object.keys(machine);
 
 // The systems whose run may use the pointer.
 const allowed = new WeakSet();
@@ -768,5 +774,6 @@ async function openPluginWindow(live, { track, device, size, controls = {} }, sy
 
 module.exports = {
   DeviceUiError, openDeviceUi, openPluginWindow, captureWindow, liveWindows, readControls, readPanelWidth, pointControls, controlPoint,
-  findTitle, infoTitle, readClickHost, runName, runScript, MEASURED_DEVICES, machine, POINTER_CALLS,
+  findTitle, infoTitle, readClickHost, hostname, runName, runScript, MEASURED_DEVICES, POINTER_CALLS, MACHINE_CALLS,
+  stopped, buildComputerUse, showComputerUse,
 };
