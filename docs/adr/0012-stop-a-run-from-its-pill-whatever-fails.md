@@ -119,7 +119,7 @@ Stop could fail, leaving a run that still clicked.
 - An event the helper was about to post when Stop came is still posted: the post follows the
   helper's look at the token at once, and nothing orders the two against Stop's removal of
   it. The notification that the mouse is free came about 0.3 s after the removal; it now
-  comes once the run has ended (ADR-0015).
+  comes when the pill goes (ADR-0015).
 - A Stop that comes while Live is being activated still finds Live brought to the front: the
   run looks for Stop once more just before it tells Live to activate, not after. The Escape
   that closes a menu after Stop is typed by the script that finds Live in front, in one go.
