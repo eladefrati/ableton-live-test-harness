@@ -9,6 +9,10 @@
 //
 //   computer-use-overlay <pid> <click-token> [<run>]
 //
+// A <pid> of 0 or below is refused with the usage, as one that is no number is: Stop's last
+// resort signals <pid> and kills it if it stays, and to kill, 0 is this program's own
+// process group and -1 every process the user may signal.
+//
 // Prints "shown" once the window server lists its windows and, as it ends, the message it
 // notifies. If its windows can't show (no desktop session, no screen, or not listed within
 // SHOWN_SECONDS), it says why on stderr and exits 1, so the run can warn that it clicks with
@@ -38,7 +42,7 @@ func fail(_ message: String) -> Never {
 }
 
 let arguments = CommandLine.arguments
-guard (3...4).contains(arguments.count), let pid = pid_t(arguments[1]) else { fail("usage: computer-use-overlay <pid> <click-token> [<run>]") }
+guard (3...4).contains(arguments.count), let pid = pid_t(arguments[1]), pid > 0 else { fail("usage: computer-use-overlay <pid> <click-token> [<run>]") }
 let token = arguments[2]
 let run = arguments.count == 4 ? arguments[3] : ""
 let RUN_ENDED = "\(run.isEmpty ? "The run" : run) has ended: the mouse is yours again."

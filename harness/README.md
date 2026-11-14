@@ -298,7 +298,9 @@ Node 18 or later. See [ADR-0001](../docs/adr/0001-fork-abletonosc.md) for the de
   helper exits 4; and with a drag's button down, before its move, where the button comes up
   and nothing more is posted. The press takes about 0.1 s to remove the token, longer than
   the helper holds a button, so for these three the window suspends the helper at that
-  event (SIGSTOP), and the check lets it go on (SIGCONT) once the token is gone. In every case
+  event (SIGSTOP), and the check lets it go on (SIGCONT) once the token is gone. First of
+  all the overlay is started with the process id 0, and with -1, for its run: it must
+  refuse, saying nothing and exiting 1 with its usage. In every case
   the window may receive
   nothing but a button-up once the run is stopped: where Stop on the pill removed the token,
   from the moment the token went, which is its folder's modification time. Where a stopped

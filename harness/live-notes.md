@@ -308,6 +308,15 @@ unexpected.
   happened. One holding a drag's button, before its move, posted the button up 5 to 13 ms
   after the signal and no drag event, and exited with status 3. Four runs each
   (`checks/pointer-guards.js`, remote Mac, 2026-11-14).
+- `computer-use-overlay` took any whole number for the process id of its run. Started with
+  0 and with -1 it said `shown` and was still up 2 s later, once each: signal 0, by which
+  it watches its run, had failed for neither. Stop's last resort signals that id, and
+  kills it if it is still there 5 s later, and to `kill`, 0 is the caller's own process
+  group and -1 every process the user may signal (not tried). The overlay now refuses an
+  id of 0 or below as it refuses one that is no number: its usage on stderr, nothing on
+  stdout and exit status 1, 10 to 18 ms after it was started, in 10 starts
+  (`checks/pointer-guards.js` and the overlay started by hand, remote Mac, macOS 26,
+  2026-11-14).
 - A run that couldn't remove its token's folder as it ended, the folder being unwritable,
   ended with status 1 and node's `ENOTEMPTY` error on stderr, whatever its own result: the
   removal threw as the process ended. Seen in Live in 2 of 2 runs that Stop's last resort

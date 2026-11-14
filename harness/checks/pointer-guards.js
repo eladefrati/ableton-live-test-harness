@@ -4,7 +4,8 @@
 // Checks what device-ui.swift posts and what it refuses, and what Stop on the pill of
 // computer-use-overlay.swift does, with real mouse events and no Live: each case shows a
 // window of its own (pointer-target.swift), runs the helper against it, and compares how the
-// helper ended with the mouse events the window received. It takes the pointer, so it
+// helper ended with the mouse events the window received. First it starts the overlay with
+// the process ids it must refuse for a run. It takes the pointer, so it
 // refuses, posting nothing, anywhere but on the click host ("clickHost" in
 // harness/local.json). Exits 1 on failure.
 
@@ -37,6 +38,9 @@ const KILL_SLACK_MS = 1000;
 const END_WAIT_MS = 3000;
 // How long Stop on the pill has to remove the token while the helper is frozen for it.
 const STOP_WAIT_MS = 3000;
+// How long the overlay has to refuse a run. One that doesn't refuse has said by then that
+// its windows are on screen, or why they aren't.
+const REFUSAL_WAIT_MS = 2000;
 
 // The click token every helper here is given, as a run's helpers are (ADR-0012), in a folder
 // of its own. Each case starts with both made anew.
@@ -96,6 +100,12 @@ const RUN_NAME = literal(path.basename(__filename));
 const SAID_STOPPED = new RegExp(`^Stopped: ${RUN_NAME} won't click again\\. The mouse is yours\\.$`);
 const SAID_RUN_ENDED = new RegExp(`^${RUN_NAME} has ended: the mouse is yours again\\.$`);
 const SAID_ENDED_RUN = new RegExp(`^${RUN_NAME} was ended: its click token couldn't be removed\\. The mouse is yours\\.$`);
+
+// The process ids the overlay must refuse for its run: Stop's last resort signals the run and
+// may kill it, and to kill, 0 is the caller's own process group and -1 every process the user
+// may signal.
+const NO_RUNS = [0, -1];
+const OVERLAY_USAGE = "usage: computer-use-overlay <pid> <click-token> [<run>]";
 
 // How long the helper holds the button before a click's release, and after a drag's move
 // before its release (device-ui.swift).
@@ -606,6 +616,30 @@ async function showOverlay(binary, pid) {
   };
 }
 
+// Starts the overlay over the process id `pid` and resolves with what differed from a refusal:
+// nothing said, its usage on stderr and exit status 1. One still up after REFUSAL_WAIT_MS is
+// ended by its own process id, never by its Stop, which signals `pid` if it can't remove the
+// token: it is given a token that isn't there, which no Stop can fail to remove.
+async function unrefused(binary, pid) {
+  fs.rmSync(TOKEN, { force: true });
+  const child = spawn(binary, [String(pid), TOKEN, path.basename(__filename)], { stdio: ["ignore", "pipe", "pipe"] });
+  let [said, complained] = ["", ""];
+  child.stdout.on("data", (data) => { said += data; });
+  child.stderr.on("data", (data) => { complained += data; });
+  const ended = new Promise((resolve) => child.on("close", (code, signal) => resolve(signal ?? code)));
+  const status = await within(REFUSAL_WAIT_MS, ended);
+  if (status === null) {
+    child.kill();
+    await ended;
+    return [`the overlay was still up ${REFUSAL_WAIT_MS} ms after it started${said && `, having said ${JSON.stringify(said.trim())}`}`];
+  }
+  return [
+    status !== 1 && `the overlay exited ${status}, not 1`,
+    complained.trim() !== OVERLAY_USAGE && `the overlay's error was "${complained.trim()}", not its usage`,
+    said && `the overlay said ${JSON.stringify(said.trim())}`,
+  ].filter(Boolean);
+}
+
 const sameEvents = (seen, expected) => seen.length === expected.length
   && expected.every((event, i) => Object.entries(event).every(([field, value]) => seen[i][field] === value));
 
@@ -728,12 +762,15 @@ async function main() {
   }
   // The helper refuses while the display sleeps: the session reports the screen locked.
   const display = await mac.keepDisplayOn();
+  const report = (name, failed) => {
+    console.log(failed.length ? `FAIL: ${name}: ${failed.join("; ")}` : `PASS: ${name}`);
+    if (failed.length) process.exitCode = 1;
+  };
   try {
-    for (const test of CASES) {
-      const failed = await failures(test, binaries);
-      console.log(failed.length ? `FAIL: ${test.name}: ${failed.join("; ")}` : `PASS: ${test.name}`);
-      if (failed.length) process.exitCode = 1;
+    for (const pid of NO_RUNS) {
+      report(`the overlay refuses the process id ${pid} for its run: it says nothing, and exits 1 with its usage`, await unrefused(binaries.overlay, pid));
     }
+    for (const test of CASES) report(test.name, await failures(test, binaries));
   } finally {
     display.stop();
   }
