@@ -314,14 +314,15 @@ test("after Stop on the pill, no press in a plug-in's window clicks", async () =
   assert.equal(clicks(system).length, 1);
 });
 
-test("Stop between a press's hover and its click stops the click", async () => {
+test("Stop between a press's hover and its click stops the click, and Live isn't brought to the front again", async () => {
   const system = fakeMachine();
   const stop = stoppable(system);
   const hover = system.hover;
   system.hover = async (...args) => { await hover(...args); stop(); };
   const ui = await open(system);
-  await assert.rejects(ui.press("Button"), /stopped from its pill/);
+  await assert.rejects(ui.press("Button"), (error) => error instanceof DeviceUiError && /stopped from its pill/.test(error.message));
   assert.equal(clicks(system).length, 0);
+  assert.equal(system.calls.at(-1)[0], "hover");
 });
 
 test("a press and a drag that Stop caught with only the release left reject with that error, which says done", async () => {
@@ -633,6 +634,24 @@ test("capture crops to the editor, in points from the window's corner, gives the
   const window = await openPluginWindow(pluginLive(), PLUGIN, system);
   assert.deepEqual(await window.capture("/out/editor.png"), { w: 400, h: 120 });
   assert.deepEqual(system.calls.slice(-2), [["capture", 11, 400, [0, 19, 400, 120], "/out/editor.png"], ["give back", "com.example.terminal"]]);
+});
+
+test("after Stop, a capture of a plug-in's window throws as stopped, and Live isn't brought to the front", async () => {
+  const system = fakePluginMachine();
+  const stop = stoppable(system);
+  const window = await openPluginWindow(pluginLive(), PLUGIN, system);
+  stop();
+  await assert.rejects(window.capture("/out/editor.png"), (error) => error instanceof DeviceUiError && /stopped from its pill/.test(error.message));
+  assert.equal(system.calls.includes("focus"), false);
+  assert.equal(system.calls.some((call) => call[0] === "capture"), false);
+});
+
+test("a capture of a plug-in's window brings Live to the front without asking to click", async () => {
+  const system = fakePluginMachine();
+  Object.assign(system, { hostname: () => "another-mac", ask: async () => assert.fail("asked to click for a capture") });
+  const window = await openPluginWindow(pluginLive(), PLUGIN, system);
+  await window.capture("/out/editor.png");
+  assert.equal(system.calls.includes("focus"), true);
 });
 
 test("close asks the helper to close the window", async () => {

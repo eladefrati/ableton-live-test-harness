@@ -502,10 +502,17 @@ async function permit(system) {
 // The system as DeviceUi and PluginWindow hold it: each call that moves the pointer passes
 // permit first, so none can skip the dialog or Stop. `permit` asks ahead of such a call.
 // After Stop the run takes nothing more from the person, the front included: Escape is typed
-// only while Live is still in front, and Live isn't brought there.
+// only while Live is still in front, and Live isn't brought there, which `focus` refuses.
+// It doesn't pass permit: a run that only captures brings Live forward too, and must not
+// start asking to click.
 function guarded(system) {
   const guard = Object.create(system);
   guard.permit = () => permit(system);
+  guard.focus = async () => {
+    const why = system.stopped();
+    if (why) throw new DeviceUiError(`${why}. Live not brought to the front`);
+    return system.focus();
+  };
   guard.escape = async () => {
     if (!system.stopped()) return system.escape();
     if (await system.liveInFront()) await system.typeEscape();
