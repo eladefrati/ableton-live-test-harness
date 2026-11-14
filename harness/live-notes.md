@@ -112,8 +112,11 @@ unexpected.
 - A Max for Live number box (`live.numbox`, -100 to 100 %) turns in 2-point steps, however
   the drag is posted: 10, 20, 30 and 40 points turned it 16, 31, 47 and 63 % either way, but
   5 points 9 or 10 % down and 6 or 7 % up, and 15 points 25 or 26 % down and 22 % up. A drag
-  of 3 points did nothing either way. Pressing at a fraction of a point (0, 0.25, 0.49, 0.51,
-  0.75) changed nothing for 10 points (remote Mac, Live 12.4.25b1, 2026-11-13).
+  of 3 points moved it neither way, which the 2-point steps don't explain; why is unknown.
+  Pressing at a fraction of a point (0, 0.25, 0.49, 0.51, 0.75) gave the same change for a
+  10-point drag (remote Mac, Live 12.4.25b1, 2026-11-13). A check drags a number box by a
+  multiple of 10 points, the distances measured to turn it the same either way; shorter
+  even distances were not measured.
 - A drag too short to move the pointer (`0 -1e-15`) crashed the helper after the button went
   down and left it held. A drag under 1 point on its longer axis is now refused (remote Mac,
   2026-11-13).
