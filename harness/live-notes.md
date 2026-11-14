@@ -285,8 +285,8 @@ unexpected.
   mouse event followed, also once the folder could be written to again (remote Mac, Live
   12.4.25b1, 2026-11-14).
 - Stop's last resort now sends the run SIGUSR2 and keeps the border up until the run has
-  ended; a run still there 5 s after the signal is killed (ADR-0012 says why that signal,
-  and why 5 s). On the signal the run counts itself stopped, whatever its token says,
+  ended; a run still there 10 s after the signal is killed (ADR-0012 says why that signal,
+  and why 10 s). On the signal the run counts itself stopped, whatever its token says,
   passes the signal on to the helpers it has running, and goes on, so that a check fails at
   the press that throws and still cleans up; `device-ui.swift` handles the signal from its
   start and stops as after Stop. With the token immutable and a helper waiting under a
@@ -295,12 +295,17 @@ unexpected.
   has, 0.12 to 0.13 s after; the overlay said Stopped 0.03 to 0.04 s after the run's end.
   With the folder unwritable and no helper running, the run had ended 0.08 to 0.09 s after
   the press was started, and the overlay said Stopped 0.04 to 0.06 s later. A run that
-  ignored the signal was killed 5.10 to 5.15 s after the press was started; its helper,
-  kept under the cover by a second notification, was gone within 0.11 s of the kill with no
-  mouse event posted, and the overlay said that the run was ended 0.05 to 0.07 s after the
-  kill. Without the second notification the cover goes before the kill, and the helper of a
-  run that doesn't act on the signal is free to click until the kill (ADR-0012). Four runs
-  each (`checks/pointer-guards.js`, remote Mac, 2026-11-14).
+  ignored the signal was killed 5.10 to 5.15 s after the press was started, when a run was
+  given 5 s; its helper, kept under the cover by a second notification, was gone within
+  0.11 s of the kill with no mouse event posted, and the overlay said that the run was ended
+  0.05 to 0.07 s after the kill. The helper of a run that doesn't act on the signal is free
+  to click until the kill (ADR-0012). Four runs each (`checks/pointer-guards.js`, remote
+  Mac, 2026-11-14).
+- A run is now given 10 s. A stopped run finishes the step it is in before it throws, at
+  its next click: in Live, a run stopped as it began to read a menu `choose` had opened took
+  2.3 and 2.4 s over the read, and ended 4.2 and 4.6 s after Stop, 1.5 and 1.8 s of which
+  were a wait the proof had added; 5 s left too little room for its clean-up (remote Mac,
+  Live 12.4.25b1, 2026-11-14).
 - A helper sent that signal itself stopped as after Stop. One waiting under a
   notification's cover exited with status 3 4 to 13 ms later. One holding a click's button
   posted the button up 6 to 8 ms after the signal, which cuts the hold short (73 to 81 ms
@@ -311,7 +316,7 @@ unexpected.
 - `computer-use-overlay` took any whole number for the process id of its run. Started with
   0 and with -1 it said `shown` and was still up 2 s later, once each: signal 0, by which
   it watches its run, had failed for neither. Stop's last resort signals that id, and
-  kills it if it is still there 5 s later, and to `kill`, 0 is the caller's own process
+  kills it if it is still there 10 s later, and to `kill`, 0 is the caller's own process
   group and -1 every process the user may signal (not tried). The overlay now refuses an
   id of 0 or below as it refuses one that is no number: its usage on stderr, nothing on
   stdout and exit status 1, 10 to 18 ms after it was started, in 10 starts

@@ -105,7 +105,7 @@ func notify(_ message: String) {
 
 // How long a run that Stop signalled has to end by itself before it is killed, and how long
 // a killed run then has to be gone: one that nothing has reaped yet still answers signal 0.
-let END_SECONDS = 5.0
+let END_SECONDS = 10.0
 let KILLED_SECONDS = 1.0
 
 // Stop's last resort (ADR-0012), for a run whose token is still there after Stop tried to

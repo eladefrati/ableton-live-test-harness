@@ -27,12 +27,12 @@ const EVENT_WAIT_MS = 300;
 // How long Notification Center takes to cover the screen once a notification is posted.
 const BANNER_WAIT_MS = 1000;
 // How long the overlay has to end once Stop is pressed. Its last resort alone gives the run
-// 5 s to end, and a run it then kills 1 s more to be gone.
-const OVERLAY_WAIT_MS = 10000;
+// 10 s to end, and a run it then kills 1 s more to be gone.
+const OVERLAY_WAIT_MS = 15000;
 // How long after its signal Stop's last resort kills a run that is still there
 // (computer-use-overlay.swift), and how much later than that the check may see the run end,
 // counted from when it started to press Stop.
-const KILL_AFTER_MS = 5000;
+const KILL_AFTER_MS = 10000;
 const KILL_SLACK_MS = 1000;
 // How long a process has to end once what holds it has gone.
 const END_WAIT_MS = 3000;
@@ -121,9 +121,8 @@ const DRAGGED = { type: "drag", dx: 30, dy: -20 };
 
 // Each case: the target's options, whether harness-computer-use's overlay runs, whether the
 // token can't be removed, whether the run ignores the signal of Stop's last resort, whether a
-// notification's banner shows first, and how long after the helper starts a second is posted
-// to keep the cover up, whether the run is stopped before the helper starts or how long
-// after, and by what if not by the token's removal, and the helper's command, if a helper
+// notification's banner shows first, whether the run is stopped before the helper starts or
+// how long after, and by what if not by the token's removal, and the helper's command, if a helper
 // runs, given the target's window and its centre, and whether a process that has ended
 // starts it, not the check's run. A target that freezes the helper says when
 // itself: the run is stopped once it has, and the helper goes on once the token is gone. Then
@@ -414,22 +413,17 @@ const CASES = [
     says: SAID_STOPPED,
     afterRun: true,
   },
-  // A notification's cover goes about 5 s after it is posted, before the run is killed, and
-  // the helper of a run that ignores the signal may click from then on: a second
-  // notification keeps the cover up past the kill.
+  // No helper runs here: one that waits under a notification's cover gives up after 10 s, as
+  // long as the run is given, and a helper whose run is killed is the case further up.
   {
-    name: "Stop on the pill when the token can't be removed and the run ignores the signal, while the helper waits for a notification's cover to go: "
-      + "the run is killed 5 s after Stop, not sooner, the helper ends with it, posting nothing, and only then does the overlay say that the run was ended",
+    name: "Stop on the pill when the token can't be removed and the run ignores the signal: "
+      + "the run is killed 10 s after Stop, not sooner, and only then does the overlay say that the run was ended",
     overlay: true,
     immutable: true,
     deaf: true,
-    banner: true,
-    bannerAgainMs: 2500,
     target: RECT,
-    stopAfterMs: 1000,
+    stopped: true,
     loss: stopPressed,
-    command: click,
-    status: withRun("SIGKILL"),
     events: () => [],
     says: SAID_ENDED_RUN,
     afterRun: true,
@@ -686,15 +680,11 @@ async function failures(test, binaries) {
         try { process.kill(pid, "SIGCONT"); } catch { /* it has ended */ }
       }
     });
-    const notify = () => tools.run("osascript", ["-e", `display notification "${path.basename(__filename)}" with title "harness-computer-use"`]);
     if (test.banner) {
-      await notify();
+      await tools.run("osascript", ["-e", `display notification "${path.basename(__filename)}" with title "harness-computer-use"`]);
       await sleep(BANNER_WAIT_MS);
     }
     const timer = test.stopAfterMs && setTimeout(lose, test.stopAfterMs);
-    // Why the second notification wasn't posted, if it wasn't.
-    let unposted = "";
-    const again = test.bannerAgainMs && setTimeout(() => notify().catch((error) => { unposted = error.message; }), test.bannerAgainMs);
     const started = Date.now();
     let ended, took, printed;
     try {
@@ -704,7 +694,6 @@ async function failures(test, binaries) {
       await sleep(EVENT_WAIT_MS);
     } finally {
       clearTimeout(timer);
-      clearTimeout(again);
       // Ending the target also releases a button the helper left held.
       printed = await target.end();
     }
@@ -738,7 +727,6 @@ async function failures(test, binaries) {
       test.says && said !== null && !test.says.test(said.text) && `the overlay said ${JSON.stringify(said.text)}, not ${test.says}${unpressed}`,
       test.afterRun && said?.at < run.endedAt() && `the overlay said ${JSON.stringify(said.text)} before the run had ended`,
       test.killedMs && !(killed >= test.killedMs[0] && killed <= test.killedMs[1]) && `the run ended ${killed} ms after Stop, not ${test.killedMs.join(" to ")}`,
-      unposted && `the second notification wasn't posted: ${unposted}`,
       ran !== (test.run ?? 0) && `the run ended with ${ran}, not ${test.run ?? 0}`,
     ].filter(Boolean);
   } finally {

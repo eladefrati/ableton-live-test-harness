@@ -117,7 +117,7 @@ Node 18 or later. See [ADR-0001](../docs/adr/0001-fork-abletonosc.md) for the de
   nothing but the release of a button it holds. A stopped run doesn't bring Live to the front
   either, so a capture of a plug-in's window throws too. If Stop can't remove the token, it
   signals the run instead (SIGUSR2): the run stops the same way, whatever its token says,
-  and the border stays until the run has ended. A run still there 5 s after the signal is
+  and the border stays until the run has ended. A run still there 10 s after the signal is
   killed, and cleans nothing up: a check has that long to clean up and end. A run
   whose border can't show, or goes, however it ends, while the run goes
   on and wasn't stopped, says so on stderr in a line starting `warn harness-computer-use`, and clicks without
@@ -288,9 +288,8 @@ Node 18 or later. See [ADR-0001](../docs/adr/0001-fork-abletonosc.md) for the de
   token can't be removed, it signals the check's run, which passes the signal on to its
   helper as a run does: the helper stops as after Stop, the run ends by itself, and only
   then does the overlay say Stopped, as it does when the token's folder can't be written
-  to, where the run reads as stopped already; a run that ignores the signal is killed 5 s
-  after Stop, not sooner, its helper waiting meanwhile under a banner's cover that a second
-  notification keeps up, and only then does the overlay say that the run was ended;
+  to, where the run reads as stopped already; a run that ignores the signal is killed 10 s
+  after Stop, not sooner, and only then does the overlay say that the run was ended;
   pressed as the run ends, it says
   that the run has ended. Stop is pressed on the pill during a gesture too, and the overlay
   says Stopped and goes: at the first move of a click's hover, after which the helper posts
