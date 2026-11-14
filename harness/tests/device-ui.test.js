@@ -775,6 +775,17 @@ test("Stop while choose reads the menu types nothing once Live is no longer in f
   assert.equal(calls.includes("escape"), false);
 });
 
+test("Stop during choose's opening click, which resolves, leaves the item unclicked and closes the menu without bringing Live forward", async () => {
+  const system = menuMachine(MENU_ROWS);
+  const stop = stoppable(system);
+  const click = system.click;
+  system.click = async (...args) => { await click(...args); stop(); };
+  await assert.rejects((await openMenu(system)).choose("Menu", "Wander"), /stopped from its pill/);
+  assert.deepEqual(clicks(system).map((call) => call[1]), [7]);
+  assert.equal(system.calls.at(-1), "typeEscape");
+  assert.equal(system.calls.includes("escape"), false);
+});
+
 test("choose keeps its failure, with a warning, when Escape fails too", async () => {
   const system = menuMachine(MENU_ROWS);
   system.escape = async () => { throw new Error("System Events got an error"); };

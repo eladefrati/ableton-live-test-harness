@@ -34,8 +34,9 @@
 //
 // Once the run is stopped (ADR-0009: the file named in HARNESS_COMPUTER_USE_STOP exists),
 // hover, click and drag post nothing but the release of a button this helper holds, and exit
-// 3 saying so. A helper that fails, or is sent SIGINT, SIGTERM or SIGHUP, while it holds the
-// button releases it before it ends.
+// 3 saying so. A click or a drag with only that release left has happened: the helper posts
+// it and exits 0. A helper that fails, or is sent SIGINT, SIGTERM or SIGHUP, while it holds
+// the button releases it before it ends.
 
 import ApplicationServices
 import Foundation
@@ -308,8 +309,8 @@ func buttonUp(_ point: CGPoint) {
     while nanosleep(&wait, &left) != 0 && errno == EINTR { wait = left }
 }
 
-// The one event a helper that is stopped, signalled or failing still posts: the button up
-// where the pointer is, if it holds the button. Returns that point.
+// The one event a helper that is halting or failing still posts: the button up where the
+// pointer is, if it holds the button. Returns that point.
 @discardableResult func release() -> CGPoint? {
     guard let held = heldAt else { return nil }
     let point = CGEvent(source: nil)?.location ?? held
@@ -334,9 +335,10 @@ func halt() -> Never {
 }
 
 // The one function a hover's, a click's and a drag's events leave from, so the one place that
-// checks Stop.
+// checks Stop. Not before a button-up: the click or the drag it ends has happened by then, so
+// a helper stopped there ends as one that did it, where status 3 would report it as not done.
 func post(_ type: CGEventType, _ point: CGPoint, moved: CGVector? = nil) {
-    if signalled != 0 || stopped() { halt() }
+    if type != .leftMouseUp && (signalled != 0 || stopped()) { halt() }
     switch type {
     case .leftMouseDown:
         // A signal the helper was started ignoring, as under nohup, stays ignored.

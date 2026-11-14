@@ -29,7 +29,7 @@ const BANNER_WAIT_MS = 1000;
 // starts without it.
 const MARKER = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "pointer-guards-")), "stopped");
 process.on("exit", () => fs.rmSync(path.dirname(MARKER), { recursive: true, force: true }));
-// How a stopped helper exits, and what it says.
+// How a helper that Stop ends before its last event exits, and what it says.
 const STOPPED = 3;
 const STOPPED_ERROR = /^harness-computer-use was stopped from its pill: this run clicks no more, and the helper (held no button|released the button at [\d.]+, [\d.]+)$/;
 
@@ -93,11 +93,10 @@ const CASES = [
     events: () => [],
   },
   {
-    name: "Stop while a click holds the button: its release is still posted",
+    name: "Stop while a click holds the button: the click completes, and the helper ends as one that wasn't stopped",
     target: [...RECT, "--stop", MARKER],
     command: click,
-    status: STOPPED,
-    stderr: STOPPED_ERROR,
+    status: 0,
     events: (x, y) => [{ type: "down", x, y }, { type: "up", x, y }],
   },
   {
@@ -107,6 +106,13 @@ const CASES = [
     status: STOPPED,
     stderr: STOPPED_ERROR,
     events: (x, y) => [{ type: "down", x, y }, { type: "up", x, y }],
+  },
+  {
+    name: "Stop once a drag's move is posted: the drag completes, and the helper ends as one that wasn't stopped",
+    target: [...RECT, "--stop-at-drag", MARKER],
+    command: drag,
+    status: 0,
+    events: (x, y) => [{ type: "down", x, y }, { ...DRAGGED, x: x + 30, y: y - 20 }, { type: "up", x: x + 30, y: y - 20 }],
   },
   {
     name: "SIGTERM while a drag holds the button: the helper releases it at the press point, then dies by the signal",

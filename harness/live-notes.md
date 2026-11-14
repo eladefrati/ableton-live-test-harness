@@ -174,11 +174,13 @@ unexpected.
   glow, the click guard doesn't skip it: a point under the pill is refused, with an error
   that names the pill.
 - Stop on the pill creates the run's stop marker, a file `device-ui.swift` looks for before
-  every mouse event it posts (ADR-0009). A helper started after Stop posted nothing. One
-  stopped while a click held the button posted the button up, so the click happened. One
-  stopped while a drag held the button, before its move, posted the button up at the press
-  point and no drag event. Each exited with status 3 (`checks/pointer-guards.js`, remote Mac,
-  2026-11-13).
+  every mouse event it posts but a button-up (ADR-0009). A helper started after Stop posted
+  nothing, and one stopped while a drag held the button, before its move, posted the button
+  up at the press point and no drag event: each exited with status 3. One stopped while a
+  click held the button posted the button up, so the click happened, and one stopped after
+  its drag's move did too, so the drag happened: with only the release left, each exited
+  with status 0 (`checks/pointer-guards.js`, remote Mac, 2026-11-13). The run's next press
+  then throws.
 - With no window server, as for a process with no desktop session, a program gets no session
   (`CGSessionCopyCurrentDictionary()` is nil), no screens, and windows that say they are
   visible and never show, all with no error; `display dialog` fails there with -1713, "No
