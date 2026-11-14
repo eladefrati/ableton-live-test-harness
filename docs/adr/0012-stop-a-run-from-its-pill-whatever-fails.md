@@ -50,11 +50,15 @@ Stop could fail, leaving a run that still clicked.
    the same way before each press.
    The helper also posts only while the run that started it lives: a run that a signal
    killed leaves its token behind, and the border then says that the mouse is free. If
-   the token is still there after Stop tried to remove it, Stop ends the run's helper and
-   the run itself by signal, also when the run reads as stopped just then, as with a folder
-   that can't be written to: what made it so may pass, and the token would let the run
-   click again. Stopping comes before the run's cleanup. Stop has no outcome in which the
-   run still clicks.
+   the token is still there after Stop tried to remove it, Stop signals the run instead
+   (SIGUSR2), also when the run reads as stopped just then, as with a folder that can't be
+   written to: what made it so may pass, and the token would let the run click again. On
+   that signal the run counts itself stopped, whatever its token says, passes the signal on
+   to a helper it has running, which stops as after Stop, and carries on: a check fails at
+   the press that throws and still cleans up, over OSC, which needs no pointer. The border
+   stays up until the run has ended, by itself or, 5 s after the signal, killed; a killed
+   run's helpers stop because their run is gone. Only then does Stop say that the mouse is
+   free. Stop has no outcome in which the run still clicks.
 6. **A stopped press throws, and says what it had done.** Once the run is stopped the helper
    posts nothing but the release of a button it holds: a press under way stops before its
    hover, before its click or before a drag's move, and a drag stopped before its move ends
@@ -62,9 +66,9 @@ Stop could fail, leaving a run that still clicked.
    The press under way throws as stopped, and so does every later press of the run. If only
    the release was left, the click or the drag has happened: the press still throws as
    stopped, and its error says that it happened (`done`), so that whatever made the press
-   clears up what the click did (ADR-0014). The run isn't killed, decision 5's last resort
-   apart: a check fails at the press that throws and still runs its cleanup, where a kill
-   would leave its tracks in Live. A stopped run takes nothing more from the person: it
+   clears up what the click did (ADR-0014). The run isn't killed, unless it outlasts the 5 s
+   of decision 5's last resort: a check fails at the press that throws and still runs its
+   cleanup, where a kill would leave its tracks in Live. A stopped run takes nothing more from the person: it
    doesn't bring Live to the front either.
 
 ## Considered
@@ -77,7 +81,17 @@ Stop could fail, leaving a run that still clicked.
   a border that dies mustn't stop the run.
 - **A signal from the pill as the only way.** It reaches the helper that runs then and no
   later one, unless the run acts on it too, which a run busy in its own code doesn't. It
-  stays as the last resort, with the run ended as well.
+  stays as the last resort, with a kill behind it.
+- **Killing the run at once in the last resort.** A killed run leaves its tracks in Live,
+  and its cleanup needs no pointer, so the run is told to stop first and killed only if it
+  doesn't end.
+- **SIGTERM or SIGINT as the last resort's signal.** A run that handled either would no
+  longer end by it, for Ctrl-C and for whatever else sends it. SIGUSR2 has no other meaning
+  to the run or to node (SIGUSR1 starts node's debugger), nothing but Stop sends it, and it
+  ends a run that doesn't handle it.
+- **A longer wait before the kill.** It is how long a run that doesn't act on the signal can
+  still click, so it is as short as a check's cleanup allows: deleting a check's tracks
+  took about 0.3 s, and 5 s leaves room for a check with more to undo.
 
 ## Consequences
 
@@ -92,8 +106,10 @@ Stop could fail, leaving a run that still clicked.
   about 1.4 s after Allow.
 - A run with no desktop session can't show the dialog either, so it is refused before the
   border matters.
-- Stop needs nothing from the run: the helper reads the token itself, so a run busy in its
-  own code is stopped as fast as an idle one.
+- Stop needs nothing from the run while it can remove the token: the helper reads the token
+  itself, so a run busy in its own code is stopped as fast as an idle one. The last resort
+  does need the run, to act on the signal: until a run that doesn't is killed, 5 s later, it
+  can still click, and the border stays up.
 - A run stops clicking when anything else removes its token or the token's folder: it can't
   tell that it wasn't stopped. Its error says what it found, so for a token that something
   else removed it says, as after Stop, that the run was stopped from its pill.
@@ -101,7 +117,8 @@ Stop could fail, leaving a run that still clicked.
   still posted, and so does a drag whose move was already posted. A drag stopped before its
   move is a click on the control: the button went down at the press point and came up where
   the pointer then was. Its error doesn't say `done`, since the drag didn't happen.
-- A run ended by Stop's last resort leaves its tracks in Live.
+- A run killed in Stop's last resort leaves its tracks in Live. That includes a run that
+  stopped clicking when told to and then went on for more than 5 s.
 - A helper outlives its run only to release a button it holds: a press that hadn't reached
   its click when the run was killed doesn't click.
 - An interrupt, quit, hangup or termination signal that reaches the helper while it holds the
