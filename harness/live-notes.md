@@ -506,6 +506,13 @@ unexpected.
   2 of 2 (remote Mac, Live 12.4.25b1, 2026-11-14).
 - While the remote Mac's display sleeps, `screencapture -l` fails with "could not create image from
   window", and the session reports the screen locked until the display wakes.
+- A video (`video.js`, ADR-0016) records a window as `screencapture -l` captures it: behind
+  other windows, without harness-computer-use's border and pill, the pointer included; Live
+  in the background shows its title bar inactive. While the display sleeps a recording gets
+  no frames: a display put to sleep 3 s into a 10 s recording left a 10 s video whose
+  picture stopped at 3 s. A recorder started with the display asleep made no file, so
+  `video.js` wakes the display first, and its helper keeps the display from sleeping while it
+  records (remote Mac, macOS 26.7, Live 12.4.25b1, 2026-11-14).
 - `ui.capture` crops its capture of Live's window with the helper's `crop`, as a capture of
   a plug-in's editor does, no longer with `sips`. The helper's crop gave its PNG no
   resolution, which reads as 72 dpi, where the capture has 144 and a crop by `sips` kept

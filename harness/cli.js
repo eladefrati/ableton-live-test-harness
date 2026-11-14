@@ -26,6 +26,13 @@
 //                                         saves a picture of its editor (ADR-0008), printing the
 //                                         editor's size in points; brings Live to the front
 //                                         while it captures
+//   node harness/cli.js video <file.mov> [--seconds <n>] [--window <id> | --screen] [-- <command...>]
+//                                         a video of Live's main window, of the window with that
+//                                         id, or of the main display (ADR-0016), until the
+//                                         command ends, the length given, Ctrl-C or SIGTERM (10
+//                                         minutes at most if no length is given); prints its
+//                                         length and size, and exits with the command's status;
+//                                         needs no OSC either
 //
 // Arguments: "12" is an int, "12.0" a float, true/false booleans, anything else a string.
 
@@ -33,6 +40,7 @@ const { connect } = require("./live.js");
 const { float } = require("./osc.js");
 const { maxMessages } = require("./log.js");
 const { captureWindow, liveWindows, openPluginWindow } = require("./device-ui.js");
+const { parseVideoArgs, runVideoCommand } = require("./video.js");
 
 function parseArg(text) {
   if (text === "true") return true;
@@ -44,10 +52,15 @@ function parseArg(text) {
 
 const USAGE = "usage: cli.js ping | reload | query <address> [args] | send <address> [args] | "
   + "notes <track> <clip> [--arrangement] | song-notes <track> | max-log [since] | windows | capture <png> [--window <id>] | "
-  + "plugin-window <track> <device> <png>";
+  + "plugin-window <track> <device> <png> | video <file.mov> [--seconds <n>] [--window <id> | --screen] [-- <command...>]";
 
 async function run(argv) {
   const [command, ...rest] = argv;
+  if (command === "video") {
+    const result = await runVideoCommand(parseVideoArgs(rest));
+    if (result.status) process.exitCode = result.status;
+    return result;
+  }
   const flags = new Set(rest.filter((a) => a.startsWith("--")));
   const args = rest.filter((a) => !a.startsWith("--"));
   if (command === "max-log") {

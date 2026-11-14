@@ -649,6 +649,12 @@ async function liveWindows(system = machine) {
   return system.windows();
 }
 
+// Live's main window on screen: { id, x, y, w, h } in points.
+async function liveMainWindow(system = machine) {
+  await system.wake();
+  return system.window();
+}
+
 // Saves a picture of one of Live's windows to `file` (PNG), with Live left where it is: the
 // capture works behind other windows. The window is Live's main one, or the one with the id
 // `window` (from liveWindows); a window that isn't Live's is refused. Needs Screen Recording
@@ -932,7 +938,7 @@ async function openPluginWindow(live, { track, device, size, controls = {} }, sy
 }
 
 module.exports = {
-  DeviceUiError, openDeviceUi, openPluginWindow, captureWindow, liveWindows, readControls, readPanelWidth, pointControls, controlPoint,
+  DeviceUiError, openDeviceUi, openPluginWindow, captureWindow, liveWindows, liveMainWindow, readControls, readPanelWidth, pointControls, controlPoint,
   findTitle, infoTitle, readClickHost, hostname, runName, runScript, MEASURED_DEVICES, POINTER_CALLS, MACHINE_CALLS,
   stopped, clickToken, buildComputerUse, showComputerUse, askToClick,
 };
