@@ -109,6 +109,11 @@ unexpected.
   too), the Dry/Wet Mix slider of AUDelay's editor (10 right, 0.5 to 0.7145) and a Max for
   Live device's number box (10 down, 16 % down). None of them read the delta fields or moved
   the pointer during the drag (remote Mac, Live 12.4.25b1, 2026-11-13).
+- A Max for Live number box (`live.numbox`, -100 to 100 %) turns in 2-point steps, however
+  the drag is posted: 10, 20, 30 and 40 points turned it 16, 31, 47 and 63 % either way, but
+  5 points 9 or 10 % down and 6 or 7 % up, and 15 points 25 or 26 % down and 22 % up. A drag
+  of 3 points did nothing either way. Pressing at a fraction of a point (0, 0.25, 0.49, 0.51,
+  0.75) changed nothing for 10 points (remote Mac, Live 12.4.25b1, 2026-11-13).
 - A drag too short to move the pointer (`0 -1e-15`) crashed the helper after the button went
   down and left it held. A drag under 1 point on its longer axis is now refused (remote Mac,
   2026-11-13).
