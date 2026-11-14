@@ -27,8 +27,10 @@ at the Mac doesn't know when the mouse is theirs again.
 3. **The click guard skips the border.** Its windows cover the screen above every app and let
    every click through; the check that the window aimed at is topmost at the point (ADR-0004,
    ADR-0008) leaves out windows with the border's title owned by its program, and nothing else.
-4. **It only informs.** A run that can't show it warns and clicks anyway: the person allowed the
-   clicks, not the border.
+4. **It only informs.** The run builds the border's program before it asks, and after Allow
+   waits for the border to say its windows are on screen. A run that can't show it (the build
+   fails, the program ends, or it says nothing for 5 s) warns and clicks anyway, and so does
+   a run whose border goes while it goes on: the person allowed the clicks, not the border.
 5. **Stop on the pill takes the mouse back.** It creates the run's stop marker, a file the run
    named when it started the border, takes the border down, and then says the mouse is free.
    The helper that posts the mouse events checks the marker before every event. Once the
@@ -47,6 +49,11 @@ at the Mac doesn't know when the mouse is theirs again.
 - A window given the border's title by a program whose name starts like the border's would be
   skipped too: the guard stops accidents, as ADR-0006's dialog does, not a program set on
   clicking.
+- After a change to the helper or the border, a run's first press builds both before the
+  dialog: about 11 s, and 25 s or more with an empty module cache. The border is on screen
+  about 1.4 s after Allow.
+- A run with no desktop session can't show the dialog either, so it is refused before the
+  border matters.
 - Stop needs nothing from the run: the helper reads the marker itself, so a run busy in its
   own code is stopped as fast as an idle one.
 - A click whose button was down when Stop came completes, since its release is the one event
