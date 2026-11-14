@@ -920,10 +920,11 @@ async function failures(test, binaries) {
     // the target waits for a notification's cover to go, which can take longer than the
     // overlay stays up after Stop (ADR-0015), and that wait is no part of what a case times.
     if (test.stopped) await lose();
-    // Stop pressed a second time, and why it couldn't be, if it couldn't.
-    let unpressedAgain = "";
+    // Stop pressed a second time: when the press returned, or why it couldn't be made.
+    let [againAt, unpressedAgain] = [null, ""];
     const again = test.againAfterMs
-      && sleep(test.againAfterMs).then(() => tools.run(binaries.press, [overlay.pid])).catch((error) => { unpressedAgain = error.message; });
+      && sleep(test.againAfterMs).then(() => tools.run(binaries.press, [overlay.pid]))
+        .then(() => { againAt = Date.now(); }, (error) => { unpressedAgain = error.message; });
     // The helper the target froze. The run is stopped then, and the helper goes on once the
     // token is gone, or STOP_WAIT_MS later: whatever fails, it isn't left frozen.
     let frozen = null;
@@ -991,6 +992,7 @@ async function failures(test, binaries) {
       held && `the button was left held, and ${held.released ? "has been released" : "could not be released"}`,
       ...stopping,
       unpressedAgain && `Stop couldn't be pressed again: ${unpressedAgain}`,
+      againAt !== null && !(againAt < run.endedAt()) && "the second press on Stop returned only once the run had ended, which doesn't show that it did nothing",
       test.says && said === null && `the overlay was still up ${OVERLAY_WAIT_MS} ms after Stop${unpressed}`,
       test.says && said !== null && !test.says.test(said.text) && `the overlay said ${JSON.stringify(said.text)}, not ${test.says}${unpressed}`,
       test.afterRun && said?.at < run.endedAt() - EXIT_NEWS_MS && `the overlay said ${JSON.stringify(said.text)} before the run had ended`,
