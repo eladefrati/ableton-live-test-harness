@@ -49,8 +49,10 @@ let STOPPED_STATUS: Int32 = 3
 
 func stopped() -> Bool { STOP_MARKER.map { access($0, F_OK) == 0 } ?? false }
 
-// Where the button went down, while this helper holds it.
-var heldAt: CGPoint? = nil
+// The button-up event, while this helper holds the button. It is made before the button goes
+// down, when failing to make it leaves nothing held, so that whatever fails with the button
+// down has the event to release it with.
+var held: CGEvent? = nil
 // A signal that would end the helper, as Ctrl-C on the run does, is held back once the button
 // goes down: the helper releases the button first, then dies by that signal.
 let ENDING_SIGNALS = [SIGINT, SIGTERM, SIGHUP]
@@ -287,11 +289,16 @@ func requireOnTop(_ id: Int, _ point: CGPoint) {
     }
 }
 
-func emit(_ type: CGEventType, _ point: CGPoint, moved: CGVector? = nil) {
+func mouseEvent(_ type: CGEventType, _ point: CGPoint) -> CGEvent {
     guard let event = CGEvent(mouseEventSource: CGEventSource(stateID: .hidSystemState), mouseType: type,
                               mouseCursorPosition: point, mouseButton: .left)
     else { fail("Cannot create a mouse event") }
     event.setIntegerValueField(.mouseEventClickState, value: 1)
+    return event
+}
+
+func emit(_ type: CGEventType, _ point: CGPoint, moved: CGVector? = nil) {
+    let event = mouseEvent(type, point)
     if let moved {
         event.setIntegerValueField(.mouseEventDeltaX, value: Int64(moved.dx))
         event.setIntegerValueField(.mouseEventDeltaY, value: Int64(moved.dy))
@@ -302,8 +309,10 @@ func emit(_ type: CGEventType, _ point: CGPoint, moved: CGVector? = nil) {
 // The button up, for a click, a drag and a release alike, and then a wait: a mouse event
 // posted as the last thing a program does is lost (live-notes.md).
 func buttonUp(_ point: CGPoint) {
-    heldAt = nil
-    emit(.leftMouseUp, point)
+    guard let up = held else { return }
+    up.location = point
+    up.post(tap: .cghidEventTap)
+    held = nil
     // A signal held back cuts a sleep short, so the rest of it is slept again.
     var (wait, left) = (timespec(tv_sec: 0, tv_nsec: 100_000_000), timespec())
     while nanosleep(&wait, &left) != 0 && errno == EINTR { wait = left }
@@ -312,8 +321,8 @@ func buttonUp(_ point: CGPoint) {
 // The one event a helper that is halting or failing still posts: the button up where the
 // pointer is, if it holds the button. Returns that point.
 @discardableResult func release() -> CGPoint? {
-    guard let held = heldAt else { return nil }
-    let point = CGEvent(source: nil)?.location ?? held
+    guard let up = held else { return nil }
+    let point = CGEvent(source: nil)?.location ?? up.location
     buttonUp(point)
     return point
 }
@@ -334,19 +343,21 @@ func halt() -> Never {
     exit(STOPPED_STATUS)
 }
 
-// The one function a hover's, a click's and a drag's events leave from, so the one place that
-// checks Stop. Not before a button-up: the click or the drag it ends has happened by then, so
-// a helper stopped there ends as one that did it, where status 3 would report it as not done.
+// The one function a hover's, a click's and a drag's events leave from, so it checks Stop
+// before each, as requireOnTop does while it waits. Not before a button-up: the click or the
+// drag it ends has happened by then, so a helper stopped there ends as one that did it, where
+// status 3 would report it as not done.
 func post(_ type: CGEventType, _ point: CGPoint, moved: CGVector? = nil) {
     if type != .leftMouseUp && (signalled != 0 || stopped()) { halt() }
     switch type {
     case .leftMouseDown:
+        let up = mouseEvent(.leftMouseUp, point)
         // A signal the helper was started ignoring, as under nohup, stays ignored.
         for number in ENDING_SIGNALS {
             if let before = signal(number, { signalled = $0 }) { signal(number, before) }
         }
         emit(type, point)
-        heldAt = point
+        held = up
     case .leftMouseUp:
         buttonUp(point)
         obeySignal()
