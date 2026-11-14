@@ -219,6 +219,25 @@ unexpected.
   the button came up, and a press that waited under a notification's cover threw 208 and
   251 ms after that, with no mouse event of the helper's after (remote Mac, Live 12.4.25b1,
   2026-11-13).
+- Stop pressed on the pill through Accessibility removed the token 71 to 123 ms after the
+  press was started, in 20 presses: longer than a click's 70 ms hold, so a press started
+  when the button goes down finds the click over. For a press that lands inside a gesture,
+  the check's window suspends the helper (SIGSTOP) at one of its events, and the check lets
+  it go on (SIGCONT) once the token is gone, which it did within 5 ms. Suspended at the
+  first move of a click's hover, the helper posted nothing more and had exited with status
+  3 by 11 to 14 ms after the token went, once the 120 ms pause it was suspended in had run
+  out: a sleep runs on while its process is suspended, and isn't cut short when the process
+  is let go on (a 2 s `usleep` in perl, suspended for 0.2 s, took 2.00 s in 3 of 3; one of
+  0.3 s, suspended past its end, returned when let go on). That first move is slow to
+  arrive: a hover's two moves, posted 120 ms apart, reached the window 84 to 113 ms apart
+  in 20 hovers. Suspended with a click's button down, it posted the button up, which
+  reached the window 9 to 19 ms after the token went, and exited with status 4. Suspended
+  with a drag's button down, before its move, it posted the button up at the press point,
+  which reached the window 3 to 18 ms after the token went, and no drag event, and exited
+  with status 3. The overlay said Stopped 2 to 18 ms after the token went. When the token
+  went is its folder's modification time: the check's window, which takes the time just
+  after it removes a token itself, read 0.02 to 0.13 ms later than that time, in 12 of 12.
+  Four runs (`checks/pointer-guards.js`, remote Mac, macOS 26, 2026-11-14).
 - Ctrl-C typed into the terminal of a run (a pty) while its helper held the button reached
   the helper as SIGINT: the button came up 6 ms after it in a click, and 15 ms in a drag,
   before the drag's move. In the drag, where the run caught the signal and went on, the

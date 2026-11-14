@@ -35,6 +35,8 @@ const KILL_AFTER_MS = 5000;
 const KILL_SLACK_MS = 1000;
 // How long a process has to end once what holds it has gone.
 const END_WAIT_MS = 3000;
+// How long Stop on the pill has to remove the token while the helper is frozen for it.
+const STOP_WAIT_MS = 3000;
 
 // The click token every helper here is given, as a run's helpers are (ADR-0012), in a folder
 // of its own. Each case starts with both made anew.
@@ -51,6 +53,10 @@ function unlockToken() {
   execFileSync("chflags", ["nouchg", TOKEN]);
   fs.chmodSync(TOKEN, 0o600);
 }
+
+// When the token went, if it has and its folder hasn't: removing a file sets its folder's
+// modification time, on the clock the target's events carry.
+const tokenWentAt = () => (fs.existsSync(FOLDER) && !fs.existsSync(TOKEN) ? fs.statSync(FOLDER).mtimeMs : undefined);
 
 // What stops a run. The token removed, as Stop on the pill removes it, when a case names
 // nothing else; or a loss the run can't tell from that; or Stop pressed on the pill itself,
@@ -95,6 +101,8 @@ const CLICK_HOLD_MS = 70;
 const DRAG_HOLD_MS = 50;
 
 const click = (window, x, y) => ["click", window, x, y];
+// A hover's first move, off the point; its second is to the point (device-ui.swift).
+const firstMove = (x, y) => ({ x: x - 15, y: y - 10 });
 // A drag 30 points right and 20 up, and the one drag event it posts.
 const drag = (window, x, y) => ["drag", window, x, y, 30, -20];
 const DRAGGED = { type: "drag", dx: 30, dy: -20 };
@@ -104,17 +112,22 @@ const DRAGGED = { type: "drag", dx: 30, dy: -20 };
 // notification's banner shows first, and how long after the helper starts a second is posted
 // to keep the cover up, whether the run is stopped before the helper starts or how long
 // after, and by what if not by the token's removal, and the helper's command, if a helper
-// runs, given the target's window and its centre. Then what must come of it: the helper's
+// runs, given the target's window and its centre. A target that freezes the helper says when
+// itself: the run is stopped once it has, and the helper goes on once the token is gone. Then
+// what must come of it: the helper's
 // exit status (the signal, if one ended it), its error, how soon it ended, the button events
-// the target's windows received, by the fields named, all that the overlay says as it ends,
+// the target's windows received, by the fields named, and the pointer's moves where a case
+// names them, all that the overlay says as it ends,
 // whether it may say so only once the run has ended, how long after Stop the run must be
 // killed, at the least and at the most, and the signal that ends the run, if one does. In
 // every case, once the run is stopped the target must receive no event but a
 // button-up, not a pointer's move either. A helper that says its click or drag had happened
 // reads Stop after its release, so it says the same whether Stop came during its hold or just
-// after: such a case also says how long after the target removed the token the button-up must
-// reach it: half the hold, which leaves a loaded machine room. Under that, the token may
-// have gone after the helper posted its release, and the case fails as not shown.
+// after: such a case also says how long after the token went the button-up must reach the
+// target: half the hold where the target removes the token, which leaves a loaded machine
+// room, and not before it where the helper is frozen with the button down until the token has
+// gone. Under that, the token may have gone after the helper posted its release, and the case
+// fails as not shown.
 const CASES = [
   {
     name: "a click reaches the target",
@@ -321,6 +334,46 @@ const CASES = [
     events: () => [],
     says: SAID_STOPPED,
   },
+  // Stop on the pill while the helper is in a gesture. The press takes longer to remove the
+  // token than the helper holds a button, so the target freezes the helper at the event the
+  // case names, and it goes on once the token is gone.
+  {
+    name: "Stop on the pill during a click's hover, the helper frozen at its first move: it posts nothing more, and the overlay says Stopped",
+    overlay: true,
+    target: [...RECT, "--freeze", "move"],
+    loss: stopPressed,
+    command: click,
+    status: STOPPED,
+    stderr: stoppedError(),
+    moves: (x, y) => [firstMove(x, y)],
+    events: () => [],
+    says: SAID_STOPPED,
+  },
+  {
+    name: "Stop on the pill while a click holds the button, the helper frozen with it down: the click completes, the helper ends as stopped, "
+      + "saying the click had happened, and the overlay says Stopped",
+    overlay: true,
+    target: [...RECT, "--freeze", "down"],
+    loss: stopPressed,
+    command: click,
+    status: HAPPENED,
+    stderr: happened("click"),
+    upAfterStopMs: 0,
+    events: (x, y) => [{ type: "down", x, y }, { type: "up", x, y }],
+    says: SAID_STOPPED,
+  },
+  {
+    name: "Stop on the pill while a drag holds the button, before its move, the helper frozen with it down: "
+      + "the button comes up at the press point, with no drag event, and the overlay says Stopped",
+    overlay: true,
+    target: [...RECT, "--freeze", "down"],
+    loss: stopPressed,
+    command: drag,
+    status: STOPPED,
+    stderr: stoppedError(),
+    events: (x, y) => [{ type: "down", x, y }, { type: "up", x, y }],
+    says: SAID_STOPPED,
+  },
   {
     name: "Stop on the pill when the token can't be removed, while the helper waits for a notification's cover to go: "
       + "the helper stops as after Stop, the run ends by itself, and only then does the overlay say Stopped",
@@ -402,16 +455,21 @@ const alive = (pid) => {
   try { process.kill(pid, 0); return true; } catch { return false; }
 };
 
-// Starts the target and resolves once its window is on screen: { window, x, y, w, h, end }.
+// Starts the target and resolves once its window is on screen: { window, x, y, w, h, froze,
+// end }. `froze` resolves with the process the target says it has frozen, once it says so.
 // `end` stops it and resolves with the lines it printed after that first one.
 async function showTarget(binary, options) {
   const child = spawn(binary, options.map(String), { stdio: ["ignore", "pipe", "inherit"] });
   const lines = [];
   const ended = new Promise((resolve) => child.on("close", resolve));
+  let frozen;
+  const froze = new Promise((resolve) => { frozen = resolve; });
   await new Promise((resolve, reject) => {
     readline.createInterface({ input: child.stdout }).on("line", (line) => {
-      lines.push(JSON.parse(line));
+      const said = JSON.parse(line);
+      lines.push(said);
       resolve();
+      if ("frozen" in said) frozen(said.frozen);
     });
     child.on("error", reject);
     ended.then(() => reject(new Error("The target ended before its window showed")));
@@ -421,7 +479,7 @@ async function showTarget(binary, options) {
     await ended;
     return lines.slice(1);
   };
-  return { ...lines[0], end };
+  return { ...lines[0], froze, end };
 }
 
 // A run of the check's own, which starts the helper as a run does, with the token named in
@@ -537,12 +595,14 @@ async function failures(test, binaries) {
     // Why Stop couldn't be pressed, if it couldn't: an overlay that is ending shows no pill.
     let unpressed = "";
     // When the run was stopped, on the clock the target's events carry. For Stop pressed on
-    // the pill, when the press was started: it returns only once the overlay has ended or,
-    // in its last resort, kept the press waiting for 1.5 s.
+    // the pill, when the token went. Where it stays, in Stop's last resort, when the press
+    // was started: it returns only once the overlay has ended or, in its last resort, kept
+    // the press waiting for 1.5 s.
     let stoppedAt;
-    const pressStop = (...after) => {
+    const pressStop = async (...after) => {
       stoppedAt = Date.now();
-      return tools.run(binaries.press, [overlay.pid, ...after]).catch((error) => { unpressed = `: ${error.message}`; });
+      await tools.run(binaries.press, [overlay.pid, ...after]).catch((error) => { unpressed = `: ${error.message}`; });
+      stoppedAt = tokenWentAt() ?? stoppedAt;
     };
     let lost = null;
     const lose = () => {
@@ -554,6 +614,18 @@ async function failures(test, binaries) {
     if (test.stopped) await lose();
     const target = await showTarget(binaries.target, test.target);
     const [x, y] = [target.x + target.w / 2, target.y + target.h / 2];
+    // The helper the target froze. The run is stopped then, and the helper goes on once the
+    // token is gone, or STOP_WAIT_MS later: whatever fails, it isn't left frozen.
+    let frozen = null;
+    target.froze.then(async (pid) => {
+      frozen = pid;
+      try {
+        lose();
+        for (const deadline = Date.now() + STOP_WAIT_MS; fs.existsSync(TOKEN) && Date.now() < deadline;) await sleep(5);
+      } finally {
+        try { process.kill(pid, "SIGCONT"); } catch { /* it has ended */ }
+      }
+    });
     const notify = () => tools.run("osascript", ["-e", `display notification "${path.basename(__filename)}" with title "harness-computer-use"`]);
     if (test.banner) {
       await notify();
@@ -583,6 +655,7 @@ async function failures(test, binaries) {
     const ran = await run.end();
     const seen = printed.filter((line) => line.type);
     const [buttons, expected] = [seen.filter((event) => event.type !== "move"), test.events(x, y)];
+    const [moves, expectedMoves] = [seen.filter((event) => event.type === "move"), test.moves?.(x, y)];
     const held = printed.find((line) => "released" in line);
     stoppedAt = printed.find((line) => "stopped" in line)?.stopped ?? stoppedAt;
     const afterStop = seen.filter((event) => event.at >= stoppedAt && event.type !== "up");
@@ -592,10 +665,12 @@ async function failures(test, binaries) {
       ended && ended.status !== test.status && `the helper exited ${ended.status}, not ${test.status}${ended.stderr && `, with "${ended.stderr}"`}`,
       ended && ended.status === test.status && test.stderr && !test.stderr.test(ended.stderr) && `the helper's error was "${ended.stderr}"`,
       took > test.withinMs && `the helper took ${took} ms, over ${test.withinMs}`,
+      test.target.includes("--freeze") && frozen === null && "the target froze no helper",
       !sameEvents(buttons, expected) && `the target received ${JSON.stringify(buttons)}, not ${JSON.stringify(expected)}`,
+      expectedMoves && !sameEvents(moves, expectedMoves) && `the pointer's moves the target received were ${JSON.stringify(moves)}, not ${JSON.stringify(expectedMoves)}`,
       afterStop.length && `after Stop the target received ${JSON.stringify(afterStop)}`,
-      test.upAfterStopMs && fs.existsSync(TOKEN) && "the click token was never removed",
-      test.upAfterStopMs && !fs.existsSync(TOKEN) && !(upAfterStop >= test.upAfterStopMs)
+      test.upAfterStopMs !== undefined && fs.existsSync(TOKEN) && "the click token was never removed",
+      test.upAfterStopMs !== undefined && !fs.existsSync(TOKEN) && !(upAfterStop >= test.upAfterStopMs)
         && `not shown that Stop came before the release: the button-up reached the target ${upAfterStop.toFixed(1)} ms after the token was removed, under ${test.upAfterStopMs}`,
       held && `the button was left held, and ${held.released ? "has been released" : "could not be released"}`,
       test.says && said === null && `the overlay was still up ${OVERLAY_WAIT_MS} ms after Stop${unpressed}`,

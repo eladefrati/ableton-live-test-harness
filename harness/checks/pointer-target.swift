@@ -2,7 +2,7 @@
 // that takes clicks without taking the front.
 //
 //   pointer-target <x> <y> <w> <h> [--cover] [--return] [--stop <file>] [--stop-at-drag <file>]
-//                  [--signal <name>] [--signal-parent <name>]
+//                  [--signal <name>] [--signal-parent <name>] [--freeze move|down]
 //                                     at that rectangle, in points from the screen's top left
 //   pointer-target --under <title>    at the rectangle of the window of that title, under it
 //
@@ -21,9 +21,14 @@
 // --stop-at-drag it removes <file> at a drag event. Having removed <file>, signalled the
 // parent, or sent the process that posted the event SIGUSR2, the signal of Stop's last
 // resort, it prints {"stopped": <when, in ms>}, after the line of the event it did so at.
+// With --freeze it suspends the process that posted an event (SIGSTOP), once: at the first
+// pointer move a process posted (move) or when the button goes down (down). It prints
+// {"frozen": <that process's id>} after the event's line, for the check to let the process
+// go on (SIGCONT).
 //
-// SIGTERM ends it, and so does the end of the process that started it. If the left button is
-// held then, it posts the button up first and prints {"released": <whether that released it>}.
+// SIGTERM ends it, and so does the end of the process that started it. A process it
+// suspended is then let go on. If the left button is held then, it posts the button up first
+// and prints {"released": <whether that released it>}.
 
 import AppKit
 
@@ -43,6 +48,7 @@ func now() -> Double { Date().timeIntervalSince1970 * 1000 }
 
 final class Pad: NSView {
     var onFirstMove: (() -> Void)?
+    var onMove: ((CGEvent) -> Void)?
     var onDown: ((CGEvent) -> Void)?
     var onDrag: (() -> Void)?
     var returnsPointer = false
@@ -63,6 +69,7 @@ final class Pad: NSView {
         report("move", event)
         onFirstMove?()
         onFirstMove = nil
+        if let posted = event.cgEvent { onMove?(posted) }
     }
     override func draw(_ dirtyRect: NSRect) {
         NSColor(white: 0.2, alpha: 0.85).setFill()
@@ -145,6 +152,18 @@ func parent(of pid: pid_t) -> pid_t {
     let size = Int32(MemoryLayout<proc_bsdinfo>.size)
     return proc_pidinfo(pid, PROC_PIDTBSDINFO, 0, &info, size) == size ? pid_t(info.pbi_ppid) : 0
 }
+let freezeAt = value("--freeze")
+if let freezeAt, !["move", "down"].contains(freezeAt) { fail("--freeze takes move or down, not \(freezeAt)") }
+// The process --freeze suspended, 0 until it has.
+var frozen: pid_t = 0
+func freeze(_ posted: CGEvent) {
+    let poster = pid_t(posted.getIntegerValueField(.eventSourceUnixProcessID))
+    // Never 0, which the events of a real mouse carry: it would suspend this program's own
+    // process group.
+    guard frozen == 0, poster > 0, kill(poster, SIGSTOP) == 0 else { return }
+    frozen = poster
+    printJSON(["frozen": Int(poster)])
+}
 let (cover, returnsPointer) = (flag("--cover"), flag("--return"))
 let rect: CGRect
 if options.count == 2, options[0] == "--under" {
@@ -152,7 +171,7 @@ if options.count == 2, options[0] == "--under" {
 } else {
     let numbers = options.compactMap { Double($0) }
     guard options.count == 4, numbers.count == 4
-    else { fail("usage: pointer-target <x> <y> <w> <h> [--cover] [--return] [--stop <file>] [--stop-at-drag <file>] [--signal <name>] [--signal-parent <name>] | --under <title>") }
+    else { fail("usage: pointer-target <x> <y> <w> <h> [--cover] [--return] [--stop <file>] [--stop-at-drag <file>] [--signal <name>] [--signal-parent <name>] [--freeze move|down] | --under <title>") }
     rect = CGRect(x: numbers[0], y: numbers[1], width: numbers[2], height: numbers[3])
 }
 
@@ -167,7 +186,9 @@ pad.onDown = { posted in
     if let sentToParent, poster > 0, case let run = parent(of: poster), run > 1, kill(run, sentToParent) == 0 {
         printJSON(["stopped": now()])
     }
+    if freezeAt == "down" { freeze(posted) }
 }
+pad.onMove = { posted in if freezeAt == "move" { freeze(posted) } }
 pad.onDrag = { stop(dragToken) }
 var over: Panel?
 if cover { pad.onFirstMove = { over = showPanel(rect).0 } }
@@ -194,6 +215,7 @@ Timer.scheduledTimer(withTimeInterval: 0.01, repeats: true) { timer in
 }
 
 func finish() -> Never {
+    if frozen > 0 { kill(frozen, SIGCONT) }
     if CGEventSource.buttonState(.combinedSessionState, button: .left) {
         let pointer = CGEvent(source: nil)?.location ?? .zero
         CGEvent(mouseEventSource: CGEventSource(stateID: .hidSystemState), mouseType: .leftMouseUp,

@@ -288,14 +288,23 @@ Node 18 or later. See [ADR-0001](../docs/adr/0001-fork-abletonosc.md) for the de
   after Stop, not sooner, its helper waiting meanwhile under a banner's cover that a second
   notification keeps up, and only then does the overlay say that the run was ended;
   pressed as the run ends, it says
-  that the run has ended. In every case
+  that the run has ended. Stop is pressed on the pill during a gesture too, and the overlay
+  says Stopped and goes: at the first move of a click's hover, after which the helper posts
+  nothing more and exits 3; with a click's button down, where the click completes and the
+  helper exits 4; and with a drag's button down, before its move, where the button comes up
+  and nothing more is posted. The press takes about 0.1 s to remove the token, longer than
+  the helper holds a button, so for these three the window suspends the helper at that
+  event (SIGSTOP), and the check lets it go on (SIGCONT) once the token is gone. In every case
   the window may receive
-  nothing but a button-up once the run is stopped. Where a stopped click or drag must
+  nothing but a button-up once the run is stopped: where Stop on the pill removed the token,
+  from the moment the token went, which is its folder's modification time. Where a stopped
+  click or drag must
   complete, the button-up must reach the window at least half the helper's hold after the
-  token was removed (35 ms in a click, 25 ms after a drag's move): under that the case fails,
+  token was removed (35 ms in a click, 25 ms after a drag's move), or, where the helper was
+  suspended with the button down, not before the token went: under that the case fails,
   as it hasn't shown that Stop came before the release. The cases that end under a
   notification's banner come last, each waiting for the banner of the case before to go,
-  and the check takes about 90 s. It takes the
+  and the check takes about 110 s. It takes the
   pointer, so it runs only on the click host and refuses on any other machine, posting
   nothing. A case that leaves the button held releases it and fails.
 
