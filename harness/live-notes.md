@@ -325,6 +325,17 @@ unexpected.
   brought Live to the front once more before it threw. `device-ui.js` now refuses to bring
   Live forward once the run is stopped, for a press and for a capture of a plug-in's window
   alike, without asking to click (unit tests, remote Mac, 2026-11-13).
+- With another app in front, a Stop that landed after that refusal had looked for it and
+  before Live was told to activate still left Live in front (remote Mac, Live 12.4.25b1,
+  2026-11-14). The run now looks again just before it tells Live to activate, once the
+  display is woken and Live looked up, and, where it brings Live forward to type Escape,
+  once more before the key. A Stop that lands after the last look still finds Live brought
+  forward (ADR-0012). The Escape after Stop is typed by the one script that finds Live in
+  front; it was a look and then a keystroke, which went to whatever app had come forward
+  between the two. A capture of a plug-in's window gives the front back to the app that
+  had it only if it brought Live forward: one refused after Stop gave it back all the same,
+  which activated that app if Live was in front by then (unit tests, remote Mac,
+  2026-11-14).
 - While the remote Mac's display sleeps, `screencapture -l` fails with "could not create image from
   window", and the session reports the screen locked until the display wakes.
 - A Live started while the display slept never redrew its window: with the LOM at 2 tracks,

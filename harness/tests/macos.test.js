@@ -90,3 +90,77 @@ test("keepDisplayOn lets go of the display when waking it fails", async () => {
   }), /no app is frontmost/);
   assert.ok(await gone(held.pid));
 });
+
+// macos.js as it loads over a stand-in for osascript: `answer` is given every AppleScript it
+// would run and returns what the script prints; waking the display, a JavaScript, succeeds.
+function macOver(answer) {
+  const childProcess = require("node:child_process");
+  const file = require.resolve("../macos.js");
+  const [execFile, loaded] = [childProcess.execFile, require.cache[file]];
+  childProcess.execFile = (command, args, done) => {
+    assert.equal(command, "osascript");
+    setImmediate(() => done(null, args[0] === "-l" ? "" : `${answer(args.at(-1))}\n`, ""));
+  };
+  delete require.cache[file];
+  try {
+    return require(file);
+  } finally {
+    childProcess.execFile = execFile;
+    require.cache[file] = loaded;
+  }
+}
+
+// System Events as the scripts of macos.js find it, with Live in front or behind another app.
+// `did` lists the scripts that act, in order: every one but those that only look.
+function fakeSystemEvents({ front = false } = {}) {
+  const did = [];
+  const answer = (script) => {
+    if (/ get frontmost of process "Live"$/.test(script)) return String(front);
+    if (/ get bundle identifier of process "Live"$/.test(script)) return "com.example.live";
+    if (/ get bundle identifier of first process whose frontmost is true$/.test(script)) return front ? "com.example.live" : "com.example.terminal";
+    did.push(script);
+    if (script === 'tell application id "com.example.live" to activate') front = true;
+    return "";
+  };
+  return { did, answer };
+}
+
+const ACTIVATE = 'tell application id "com.example.live" to activate';
+
+test("activate calls the function it is given just before it tells Live to activate, and tells Live nothing if the function throws", async () => {
+  const events = fakeSystemEvents();
+  await macOver(events.answer).activate({ refuse: () => events.did.push("asked") });
+  assert.deepEqual(events.did, ["asked", ACTIVATE]);
+
+  const refused = fakeSystemEvents();
+  await assert.rejects(macOver(refused.answer).activate({ refuse: () => { throw new Error("stopped"); } }), /^Error: stopped$/);
+  assert.deepEqual(refused.did, []);
+});
+
+test("typeInLive calls the function it is given before Live is activated and again just before the keys, and types nothing if it throws then", async () => {
+  const events = fakeSystemEvents();
+  await macOver(events.answer).typeInLive("key code 53", { refuse: () => events.did.push("asked") });
+  assert.equal(events.did.length, 4);
+  assert.deepEqual(events.did.slice(0, 3), ["asked", ACTIVATE, "asked"]);
+  assert.match(events.did[3], /key code 53/);
+
+  // Refused once Live has come forward, as when Stop comes meanwhile.
+  const refused = fakeSystemEvents();
+  let asked = 0;
+  const refuse = () => { if (++asked === 2) throw new Error("stopped"); };
+  await assert.rejects(macOver(refused.answer).typeInLive("key code 53", { refuse }), /^Error: stopped$/);
+  assert.deepEqual(refused.did, [ACTIVATE]);
+
+  // And with Live in front already, where nothing is activated.
+  const inFront = fakeSystemEvents({ front: true });
+  await assert.rejects(macOver(inFront.answer).typeInLive("key code 53", { refuse: () => { throw new Error("stopped"); } }), /^Error: stopped$/);
+  assert.deepEqual(inFront.did, []);
+});
+
+test("typeIfLiveInFront looks for Live in front and types in one script, and activates nothing", async () => {
+  for (const front of [true, false]) {
+    const events = fakeSystemEvents({ front });
+    await macOver(events.answer).typeIfLiveInFront("key code 53");
+    assert.deepEqual(events.did, ['tell application "System Events" to if frontmost of process "Live" then key code 53']);
+  }
+});

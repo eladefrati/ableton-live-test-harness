@@ -445,9 +445,10 @@ const machine = {
   // A slept display has no windows to capture.
   wake: () => mac.wakeDisplay(),
   // The display first: activate() returns at once if Live is already in front, even asleep.
-  async focus() {
+  // `refuse` is called just before Live is told to activate, and throws if it must not be.
+  async focus(refuse) {
     await mac.wakeDisplay();
-    await mac.activate();
+    await mac.activate({ refuse });
     if (!(await mac.isFrontmost())) throw new DeviceUiError("Live isn't frontmost. Not clicked");
   },
   window: async () => JSON.parse(await helper("window")),
@@ -484,11 +485,11 @@ const machine = {
   clickEditor: (title, x, y, [w, h]) => helper("click-editor", title, x, y, w, h),
   dragEditor: (title, x, y, [w, h], dx, dy) => helper("drag-editor", title, x, y, w, h, dx, dy),
   frontmost: () => mac.frontmostApp(),
-  // Escape, which closes an open menu: `escape` brings Live to the front first, `typeEscape`
-  // types it to whatever app is in front.
-  escape: () => mac.typeInLive("key code 53"),
-  liveInFront: () => mac.isFrontmost(),
-  typeEscape: () => mac.osascript('tell application "System Events" to key code 53'),
+  // Escape, which closes an open menu: `escape` brings Live to the front first, calling
+  // `refuse` before that and before it types; `escapeIfInFront` types it only if Live is in
+  // front, and doesn't bring it there.
+  escape: (refuse) => mac.typeInLive("key code 53", { refuse }),
+  escapeIfInFront: () => mac.typeIfLiveInFront("key code 53"),
   giveBack: (id) => mac.giveBackFront(id),
   // Crops a capture of the window, `width` points wide, to [x, y, w, h] in points.
   async captureRect(windowId, width, rect, file) {
@@ -538,18 +539,30 @@ async function permit(system) {
 // After Stop the run takes nothing more from the person, the front included: Escape is typed
 // only while Live is still in front, and Live isn't brought there, which `focus` refuses.
 // It doesn't pass permit: a run that only captures brings Live forward too, and must not
-// start asking to click.
+// start asking to click. Stop may come while Live is being brought forward, so the system
+// is handed the refusal, to call again just before it tells Live to activate, and before
+// it types.
 function guarded(system) {
   const guard = Object.create(system);
   guard.permit = () => permit(system);
-  guard.focus = async () => {
+  const refuseIfStopped = () => {
     const why = system.stopped();
     if (why) throw new DeviceUiError(`${why}. Live not brought to the front`);
-    return system.focus();
+  };
+  guard.focus = async () => {
+    refuseIfStopped();
+    return system.focus(refuseIfStopped);
   };
   guard.escape = async () => {
-    if (!system.stopped()) return system.escape();
-    if (await system.liveInFront()) await system.typeEscape();
+    if (!system.stopped()) {
+      try {
+        return await system.escape(refuseIfStopped);
+      } catch (error) {
+        // Stopped meanwhile: as after Stop.
+        if (!system.stopped()) throw error;
+      }
+    }
+    await system.escapeIfInFront();
   };
   for (const call of POINTER_CALLS) {
     guard[call] = async (...args) => {
@@ -811,6 +824,11 @@ class PluginWindow {
   // Brings Live to the front and waits for the window: { id, x, y, w, h, editor: { x, y, w, h } }.
   async locate() {
     await this.system.focus();
+    return this.shown();
+  }
+
+  // Waits for the window, which Live shows once it is in front.
+  async shown() {
     for (const deadline = Date.now() + EDITOR_WAIT_MS; ; await sleep(200)) {
       try {
         return await this.system.editor(this.title);
@@ -852,8 +870,11 @@ class PluginWindow {
   async capture(file) {
     await this.system.wake();
     const before = await this.system.frontmost().catch(() => null);
+    // Outside the try: a capture that didn't bring Live forward, as one refused after Stop,
+    // has no front to give back.
+    await this.system.focus();
     try {
-      const window = await this.locate();
+      const window = await this.shown();
       const { editor } = window;
       await this.system.captureRect(window.id, window.w, [editor.x - window.x, editor.y - window.y, editor.w, editor.h], file);
       return { w: editor.w, h: editor.h };

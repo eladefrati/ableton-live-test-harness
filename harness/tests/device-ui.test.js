@@ -325,6 +325,23 @@ test("Stop between a press's hover and its click stops the click, and Live isn't
   assert.equal(system.calls.at(-1)[0], "hover");
 });
 
+test("Stop that comes while a press brings Live forward is seen by the function the machine is handed, which it calls before it activates Live", async () => {
+  const system = fakeMachine();
+  const stop = stoppable(system);
+  let stopping = false;
+  system.focus = async (refuse) => {
+    if (stopping) stop();
+    refuse();
+    system.calls.push("focus");
+  };
+  const ui = await open(system);
+  await ui.press("Button");
+  stopping = true;
+  const before = system.calls.length;
+  await assert.rejects(ui.press("Button"), { message: `${STOPPED}. Live not brought to the front` });
+  assert.equal(system.calls.length, before);
+});
+
 test("a press and a drag that Stop caught with only the release left reject with that error, which says done", async () => {
   const system = fakeMachine();
   system.click = system.drag = async () => { throw happened(); };
@@ -341,7 +358,7 @@ test("a press and a drag that Stop caught with only the release left reject with
 // The machine's calls that never move the pointer or press its button, so need no permit.
 const OTHER_CALLS = [
   "hostname", "clickHost", "ask", "buildComputerUse", "showComputerUse", "stopped", "wake", "focus", "window", "windows", "capture", "read", "captureCrop",
-  "pluginWindow", "editor", "frontmost", "escape", "liveInFront", "typeEscape", "giveBack", "captureRect",
+  "pluginWindow", "editor", "frontmost", "escape", "escapeIfInFront", "giveBack", "captureRect",
 ];
 
 test("every call of the machine is either one that takes the pointer, which passes permit, or listed as one that never does", () => {
@@ -636,7 +653,9 @@ test("capture crops to the editor, in points from the window's corner, gives the
   assert.deepEqual(system.calls.slice(-2), [["capture", 11, 400, [0, 19, 400, 120], "/out/editor.png"], ["give back", "com.example.terminal"]]);
 });
 
-test("after Stop, a capture of a plug-in's window throws as stopped, and Live isn't brought to the front", async () => {
+const gaveBack = (system) => system.calls.filter((call) => call[0] === "give back").map((call) => call[1]);
+
+test("after Stop, a capture of a plug-in's window throws as stopped: Live isn't brought to the front, and the front is given back to no app", async () => {
   const system = fakePluginMachine();
   const stop = stoppable(system);
   const window = await openPluginWindow(pluginLive(), PLUGIN, system);
@@ -644,6 +663,52 @@ test("after Stop, a capture of a plug-in's window throws as stopped, and Live is
   await assert.rejects(window.capture("/out/editor.png"), (error) => error instanceof DeviceUiError && /stopped from its pill/.test(error.message));
   assert.equal(system.calls.includes("focus"), false);
   assert.equal(system.calls.some((call) => call[0] === "capture"), false);
+  assert.deepEqual(gaveBack(system), []);
+});
+
+test("a capture gives the front back when it fails once Live is in front, and to no app when Live couldn't be brought there", async () => {
+  const behind = fakePluginMachine();
+  behind.focus = async () => { throw new DeviceUiError("Live isn't frontmost. Not clicked"); };
+  await assert.rejects((await openPluginWindow(pluginLive(), PLUGIN, behind)).capture("/out/editor.png"), /isn't frontmost/);
+  assert.deepEqual(gaveBack(behind), []);
+
+  const unread = fakePluginMachine();
+  unread.captureRect = async () => { throw new DeviceUiError("could not create image from window"); };
+  await assert.rejects((await openPluginWindow(pluginLive(), PLUGIN, unread)).capture("/out/editor.png"), /could not create image/);
+  assert.deepEqual(gaveBack(unread), ["com.example.terminal"]);
+});
+
+// Runs `body` on the machine itself, with a stand-in for its helper and for what it asks of
+// macOS: `activate` takes the place of macos.js's.
+async function withMachine(activate, body) {
+  const real = { frontmostApp: mac.frontmostApp, giveBackFront: mac.giveBackFront, activate: mac.activate };
+  Object.assign(mac, { frontmostApp: async () => "com.example.terminal", giveBackFront: async () => {}, activate });
+  try {
+    return await withHelper([`echo '{"open": true}'`], body);
+  } finally {
+    Object.assign(mac, real);
+  }
+}
+
+test("the machine hands the function that refuses once the run is stopped on to the activation of Live", async () => {
+  const token = clickToken();
+  let activated = false;
+  // As macos.js does: it calls the function just before it tells Live to activate. Here Stop
+  // has come by then.
+  const activate = async ({ refuse }) => {
+    fs.rmSync(token);
+    refuse();
+    activated = true;
+  };
+  try {
+    await withMachine(activate, async () => {
+      const window = await openPluginWindow(pluginLive(), PLUGIN);
+      await assert.rejects(window.capture("/out/editor.png"), { message: `${STOPPED}. Live not brought to the front` });
+    });
+    assert.equal(activated, false);
+  } finally {
+    fs.writeFileSync(token, "");
+  }
 });
 
 test("a capture of a plug-in's window brings Live to the front without asking to click", async () => {
@@ -704,7 +769,7 @@ test("after Stop on the pill, no drag", async () => {
 });
 
 // A device whose menu control opens a window of its own, as a Live chooser does.
-function menuMachine(rows, { opens = true, front = true } = {}) {
+function menuMachine(rows, { opens = true } = {}) {
   const system = fakeMachine({ info: "Menu" });
   const menu = { id: 9, title: "", layer: 101, x: 600, y: 900, w: 88, h: 122 };
   let open = false;
@@ -712,8 +777,7 @@ function menuMachine(rows, { opens = true, front = true } = {}) {
     windows: async () => (open ? [menu, { ...WINDOW, layer: 0 }] : [{ ...WINDOW, layer: 0 }]),
     click: async (id, x, y) => { system.calls.push(["click", id, x, y]); if (id === 7 && opens) open = true; },
     escape: async () => { system.calls.push("escape"); },
-    liveInFront: async () => front,
-    typeEscape: async () => { system.calls.push("typeEscape"); },
+    escapeIfInFront: async () => { system.calls.push("escapeIfInFront"); },
   });
   const read = system.read;
   system.read = async (id) => (id === 9 ? { width: 176, lines: rows } : read(id));
@@ -837,27 +901,28 @@ test("choose refuses a missing item before anything is clicked", async () => {
   assert.equal(system.calls.length, 0);
 });
 
-// Stops the run while choose reads the menu it opened, and resolves with the system's calls.
-async function stoppedWhileReading(front) {
-  const system = menuMachine(MENU_ROWS, { front });
+test("Stop while choose reads the menu leaves its closing to the one call that types Escape only if Live is in front, without bringing Live forward", async () => {
+  const system = menuMachine(MENU_ROWS);
   const stop = stoppable(system);
   const read = system.read;
   system.read = async (id) => { if (id === 9) stop(); return read(id); };
   await assert.rejects((await openMenu(system)).choose("Menu", "Wander"), /stopped from its pill/);
   assert.equal(clicks(system).length, 1);
-  return system.calls;
-}
-
-test("Stop while choose reads the menu closes it with Live still in front, without bringing Live forward", async () => {
-  const calls = await stoppedWhileReading(true);
-  assert.equal(calls.at(-1), "typeEscape");
-  assert.equal(calls.includes("escape"), false);
+  assert.equal(system.calls.at(-1), "escapeIfInFront");
+  assert.equal(system.calls.includes("escape"), false);
 });
 
-test("Stop while choose reads the menu types nothing once Live is no longer in front", async () => {
-  const calls = await stoppedWhileReading(false);
-  assert.equal(calls.includes("typeEscape"), false);
-  assert.equal(calls.includes("escape"), false);
+test("Stop that comes while Live is brought forward for the Escape that closes choose's menu leaves the closing to that one call", async () => {
+  const system = menuMachine(MENU_ROWS);
+  const stop = stoppable(system);
+  // As the machine does: it calls the function it is handed before it activates Live or types.
+  system.escape = async (refuse) => { stop(); refuse(); system.calls.push("escape"); };
+  const warnings = await warningsOf(async () => {
+    await assert.rejects((await openMenu(system)).choose("Menu", "Triangle"), /0 items reading "Triangle"/);
+  });
+  assert.deepEqual(warnings, []);
+  assert.equal(system.calls.at(-1), "escapeIfInFront");
+  assert.equal(system.calls.includes("escape"), false);
 });
 
 test("Stop that catches choose's opening click with only its release left: the click throws done, and the menu it opened is closed without bringing Live forward", async () => {
@@ -867,7 +932,7 @@ test("Stop that catches choose's opening click with only its release left: the c
   system.click = async (...args) => { await click(...args); stop(); throw happened(); };
   await assert.rejects((await openMenu(system)).choose("Menu", "Wander"), isHappened);
   assert.deepEqual(clicks(system).map((call) => call[1]), [7]);
-  assert.equal(system.calls.at(-1), "typeEscape");
+  assert.equal(system.calls.at(-1), "escapeIfInFront");
   assert.equal(system.calls.includes("escape"), false);
 });
 
@@ -883,14 +948,14 @@ test("Stop that catches choose's click on the item with only its release left: t
   };
   await assert.rejects((await openMenu(system)).choose("Menu", "Wander"), isHappened);
   assert.deepEqual(clicks(system).map((call) => call[1]), [7, 9]);
-  assert.equal(system.calls.includes("escape") || system.calls.includes("typeEscape"), false);
+  assert.equal(system.calls.includes("escape") || system.calls.includes("escapeIfInFront"), false);
 });
 
 test("an opening click of choose that fails without done types nothing", async () => {
   const system = menuMachine(MENU_ROWS);
   system.click = async () => { throw new DeviceUiError("The window at the point is Finder 3, not 7"); };
   await assert.rejects((await openMenu(system)).choose("Menu", "Wander"), (error) => /Finder 3/.test(error.message) && !("done" in error));
-  assert.equal(system.calls.includes("escape") || system.calls.includes("typeEscape"), false);
+  assert.equal(system.calls.includes("escape") || system.calls.includes("escapeIfInFront"), false);
 });
 
 test("choose keeps its failure, with a warning, when Escape fails too", async () => {

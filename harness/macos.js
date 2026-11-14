@@ -82,10 +82,13 @@ async function keepDisplayOn({ wake = wakeDisplay, hold: start = holdDisplay } =
 // Events' "set frontmost of process", sent once and not checked, wasn't enough: started
 // with Ghostty in front, save-reopen.js failed in 1 of 2 runs, and 0 of 6 with this
 // (2026-11-02). Live is addressed by its bundle id, which Suite and Beta don't share.
-async function activate({ timeoutMs = 3000 } = {}) {
+// `refuse`, if given, is called just before Live is told to activate, and throws if Live
+// must no longer be: what its caller looked at may have changed while the display woke.
+async function activate({ timeoutMs = 3000, refuse } = {}) {
   if (await isFrontmost()) return;
   await wakeDisplay();
   const id = await osascript(`tell application "System Events" to get bundle identifier of process "Live"`);
+  if (refuse) refuse();
   await osascript(`tell application id ${quote(id)} to activate`);
   await waitFor(isFrontmost, "Live to come to the front", timeoutMs);
 }
@@ -93,11 +96,17 @@ async function activate({ timeoutMs = 3000 } = {}) {
 // Sends keystrokes (System Events `keystroke` and `key code` lines) to Live. They go to the
 // frontmost app, whatever process the tell block names, so Live is brought to the front
 // first, and if it can't be, nothing is typed. A click elsewhere between the check and the
-// keys still takes them.
-async function typeInLive(body) {
-  await activate();
+// keys still takes them. `refuse`, if given, is called before Live is told to activate, as
+// activate does, and again just before the keys are typed: it throws if they must not be.
+async function typeInLive(body, { refuse } = {}) {
+  await activate({ refuse });
+  if (refuse) refuse();
   await osascript(inLive(body));
 }
+
+// Sends keystrokes to Live only if it is frontmost, and doesn't bring it there. One script
+// looks and types, so that no other app comes to the front between the two.
+const typeIfLiveInFront = (body) => osascript(`tell application "System Events" to if frontmost of process "Live" then ${body}`);
 
 // Brings the app with bundle id `id` back to the front, if Live is still there. Typing
 // leaves Live in front, where keys meant for the app the user was in land instead (a space
@@ -413,5 +422,5 @@ module.exports = {
   MacError, osascript, activate, wakeDisplay, keepDisplayOn, isFrontmost, menuItems, clickMenu, isChecked, undoName,
   setToggle, setKeyMapMode, setMidiMapMode, liveApp, saveSet, saveSetAs, openInBackground, openSet,
   openSetAndWait, windowTitle, sameFile, SAVE_CHANGES, TEMP_FILES, STOP_AUDIO, HARNESS_TEMP, inHarnessTemp, tempFolder,
-  emptyHarnessTemp, livePids, liveStartTime, frontmostApp, giveBackFront, typeInLive,
+  emptyHarnessTemp, livePids, liveStartTime, frontmostApp, giveBackFront, typeInLive, typeIfLiveInFront,
 };
