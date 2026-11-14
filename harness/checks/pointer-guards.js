@@ -914,13 +914,16 @@ async function failures(test, binaries) {
       lost.catch(() => {});
       return lost;
     };
+    const target = await showTarget(binaries.target, test.target);
+    const [x, y] = [target.x + target.w / 2, target.y + target.h / 2];
+    // A run stopped before its helper starts is stopped once the target shows, not before:
+    // the target waits for a notification's cover to go, which can take longer than the
+    // overlay stays up after Stop (ADR-0015), and that wait is no part of what a case times.
     if (test.stopped) await lose();
     // Stop pressed a second time, and why it couldn't be, if it couldn't.
     let unpressedAgain = "";
     const again = test.againAfterMs
       && sleep(test.againAfterMs).then(() => tools.run(binaries.press, [overlay.pid])).catch((error) => { unpressedAgain = error.message; });
-    const target = await showTarget(binaries.target, test.target);
-    const [x, y] = [target.x + target.w / 2, target.y + target.h / 2];
     // The helper the target froze. The run is stopped then, and the helper goes on once the
     // token is gone, or STOP_WAIT_MS later: whatever fails, it isn't left frozen.
     let frozen = null;
