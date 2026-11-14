@@ -36,12 +36,12 @@ at the Mac doesn't know when the mouse is theirs again.
    The helper that posts the mouse events checks the marker before every event but the
    release of a button it holds. Once the marker exists it posts nothing but that release: a
    press under way stops before its hover, before its click or before a drag's move, and a
-   drag stopped before its move ends with the button up at the press point. The press under
-   way throws, unless only its release was left: then the click or the drag has happened, and
-   the press resolves. Every later press of the run throws. The run isn't killed: a check
-   fails at the press that throws and still runs its cleanup, where a kill would leave its
-   tracks in Live. The pill is a window of its own that takes clicks, so the click guard
-   refuses a point under it.
+   drag stopped before its move ends with the button up where the pointer then is, the press
+   point unless the mouse was moved. The press under way throws, unless only its release was
+   left: then the click or the drag has happened, and the press resolves. Every later press
+   of the run throws. The run isn't killed: a check fails at the press that throws and still
+   runs its cleanup, where a kill would leave its tracks in Live. The pill is a window of its
+   own that takes clicks, so the click guard refuses a point under it.
 
 ## Consequences
 
@@ -62,6 +62,8 @@ at the Mac doesn't know when the mouse is theirs again.
   still posted, and so does a drag whose move was already posted. Such a press resolves, so
   the run knows it happened: one that opened a menu with it goes on to close the menu
   (ADR-0011). A drag stopped before its move is a click on the control, and throws: the
-  button went down and came up at the press point.
-- A signal that would end the helper while it holds the button, such as Ctrl-C on the run, is
-  held back until the helper has released the button, which it then does at once.
+  button went down at the press point and came up where the pointer then was.
+- An interrupt, quit, hangup or termination signal that reaches the helper while it holds the
+  button, such as Ctrl-C or Ctrl-\ on the run, is held back until the helper has released the
+  button, which it then does at once. A kill (SIGKILL) or a crash of the helper still leaves
+  the button held.
