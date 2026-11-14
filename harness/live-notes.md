@@ -367,10 +367,14 @@ unexpected.
 - Stop pressed before the overlay had said that its windows were on screen took the glow
   down, so the overlay never found all its windows listed: it ended with status 1 two
   seconds after it began to look, with no notification, and its run would have warned that
-  it clicks with no border. It now waits only for the windows that are still up, says
-  shown, and stays until the run has ended. Seen with a copy of the overlay that looks for
-  its windows once a second, where it looks every 0.05 s, and Stop pressed through
-  Accessibility before its first look, twice (remote Mac, 2026-11-14).
+  it clicks with no border. It now leaves the glow out once Stop has removed the token,
+  says shown when the pill is listed, and stays as it does after any Stop. Seen with a copy
+  of the overlay that looks for its windows once a second, where it looks every 0.05 s, and
+  Stop pressed through Accessibility before its first look, twice. Which windows to wait
+  for can't be taken from `NSWindow.isVisible`: a copy that took its own glow down without
+  Stop, and one that hid its app 0.2 s in, which left none of its windows listed, both said
+  shown that way with the token still there. Both now end as not shown, with status 1
+  (remote Mac, 2026-11-14).
 - A helper sent that signal itself stopped as after Stop. One waiting under a
   notification's cover exited with status 3 4 to 13 ms later. One holding a click's button
   posted the button up 6 to 8 ms after the signal, which cuts the hold short (73 to 81 ms

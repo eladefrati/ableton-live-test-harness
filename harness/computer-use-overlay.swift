@@ -17,6 +17,8 @@
 //
 // Prints "shown" once the window server lists its windows, "stopping" once Stop is pressed
 // and has removed the token or signalled the run, and, as it ends, the message it notifies.
+// A Stop that removes the token before "shown" takes the glow down: "shown" then follows
+// "stopping", once the pill is listed.
 // If its windows can't show (no desktop session, no screen, or not listed within
 // SHOWN_SECONDS), it says why on stderr and exits 1, so the run can warn that it clicks with
 // no border.
@@ -342,15 +344,16 @@ for screen in NSScreen.screens {
 }
 windows.forEach { $0.orderFrontRegardless() }
 
-// Says "shown" once the window server lists every window that is up: NSWindow.isVisible is
-// true even with no window server, and false only for the glow that Stop, pressed before
-// this, has taken down.
+// Says "shown" once the window server lists every window that is to be up: all of them, but
+// for the glow once a Stop that came before this has removed the token and so taken it
+// down. The window server is asked, not the windows: NSWindow.isVisible is true even with
+// no window server, and false for a window that anything has taken off the screen.
 let SHOWN_SECONDS = 2.0
 let started = Date()
 Timer.scheduledTimer(withTimeInterval: 0.05, repeats: true) { timer in
     let list = CGWindowListCopyWindowInfo([.optionOnScreenOnly], kCGNullWindowID) as? [[String: Any]] ?? []
     let listed = Set(list.compactMap { $0[kCGWindowNumber as String] as? Int })
-    if MainActor.assumeIsolated({ windows.filter(\.isVisible).allSatisfy { listed.contains($0.windowNumber) } }) {
+    if MainActor.assumeIsolated({ windows.filter { !(stopper.removed && $0.title == OVERLAY_TITLE) }.allSatisfy { listed.contains($0.windowNumber) } }) {
         timer.invalidate()
         print("shown")
         fflush(stdout)
