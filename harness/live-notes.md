@@ -395,7 +395,13 @@ unexpected.
   had ended. `sysctl` gives such a process's state (5, `SZOMB`), where `proc_pidinfo` fails
   with `ESRCH` as for one that is gone. The overlay now reads the state too, and said that
   the run had ended, or Stopped, within 3 s (`checks/pointer-guards.js`, remote Mac,
-  macOS 26, 2026-11-14).
+  macOS 26, 2026-11-14). So the process that started a run can read what the overlay says
+  of the run's end before it hears of that end itself. A script held up for 0.4 s as it
+  ended its run read the overlay's words first in 12 of 12 runs, 0.02 to 0.4 ms before the
+  run's exit reached it, once on the millisecond before; left idle, it heard of the exit
+  first, 0.12 to 0.18 s before the words, in 4 of 4. `checks/pointer-guards.js`, which
+  fails an overlay that says a run was stopped before the run has ended, allows the words
+  10 ms (remote Mac, 2026-11-14).
 - `Process.waitUntilExit()` runs the run loop while it waits. Waiting that way for its
   notification, an overlay whose Stop had just ended the run, or was pressed as the run
   ended, had its timer fire meanwhile and notified a second time that the run had ended. It

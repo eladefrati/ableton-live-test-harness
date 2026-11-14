@@ -39,6 +39,11 @@ const OVERLAY_WAIT_MS = 15000;
 // counted from when it started to press Stop.
 const KILL_AFTER_MS = 10000;
 const KILL_SLACK_MS = 1000;
+// How much sooner the check may read what the overlay says of a run's end than it hears of
+// that end itself. The overlay reads the run's state from the kernel, where a run that has
+// ended shows before the check has waited for it, and when both are waiting for the check
+// it reads the overlay's words first: up to 0.4 ms sooner in 12 runs (live-notes.md).
+const EXIT_NEWS_MS = 10;
 // How long a process has to end once what holds it has gone.
 const END_WAIT_MS = 3000;
 // How long Stop on the pill has to remove the token while the helper is frozen for it.
@@ -903,7 +908,7 @@ async function failures(test, binaries) {
       ...stopping,
       test.says && said === null && `the overlay was still up ${OVERLAY_WAIT_MS} ms after Stop${unpressed}`,
       test.says && said !== null && !test.says.test(said.text) && `the overlay said ${JSON.stringify(said.text)}, not ${test.says}${unpressed}`,
-      test.afterRun && said?.at < run.endedAt() && `the overlay said ${JSON.stringify(said.text)} before the run had ended`,
+      test.afterRun && said?.at < run.endedAt() - EXIT_NEWS_MS && `the overlay said ${JSON.stringify(said.text)} before the run had ended`,
       test.killedMs && !(killed >= test.killedMs[0] && killed <= test.killedMs[1]) && `the run ended ${killed} ms after Stop, not ${test.killedMs.join(" to ")}`,
       ran !== (test.run ?? 0) && `the run ended with ${ran}, not ${test.run ?? 0}`,
     ].filter(Boolean);
