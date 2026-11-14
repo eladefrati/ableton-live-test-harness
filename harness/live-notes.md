@@ -306,6 +306,15 @@ unexpected.
   2.3 and 2.4 s over the read, and ended 4.2 and 4.6 s after Stop, 1.5 and 1.8 s of which
   were a wait the proof had added; 5 s left too little room for its clean-up (remote Mac,
   Live 12.4.25b1, 2026-11-14).
+- In Live, with a real click posted on Stop and the token's folder unwritable, a run whose
+  click waited under a notification's cover threw as stopped from its pill, deleted its
+  track and ended by itself, with status 0, 0.42 and 0.49 s after the click, and no mouse
+  event followed; with the user-immutable flag on the token, which the helper could still
+  read, the same, 0.49 s after. A run stopped as `choose` read the menu it had opened
+  closed the menu, left the chooser's value as it was, deleted its track and ended 2.1 and
+  2.4 s after the click. The border went 0.5 to 0.6 s after the run's end. A run that
+  ignored the signal was killed 10.0 s after the click and left its track in Live; no mouse
+  event followed (remote Mac, Live 12.4.25b1, 2026-11-14).
 - A helper sent that signal itself stopped as after Stop. One waiting under a
   notification's cover exited with status 3 4 to 13 ms later. One holding a click's button
   posted the button up 6 to 8 ms after the signal, which cuts the hold short (73 to 81 ms
@@ -384,7 +393,9 @@ unexpected.
   between the two. A capture of a plug-in's window gives the front back to the app that
   had it only if it brought Live forward: one refused after Stop gave it back all the same,
   which activated that app if Live was in front by then (unit tests, remote Mac,
-  2026-11-14).
+  2026-11-14). In Live, with another app in front and Stop pressed by a real click once a
+  press's bringing Live forward had begun, the press threw and that app stayed in front, in
+  2 of 2 (remote Mac, Live 12.4.25b1, 2026-11-14).
 - While the remote Mac's display sleeps, `screencapture -l` fails with "could not create image from
   window", and the session reports the screen locked until the display wakes.
 - A Live started while the display slept never redrew its window: with the LOM at 2 tracks,
