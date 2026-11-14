@@ -7,8 +7,10 @@ const os = require("node:os");
 const path = require("node:path");
 const { latestBuild, chooseBuild, placesProblem, straddleProblem, buildScript, clipNotes, commandLine, run } = require("../device-checks.js");
 
-function folder(names) {
+// A temp folder holding empty files named `names`, removed when the test `t` ends.
+function folder(t, names) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "device-checks-"));
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
   for (const name of names) fs.writeFileSync(path.join(dir, name), "");
   return dir;
 }
@@ -24,8 +26,8 @@ function amxd(boxes) {
   return Buffer.concat([chunk("ampf", Buffer.from("mmmm")), chunk("meta", Buffer.alloc(4)), chunk("ptch", patcher)]);
 }
 
-test("chooseBuild takes a file name or a function, and defaults to the highest version", () => {
-  const dir = folder(["Device 2030.1.9.3.amxd", "Device 2030.1.18.1.amxd", "Device-v2.amxd"]);
+test("chooseBuild takes a file name or a function, and defaults to the highest version", (t) => {
+  const dir = folder(t, ["Device 2030.1.9.3.amxd", "Device 2030.1.18.1.amxd", "Device-v2.amxd"]);
   assert.equal(chooseBuild(null, dir, "Device"), "Device 2030.1.18.1.amxd");
   assert.equal(chooseBuild("Device-v2.amxd", dir, "Device"), "Device-v2.amxd");
   assert.equal(chooseBuild((d) => fs.readdirSync(d).find((n) => n.endsWith("-v2.amxd")), dir, "Device"), "Device-v2.amxd");
@@ -33,16 +35,16 @@ test("chooseBuild takes a file name or a function, and defaults to the highest v
   assert.throws(() => chooseBuild(() => undefined, dir, "Device"), /gave no file name/);
 });
 
-test("latestBuild takes the highest version, numerically, of that device only", () => {
-  const dir = folder(["Device 2030.1.9.3.amxd", "Device 2030.1.18.1.amxd", "Device 2030.1.18.10.amxd",
+test("latestBuild takes the highest version, numerically, of that device only", (t) => {
+  const dir = folder(t, ["Device 2030.1.9.3.amxd", "Device 2030.1.18.1.amxd", "Device 2030.1.18.10.amxd",
     "Device 2030.1.18.2.amxd", "Device Two 2030.1.19.1.amxd", "Device Three 2030.1.20.1.amxd", "notes.txt"]);
   assert.equal(latestBuild(dir, "Device"), "Device 2030.1.18.10.amxd");
   assert.equal(latestBuild(dir, "Device Two"), "Device Two 2030.1.19.1.amxd");
   assert.throws(() => latestBuild(dir, "Other Device"), /No Other Device build/);
 });
 
-test("buildScript finds the [v8] object's script by its text", () => {
-  const dir = folder([]);
+test("buildScript finds the [v8] object's script by its text", (t) => {
+  const dir = folder(t, []);
   const file = path.join(dir, "Device 2030.1.18.1.amxd");
   fs.writeFileSync(file, amxd([
     { text: "v8ui", textfile: { text: "view" } },

@@ -460,8 +460,9 @@ test("runScript is null for code given with -e or -p or on stdin, whatever argum
   assert.equal(runScript(["--enable-source-maps"], ["node", "/a/check.js"]), "/a/check.js");
 });
 
-test("the click host is read from local.json; no file or no key is none", () => {
+test("the click host is read from local.json; no file or no key is none", (t) => {
   const folder = fs.mkdtempSync(path.join(os.tmpdir(), "device-ui-test-"));
+  t.after(() => fs.rmSync(folder, { recursive: true, force: true }));
   const file = path.join(folder, "local.json");
   assert.equal(readClickHost(file), null);
   fs.writeFileSync(file, '{"remote": "user@click-mac"}');
