@@ -18,8 +18,9 @@
 // as Stop on harness-computer-use's pill removes a run's click token, with --signal it
 // sends the signal of that name to the process that posted the event, and with
 // --signal-parent to that process's parent alone, the run that started it. With
-// --stop-at-drag it removes <file> at a drag event. Having removed <file> or signalled the
-// parent, it prints {"stopped": <when, in ms>}, after the line of the event it did so at.
+// --stop-at-drag it removes <file> at a drag event. Having removed <file>, signalled the
+// parent, or sent the process that posted the event SIGUSR2, the signal of Stop's last
+// resort, it prints {"stopped": <when, in ms>}, after the line of the event it did so at.
 //
 // SIGTERM ends it, and so does the end of the process that started it. If the left button is
 // held then, it posts the button up first and prints {"released": <whether that released it>}.
@@ -130,7 +131,7 @@ func stop(_ token: String?) {
     guard let token, unlink(token) == 0 else { return }
     printJSON(["stopped": now()])
 }
-let SIGNALS = ["SIGINT": SIGINT, "SIGQUIT": SIGQUIT, "SIGTERM": SIGTERM, "SIGHUP": SIGHUP]
+let SIGNALS = ["SIGINT": SIGINT, "SIGQUIT": SIGQUIT, "SIGTERM": SIGTERM, "SIGHUP": SIGHUP, "SIGUSR2": SIGUSR2]
 func signalOption(_ option: String) -> Int32? {
     value(option).map { name -> Int32 in
         guard let number = SIGNALS[name] else { fail("\(option) takes \(SIGNALS.keys.sorted().joined(separator: ", ")), not \(name)") }
@@ -161,7 +162,7 @@ pad.onDown = { posted in
     stop(token)
     let poster = pid_t(posted.getIntegerValueField(.eventSourceUnixProcessID))
     // Never 0, which would signal this program's own process group.
-    if let sent, poster > 0 { kill(poster, sent) }
+    if let sent, poster > 0, kill(poster, sent) == 0, sent == SIGUSR2 { printJSON(["stopped": now()]) }
     // Nor process 1, the parent of a poster whose own has ended.
     if let sentToParent, poster > 0, case let run = parent(of: poster), run > 1, kill(run, sentToParent) == 0 {
         printJSON(["stopped": now()])

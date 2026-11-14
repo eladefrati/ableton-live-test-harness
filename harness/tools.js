@@ -10,15 +10,18 @@ const path = require("node:path");
 const { execFile } = require("node:child_process");
 
 // Runs `cmd args` and resolves with its stdout, in the environment `env` if one is given and
-// in this process's if not. A failure rejects with its stderr, or else the reason it couldn't
-// run; the error's `cause` is execFile's own, whose `code` is the exit status.
-function run(cmd, args = [], { env } = {}) {
+// in this process's if not. `started`, if given, is called with the command's process as it
+// starts, for a caller that may have to signal it. A failure rejects with its stderr, or else
+// the reason it couldn't run; the error's `cause` is execFile's own, whose `code` is the exit
+// status and whose `signal` is the signal that ended the command, if one did.
+function run(cmd, args = [], { env, started } = {}) {
   const words = args.map(String);
   return new Promise((resolve, reject) => {
-    execFile(cmd, words, { maxBuffer: 16 * 1024 * 1024, env }, (error, stdout, stderr) => {
+    const child = execFile(cmd, words, { maxBuffer: 16 * 1024 * 1024, env }, (error, stdout, stderr) => {
       if (error) reject(new Error(`${[cmd, ...words].join(" ")} failed: ${(stderr || error.message).trim()}`, { cause: error }));
       else resolve(stdout);
     });
+    if (started) started(child);
   });
 }
 

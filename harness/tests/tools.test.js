@@ -27,6 +27,10 @@ test("run rejects with the command and its stderr", async () => {
   });
 });
 
+test("run hands the command's process to `started`, and rejects with the signal that ended the command", async () => {
+  await assert.rejects(run("/bin/sleep", ["5"], { started: (child) => child.kill("SIGUSR2") }), (error) => error.cause.signal === "SIGUSR2");
+});
+
 test("run rejects with the reason a command couldn't start", async () => {
   await assert.rejects(run("/no/such/command"), /^Error: \/no\/such\/command failed: .*ENOENT/);
 });

@@ -116,7 +116,9 @@ Node 18 or later. See [ADR-0001](../docs/adr/0001-fork-abletonosc.md) for the de
   that started it lives: one whose run a signal killed, which leaves the token behind, posts
   nothing but the release of a button it holds. A stopped run doesn't bring Live to the front
   either, so a capture of a plug-in's window throws too. If Stop can't remove the token, it
-  ends the run and its click helper by signal, and that run cleans nothing up. A run
+  signals the run instead (SIGUSR2): the run stops the same way, whatever its token says,
+  and the border stays until the run has ended. A run still there 5 s after the signal is
+  killed, and cleans nothing up: a check has that long to clean up and end. A run
   whose border can't show, or goes, however it ends, while the run goes
   on and wasn't stopped, says so on stderr in a line starting `warn harness-computer-use`, and clicks without
   it; when the border couldn't be built, the dialog says, in place of the glow, that nothing
@@ -201,8 +203,9 @@ Node 18 or later. See [ADR-0001](../docs/adr/0001-fork-abletonosc.md) for the de
   device reports (status line, check results) over UDP 11002. Take the time before the
   action and pass it as `since`: `const since = Date.now(); live.setParameter(...);
   await live.waitForHook("check", { since })`.
-- `tools.js` and `amxd.js`: shared by the modules above. `run(cmd, args, {env})` runs a
-  command, in the environment `env` if one is given,
+- `tools.js` and `amxd.js`: shared by the modules above. `run(cmd, args, {env, started})` runs a
+  command, in the environment `env` if one is given, and hands its process to `started` if
+  one is given, for a caller that may have to signal it,
   `helperBinary(source)` compiles a Swift helper once per version of its source,
   `escapeXml(text)`; `patcherChunk(bytes)` finds the patcher in an `.amxd`.
 - `settings.js`: Live's settings, read from `Preferences.cfg` without touching Live's
@@ -268,16 +271,23 @@ Node 18 or later. See [ADR-0001](../docs/adr/0001-fork-abletonosc.md) for the de
   while a drag holds the button, before its move, brings the button up and posts nothing
   more, and so does the run killed then, by a signal sent to it alone; SIGTERM or SIGQUIT while a
   drag holds the button brings it up before the helper dies by SIGTERM, or exits with status
-  131 after SIGQUIT;
-  Stop while the helper waits under a notification's banner ends the wait, and so does the
+  131 after SIGQUIT; the signal of Stop's last resort (SIGUSR2), sent to the helper, does as
+  Stop does: while a click holds the button the click completes and the helper exits 4, and
+  while a drag holds it, before its move, the button comes up and nothing more is posted;
+  Stop while the helper waits under a notification's banner ends the wait, and so does that
+  signal, and the
   loss of the token's folder, removed or made unwritable, and so does the run killed, by a
   signal sent to it alone (the overlay then says that the run has ended), for which the
   check posts a notification, whose banner must show. Stop is also pressed on the pill
   itself, through Accessibility (`checks/press-stop.swift`): the overlay removes the token,
   says Stopped and goes; when the
-  token can't be removed, it ends the helper and the run by signal, and kills a run that
-  outlives SIGTERM; when the token's folder can't be written to, where the run reads as
-  stopped already, it ends the run by signal all the same; pressed as the run ends, it says
+  token can't be removed, it signals the check's run, which passes the signal on to its
+  helper as a run does: the helper stops as after Stop, the run ends by itself, and only
+  then does the overlay say Stopped, as it does when the token's folder can't be written
+  to, where the run reads as stopped already; a run that ignores the signal is killed 5 s
+  after Stop, not sooner, its helper waiting meanwhile under a banner's cover that a second
+  notification keeps up, and only then does the overlay say that the run was ended;
+  pressed as the run ends, it says
   that the run has ended. In every case
   the window may receive
   nothing but a button-up once the run is stopped. Where a stopped click or drag must
@@ -285,7 +295,7 @@ Node 18 or later. See [ADR-0001](../docs/adr/0001-fork-abletonosc.md) for the de
   token was removed (35 ms in a click, 25 ms after a drag's move): under that the case fails,
   as it hasn't shown that Stop came before the release. The cases that end under a
   notification's banner come last, each waiting for the banner of the case before to go,
-  and the check takes about 80 s. It takes the
+  and the check takes about 90 s. It takes the
   pointer, so it runs only on the click host and refuses on any other machine, posting
   nothing. A case that leaves the button held releases it and fails.
 

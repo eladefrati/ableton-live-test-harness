@@ -212,10 +212,26 @@ const helperBinary = () => tools.helperBinary(HELPER_SOURCE).catch((e) => {
 const HAPPENED_STATUS = 4;
 
 async function helper(...args) {
-  return exec(await helperBinary(), args, { env: helperEnvironment() }).catch((error) => {
-    if (error.cause?.cause?.code === HAPPENED_STATUS) error.done = true;
+  const binary = await helperBinary();
+  let child;
+  try {
+    return await exec(binary, args, {
+      env: helperEnvironment(),
+      started(spawned) {
+        child = spawned;
+        runningHelpers.add(child);
+      },
+    });
+  } catch (error) {
+    const ended = error.cause?.cause;
+    // The helper handles the signal from its start: one that the signal ended got it before
+    // that, so before it posted anything.
+    if (ended?.signal === "SIGUSR2") throw new DeviceUiError(`${STOPPED_FROM_PILL}, and the helper had posted nothing`, { cause: error });
+    if (ended?.code === HAPPENED_STATUS) error.done = true;
     throw error;
-  });
+  } finally {
+    runningHelpers.delete(child);
+  }
 }
 
 // The one machine clicks are allowed on without asking: "clickHost" in harness/local.json,
@@ -288,16 +304,32 @@ async function askToClick(script, border) {
 // run is killed.
 const OVERLAY_SOURCE = path.join(__dirname, "computer-use-overlay.swift");
 
+// What a run that Stop on its pill stopped says, and its helper.
+const STOPPED_FROM_PILL = "harness-computer-use was stopped from its pill: this run clicks no more";
+
+// Stop's last resort (ADR-0012): when Stop can't remove the run's click token it sends the
+// run SIGUSR2. The run then counts as stopped for good, whatever its token says, and passes
+// the signal on to the helpers it has running, which stop as after Stop. Nothing ends here:
+// a check fails at the press that throws and still cleans up.
+let stopSignalled = false;
+const runningHelpers = new Set();
+function onStopSignal() {
+  stopSignalled = true;
+  for (const child of runningHelpers) child.kill("SIGUSR2");
+}
+
 // The run's click token (ADR-0012), a file that exists while the run may click and that the
 // pill's Stop removes: one for the run, in a folder of its own, made when first needed and
 // kept here, so that Stop on any pill the run shows stops it. It is never made again: a run
-// whose token has gone stays stopped. Exported for the tests.
+// whose token has gone stays stopped. From when it is made, the run listens for the signal
+// of Stop's last resort. Exported for the tests.
 let clickTokenPath = null;
 function clickToken() {
   if (!clickTokenPath) {
     // Not in the harness's temp folder, which relaunch.js and quit.js empty.
     const folder = fs.mkdtempSync(path.join(os.tmpdir(), "harness-computer-use-"));
     process.on("exit", () => fs.rmSync(folder, { recursive: true, force: true }));
+    process.on("SIGUSR2", onStopSignal);
     const token = path.join(folder, "token");
     fs.writeFileSync(token, "");
     clickTokenPath = token;
@@ -305,12 +337,13 @@ function clickToken() {
   return clickTokenPath;
 }
 
-// Why the run may click no more, or null while it may: while its token can be opened for
-// reading and the token's folder can be written to and searched, so that Stop can remove the
-// token. Anything else counts as stopped, since the run can't tell that it wasn't;
-// device-ui.swift reads the token the same way. A run with no token, one that showed no
-// border, has no Stop to obey.
+// Why the run may click no more, or null while it may: while Stop hasn't signalled it, its
+// token can be opened for reading and the token's folder can be written to and searched, so
+// that Stop can remove the token. Anything else counts as stopped, since the run can't tell
+// that it wasn't; device-ui.swift reads the token the same way. A run with no token, one that
+// showed no border, has no Stop to obey.
 function stopped(token = clickTokenPath) {
+  if (stopSignalled) return STOPPED_FROM_PILL;
   if (token === null) return null;
   const folder = path.dirname(token);
   const cantTell = (why) => `harness-computer-use can't tell that it wasn't stopped (${why}), which counts as stopped: this run clicks no more`;
@@ -324,8 +357,7 @@ function stopped(token = clickTokenPath) {
     fs.closeSync(fs.openSync(token, "r"));
     return null;
   } catch (error) {
-    return error.code === "ENOENT" ? "harness-computer-use was stopped from its pill: this run clicks no more"
-      : cantTell(`the token ${token} can't be read`);
+    return error.code === "ENOENT" ? STOPPED_FROM_PILL : cantTell(`the token ${token} can't be read`);
   }
 }
 

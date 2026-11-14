@@ -36,7 +36,9 @@
 // button this helper holds, and exit 3 saying so. The run counts as stopped unless the helper
 // can tell that it wasn't: the click token named in HARNESS_COMPUTER_USE_TOKEN can be read,
 // and its folder written to. A run that has ended counts as stopped too, whatever became of
-// its token: the helper posts only while the process that started it is still its parent. A
+// its token: the helper posts only while the process that started it is still its parent.
+// So does a run that Stop signalled because it couldn't remove the token: the run passes the
+// signal, SIGUSR2, on to this helper, which handles it from its start, whatever its command. A
 // click or a drag with only that release left has happened: the helper posts it and exits 4,
 // saying that too. A helper that fails, or is sent SIGINT,
 // SIGQUIT, SIGTERM or SIGHUP, while it holds the button releases it before it ends: by that
@@ -46,6 +48,12 @@ import ApplicationServices
 import Foundation
 import Vision
 
+// Stop's last resort (ADR-0012): a Stop that can't remove the click token sends the run
+// SIGUSR2, and the run passes it on to the helpers it has running. Handled before anything
+// else, whatever the command: the signal ends a program that doesn't handle it.
+var stopSignalled: sig_atomic_t = 0
+signal(SIGUSR2) { _ in stopSignalled = 1 }
+
 // Stop (ADR-0012). The run names its click token in HARNESS_COMPUTER_USE_TOKEN: a file that
 // exists while the run may click, which the pill's Stop removes.
 let CLICK_TOKEN = ProcessInfo.processInfo.environment["HARNESS_COMPUTER_USE_TOKEN"]
@@ -53,19 +61,23 @@ let STOPPED_STATUS: Int32 = 3
 // Stopped with only a button's release left: the click or the drag happened.
 let HAPPENED_STATUS: Int32 = 4
 
+// What the helper of a run that Stop on its pill stopped says.
+let STOPPED_FROM_PILL = "harness-computer-use was stopped from its pill: this run clicks no more"
+
 // The run that started this helper: its parent as it starts. A run that a signal killed
 // leaves its token behind, and its helper gets process 1 for a parent.
 let RUN = getppid()
 
 // Why this helper may post no more, or nil while it may: while the run that started it is
-// still its parent, and the token can be opened for reading and its folder can be written to
-// and searched, so that Stop can remove the token. Anything else counts as stopped, since the
-// helper can't tell that the run wasn't; device-ui.js reads the token the same way. A helper
-// given no token, as on the click host, has no Stop to obey, and still posts no more once its
-// run has ended.
+// still its parent, Stop hasn't signalled it, and the token can be opened for reading and its
+// folder can be written to and searched, so that Stop can remove the token. Anything else
+// counts as stopped, since the helper can't tell that the run wasn't; device-ui.js reads the
+// token the same way. A helper given no token, as on the click host, has no Stop to obey, and
+// still posts no more once its run has ended.
 func stopped() -> String? {
     // Process 1 from the start is a run that ended before the helper got going.
     if RUN == 1 || getppid() != RUN { return "harness-computer-use's run has ended: this helper clicks no more" }
+    if stopSignalled != 0 { return STOPPED_FROM_PILL }
     guard let token = CLICK_TOKEN else { return nil }
     let folder = (token as NSString).deletingLastPathComponent
     func cantTell(_ why: String) -> String {
@@ -80,8 +92,7 @@ func stopped() -> String? {
         close(file)
         return nil
     }
-    return errno == ENOENT ? "harness-computer-use was stopped from its pill: this run clicks no more"
-        : cantTell("the token \(token) can't be read")
+    return errno == ENOENT ? STOPPED_FROM_PILL : cantTell("the token \(token) can't be read")
 }
 
 // The button-up event, while this helper holds the button. It is made before the button goes

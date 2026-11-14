@@ -3,8 +3,9 @@
 // notification that the mouse is free again. The pill's Stop removes the file <click-token>,
 // without which the run and its helper post nothing but the release of a button the helper
 // holds, and takes all of this down at once. If the token is still there after that, Stop
-// ends the run's helpers and the run by signal instead. The glow lets every click through;
-// nothing here takes the front.
+// signals the run instead: the run stops clicking and goes on to its clean-up, and all of
+// this stays up until the run has ended, by itself or, END_SECONDS after the signal, killed.
+// The glow lets every click through; nothing here takes the front.
 //
 //   computer-use-overlay <pid> <click-token> [<run>]
 //
@@ -98,41 +99,29 @@ func notify(_ message: String) {
     exit(0)
 }
 
-// Sends SIGTERM to the helpers the run has started: its child processes named as tools.js
-// names device-ui.swift's binary. A helper that holds the button releases it first.
-func endHelpers(of run: pid_t) {
-    var children = [pid_t](repeating: 0, count: 4096)
-    let count = proc_listchildpids(run, &children, Int32(children.count * MemoryLayout<pid_t>.size))
-    for child in children.prefix(max(0, Int(count))) {
-        var name = [CChar](repeating: 0, count: 64)
-        proc_name(child, &name, UInt32(name.count))
-        if String(cString: name).hasPrefix("device-ui-") { kill(child, SIGTERM) }
-    }
-}
-
-// How long the run has to die by SIGTERM before it is killed.
-let TERMINATE_SECONDS = 2.0
+// How long a run that Stop signalled has to end by itself before it is killed, and how long
+// a killed run then has to be gone: one that nothing has reaped yet still answers signal 0.
+let END_SECONDS = 5.0
+let KILLED_SECONDS = 1.0
 
 // Stop's last resort (ADR-0012), for a run whose token is still there after Stop tried to
-// remove it: ends the run's helpers and the run by signal. The run is suspended while its
-// helpers are found, so that it starts none meanwhile, and again before it is killed, as one
-// that outlives SIGTERM may have started more.
-func endRun(_ run: pid_t) {
-    kill(run, SIGSTOP)
-    endHelpers(of: run)
-    kill(run, SIGTERM)
-    kill(run, SIGCONT)
-    let deadline = Date().addingTimeInterval(TERMINATE_SECONDS)
+// remove it: sends the run SIGUSR2, on which it counts itself stopped, stops its helpers and
+// goes on to its clean-up, and waits for it to end, the border still up. A run still there
+// after END_SECONDS is killed; its helpers stop because their run has gone. Returns whether
+// the run ended by itself.
+func endRun(_ run: pid_t) -> Bool {
+    kill(run, SIGUSR2)
+    let deadline = Date().addingTimeInterval(END_SECONDS)
     while kill(run, 0) == 0 {
         if Date() > deadline {
-            kill(run, SIGSTOP)
-            endHelpers(of: run)
             kill(run, SIGKILL)
-            return
+            let gone = Date().addingTimeInterval(KILLED_SECONDS)
+            while kill(run, 0) == 0, Date() < gone { usleep(50_000) }
+            return false
         }
         usleep(50_000)
-        endHelpers(of: run)
     }
+    return true
 }
 
 // Stop's target. It is called on the main thread, as AppKit calls every action.
@@ -150,8 +139,8 @@ final class Stopper: NSObject {
             // A run that has ended has nothing left to stop, whatever became of its token: it
             // removes the token's folder a moment before this program notices it has gone.
             if kill(target, 0) != 0 { finish(RUN_ENDED) }
-            if gone { finish("Stopped: \(name.isEmpty ? "the run" : name) won't click again. The mouse is yours.") }
-            endRun(target)
+            // Nothing is said, and the border stays, until a run that is signalled has ended.
+            if gone || endRun(target) { finish("Stopped: \(name.isEmpty ? "the run" : name) won't click again. The mouse is yours.") }
             finish("\(name.isEmpty ? "The run" : name) was ended: its click token couldn't be removed. The mouse is yours.")
         }
     }

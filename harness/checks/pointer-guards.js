@@ -26,8 +26,13 @@ const EVENT_WAIT_MS = 300;
 // How long Notification Center takes to cover the screen once a notification is posted.
 const BANNER_WAIT_MS = 1000;
 // How long the overlay has to end once Stop is pressed. Its last resort alone gives the run
-// 2 s.
+// 5 s to end, and a run it then kills 1 s more to be gone.
 const OVERLAY_WAIT_MS = 10000;
+// How long after its signal Stop's last resort kills a run that is still there
+// (computer-use-overlay.swift), and how much later than that the check may see the run end,
+// counted from when it started to press Stop.
+const KILL_AFTER_MS = 5000;
+const KILL_SLACK_MS = 1000;
 // How long a process has to end once what holds it has gone.
 const END_WAIT_MS = 3000;
 
@@ -49,13 +54,15 @@ function unlockToken() {
 
 // What stops a run. The token removed, as Stop on the pill removes it, when a case names
 // nothing else; or a loss the run can't tell from that; or Stop pressed on the pill itself,
-// at once after the run's end if the presser is given the run to end; or the run killed, by
-// a signal sent to it alone, which its helper doesn't get and which leaves the token there.
+// at once after the run's end if the presser is given the run to end; or the helper sent the
+// signal of Stop's last resort, as its run passes it on; or the run killed, by a signal sent
+// to it alone, which its helper doesn't get and which leaves the token there.
 const tokenRemoved = () => fs.rmSync(TOKEN);
 const folderGone = () => fs.rmSync(FOLDER, { recursive: true });
 const folderUnwritable = () => fs.chmodSync(FOLDER, 0o500);
 const tokenUnreadable = () => fs.chmodSync(TOKEN, 0o000);
 const stopPressed = (the) => the.pressStop();
+const helperSignalled = (the) => the.run.signalHelper("SIGUSR2");
 const runKilled = (the) => process.kill(the.run.pid, "SIGTERM");
 
 // How a helper that is stopped before its last event exits, and what it says: that Stop
@@ -93,13 +100,16 @@ const drag = (window, x, y) => ["drag", window, x, y, 30, -20];
 const DRAGGED = { type: "drag", dx: 30, dy: -20 };
 
 // Each case: the target's options, whether harness-computer-use's overlay runs, whether the
-// token can't be removed, whether the run outlives SIGTERM, whether a notification's banner
-// shows first, whether the run is stopped before the helper starts or how long after, and by
-// what if not by the token's removal, and the helper's command, if a helper runs, given the
-// target's window and its centre. Then what must come of it: the helper's exit status (the signal, if one ended it),
-// its error, how soon it ended, the button events the target's windows received, by the
-// fields named, all that the overlay says as it ends, and the signal that ends the run, if
-// one does. In every case, once the run is stopped the target must receive no event but a
+// token can't be removed, whether the run ignores the signal of Stop's last resort, whether a
+// notification's banner shows first, and how long after the helper starts a second is posted
+// to keep the cover up, whether the run is stopped before the helper starts or how long
+// after, and by what if not by the token's removal, and the helper's command, if a helper
+// runs, given the target's window and its centre. Then what must come of it: the helper's
+// exit status (the signal, if one ended it), its error, how soon it ended, the button events
+// the target's windows received, by the fields named, all that the overlay says as it ends,
+// whether it may say so only once the run has ended, how long after Stop the run must be
+// killed, at the least and at the most, and the signal that ends the run, if one does. In
+// every case, once the run is stopped the target must receive no event but a
 // button-up, not a pointer's move either. A helper that says its click or drag had happened
 // reads Stop after its release, so it says the same whether Stop came during its hold or just
 // after: such a case also says how long after the target removed the token the button-up must
@@ -193,6 +203,22 @@ const CASES = [
     events: (x, y) => [{ type: "down", x, y }, { type: "up", x, y }],
   },
   {
+    name: "Stop's signal while a click holds the button: the click completes, and the helper ends as stopped, saying the click had happened",
+    target: [...RECT, "--signal", "SIGUSR2"],
+    command: click,
+    status: HAPPENED,
+    stderr: happened("click"),
+    events: (x, y) => [{ type: "down", x, y }, { type: "up", x, y }],
+  },
+  {
+    name: "Stop's signal while a drag holds the button, before its move: the button comes up at the press point, with no drag event",
+    target: [...RECT, "--signal", "SIGUSR2"],
+    command: drag,
+    status: STOPPED,
+    stderr: stoppedError(),
+    events: (x, y) => [{ type: "down", x, y }, { type: "up", x, y }],
+  },
+  {
     name: "Stop once a drag's move is posted: the drag completes, and the helper ends as stopped, saying the drag had happened",
     target: [...RECT, "--stop-at-drag", TOKEN],
     command: drag,
@@ -257,6 +283,18 @@ const CASES = [
     events: () => [],
   },
   {
+    name: "Stop's signal to a helper that waits for a notification's cover to go: it leaves the wait, posting nothing",
+    banner: true,
+    target: RECT,
+    stopAfterMs: 1000,
+    loss: helperSignalled,
+    command: click,
+    status: STOPPED,
+    stderr: stoppedError(),
+    withinMs: 2500,
+    events: () => [],
+  },
+  {
     name: "the run killed while the helper waits for a notification's cover to go: the helper leaves the wait and ends, posting nothing, "
       + "and the overlay says that the run has ended",
     overlay: true,
@@ -285,7 +323,7 @@ const CASES = [
   },
   {
     name: "Stop on the pill when the token can't be removed, while the helper waits for a notification's cover to go: "
-      + "the overlay ends the helper and the run, and says so",
+      + "the helper stops as after Stop, the run ends by itself, and only then does the overlay say Stopped",
     overlay: true,
     immutable: true,
     banner: true,
@@ -293,33 +331,45 @@ const CASES = [
     stopAfterMs: 1000,
     loss: stopPressed,
     command: click,
-    status: withRun("SIGTERM"),
+    status: STOPPED,
+    stderr: stoppedError(),
+    withinMs: 2500,
     events: () => [],
-    says: SAID_ENDED_RUN,
-    run: "SIGTERM",
+    says: SAID_STOPPED,
+    afterRun: true,
   },
+  // A notification's cover goes about 5 s after it is posted, before the run is killed, and
+  // the helper of a run that ignores the signal may click from then on: a second
+  // notification keeps the cover up past the kill.
   {
-    name: "Stop on the pill when the token can't be removed and the run outlives SIGTERM: the overlay kills the run, and says so",
+    name: "Stop on the pill when the token can't be removed and the run ignores the signal, while the helper waits for a notification's cover to go: "
+      + "the run is killed 5 s after Stop, not sooner, the helper ends with it, posting nothing, and only then does the overlay say that the run was ended",
     overlay: true,
     immutable: true,
     deaf: true,
+    banner: true,
+    bannerAgainMs: 2500,
     target: RECT,
-    stopped: true,
+    stopAfterMs: 1000,
     loss: stopPressed,
+    command: click,
+    status: withRun("SIGKILL"),
     events: () => [],
     says: SAID_ENDED_RUN,
+    afterRun: true,
+    killedMs: [KILL_AFTER_MS, KILL_AFTER_MS + KILL_SLACK_MS],
     run: "SIGKILL",
   },
   {
     name: "Stop on the pill when the token's folder can't be written to, where the run reads as stopped already: "
-      + "the overlay ends the run all the same, and says so",
+      + "the run ends by itself, and only then does the overlay say Stopped",
     overlay: true,
     target: RECT,
     stopped: true,
     loss: (the) => { folderUnwritable(); return the.pressStop(); },
     events: () => [],
-    says: SAID_ENDED_RUN,
-    run: "SIGTERM",
+    says: SAID_STOPPED,
+    afterRun: true,
   },
   {
     name: "Stop on the pill once the run has ended says that the run has ended, not Stopped",
@@ -376,36 +426,52 @@ async function showTarget(binary, options) {
 
 // A run of the check's own, which starts the helper as a run does, with the token named in
 // the helper's environment, and which the overlay is given as its run: Stop's last resort
-// ends the run and its helpers by signal, so the check itself is never the run. For each
-// line of arguments it reads it starts the helper, prints the helper's pid and, once the
+// signals the run, and kills one that doesn't end, so the check itself is never the run. For
+// each line of arguments it reads it starts the helper, prints the helper's pid and, once the
 // helper ends, how: its exit status (the signal, if one ended it) and what it wrote to
-// stderr. It ends when its input does. Given a third argument, it outlives SIGTERM.
+// stderr. It ends when its input does. On the signal of Stop's last resort (SIGUSR2) it does
+// as a run does: it passes the signal on to its helper and ends by itself once the helper
+// has. Given a third argument, it ignores the signal.
 const RUN = `
   const { execFile } = require("node:child_process");
   const [binary, token, deaf] = process.argv.slice(1);
-  if (deaf) process.on("SIGTERM", () => {});
+  let helper = null;
+  process.on("SIGUSR2", () => {
+    if (deaf) return;
+    if (helper) helper.kill("SIGUSR2");
+    process.stdin.destroy();
+  });
   require("node:readline").createInterface({ input: process.stdin }).on("line", (line) => {
-    const helper = execFile(binary, JSON.parse(line), { env: { ...process.env, HARNESS_COMPUTER_USE_TOKEN: token } }, (error, stdout, stderr) => {
+    helper = execFile(binary, JSON.parse(line), { env: { ...process.env, HARNESS_COMPUTER_USE_TOKEN: token } }, (error, stdout, stderr) => {
       console.log(JSON.stringify({ status: error ? error.code ?? error.signal : 0, stderr: stderr.trim() }));
     });
     console.log(JSON.stringify({ helper: helper.pid }));
   });`;
 
-// Starts such a run: { pid, helper, end }. `helper` runs the helper and resolves with how it
-// ended, or, when the run ends before it says, with whether the helper ended with it. `end`
-// ends the run and resolves with its exit status, or the signal that ended it.
+// Starts such a run: { pid, helper, signalHelper, endedAt, end }. `helper` runs the helper and
+// resolves with how it ended, or, when the run ends before it says, with whether the helper
+// ended with it. `signalHelper` sends that helper a signal. `endedAt` is when the run ended,
+// null until it has. `end` ends the run and resolves with its exit status, or the signal that
+// ended it.
 function startRun(helper, deaf) {
   const child = spawn(process.execPath, ["-e", RUN, helper, TOKEN, ...(deaf ? ["deaf"] : [])], { stdio: ["pipe", "pipe", "inherit"] });
-  const ended = new Promise((resolve) => child.on("exit", (code, signal) => resolve(signal ?? code)));
+  let [endedAt, helperPid] = [null, null];
+  const ended = new Promise((resolve) => child.on("exit", (code, signal) => {
+    endedAt = Date.now();
+    resolve(signal ?? code);
+  }));
   const line = linesOf(child);
   const said = async () => JSON.parse(await line());
-  // A run that a signal ended no longer reads its input.
+  // A run that has ended no longer reads its input.
   child.stdin.on("error", () => {});
   return {
     pid: child.pid,
+    endedAt: () => endedAt,
+    signalHelper: (signal) => process.kill(helperPid, signal),
     async helper(args) {
       child.stdin.write(`${JSON.stringify(args.map(String))}\n`);
       const started = await said();
+      helperPid = started?.helper ?? null;
       const result = await said();
       if (result) return result;
       const how = await ended;
@@ -419,7 +485,7 @@ function startRun(helper, deaf) {
     },
     async end() {
       child.stdin.end();
-      // One that a signal has suspended can't end by itself.
+      // One whose helper still runs doesn't end with its input.
       if ((await within(END_WAIT_MS, ended)) === null) child.kill("SIGKILL");
       return ended;
     },
@@ -428,22 +494,27 @@ function startRun(helper, deaf) {
 
 // Starts the overlay over the run `pid` and resolves once it says its windows are on screen:
 // { pid, said, end }. `said` resolves, once the overlay has ended and so taken its windows
-// down, with all it said as it did, or with null if it doesn't end in time. `end` ends one
-// that is still up, which doesn't notify.
+// down, with all it said as it did and when it began to ({ text, at }), or with null if it
+// doesn't end in time. `end` ends one that is still up, which doesn't notify.
 async function showOverlay(binary, pid) {
   const child = spawn(binary, [String(pid), TOKEN, path.basename(__filename)], { stdio: ["ignore", "pipe", "inherit"] });
   const ended = new Promise((resolve) => child.on("exit", resolve));
   const line = linesOf(child);
   if ((await line()) !== "shown") throw new Error("The overlay ended before its windows showed");
-  const last = async () => {
+  // Read from now on, not when asked for, so that `at` is when the overlay said it.
+  const last = (async () => {
     const lines = [];
-    for (let next = await line(); next !== null; next = await line()) lines.push(next);
+    let at;
+    for (let next = await line(); next !== null; next = await line()) {
+      at ??= Date.now();
+      lines.push(next);
+    }
     await ended;
-    return lines.join("\n");
-  };
+    return { text: lines.join("\n"), at };
+  })();
   return {
     pid: child.pid,
-    said: () => within(OVERLAY_WAIT_MS, last()),
+    said: () => within(OVERLAY_WAIT_MS, last),
     async end() {
       child.kill();
       await ended;
@@ -465,12 +536,17 @@ async function failures(test, binaries) {
     if (test.overlay) overlay = await showOverlay(binaries.overlay, run.pid);
     // Why Stop couldn't be pressed, if it couldn't: an overlay that is ending shows no pill.
     let unpressed = "";
-    const pressStop = (...after) => tools.run(binaries.press, [overlay.pid, ...after]).catch((error) => { unpressed = `: ${error.message}`; });
-    // When the run was stopped, on the clock the target's events carry.
+    // When the run was stopped, on the clock the target's events carry. For Stop pressed on
+    // the pill, when the press was started: it returns only once the overlay has ended or,
+    // in its last resort, kept the press waiting for 1.5 s.
     let stoppedAt;
+    const pressStop = (...after) => {
+      stoppedAt = Date.now();
+      return tools.run(binaries.press, [overlay.pid, ...after]).catch((error) => { unpressed = `: ${error.message}`; });
+    };
     let lost = null;
     const lose = () => {
-      lost = Promise.resolve().then(() => (test.loss ?? tokenRemoved)({ run, pressStop })).then(() => { stoppedAt = Date.now(); });
+      lost = Promise.resolve().then(() => (test.loss ?? tokenRemoved)({ run, pressStop })).then(() => { stoppedAt ??= Date.now(); });
       // Thrown once the helper has ended, not as an unhandled rejection in the timer below.
       lost.catch(() => {});
       return lost;
@@ -478,11 +554,15 @@ async function failures(test, binaries) {
     if (test.stopped) await lose();
     const target = await showTarget(binaries.target, test.target);
     const [x, y] = [target.x + target.w / 2, target.y + target.h / 2];
+    const notify = () => tools.run("osascript", ["-e", `display notification "${path.basename(__filename)}" with title "harness-computer-use"`]);
     if (test.banner) {
-      await tools.run("osascript", ["-e", `display notification "${path.basename(__filename)}" with title "harness-computer-use"`]);
+      await notify();
       await sleep(BANNER_WAIT_MS);
     }
     const timer = test.stopAfterMs && setTimeout(lose, test.stopAfterMs);
+    // Why the second notification wasn't posted, if it wasn't.
+    let unposted = "";
+    const again = test.bannerAgainMs && setTimeout(() => notify().catch((error) => { unposted = error.message; }), test.bannerAgainMs);
     const started = Date.now();
     let ended, took, printed;
     try {
@@ -491,6 +571,7 @@ async function failures(test, binaries) {
       await sleep(EVENT_WAIT_MS);
     } finally {
       clearTimeout(timer);
+      clearTimeout(again);
       // Ending the target also releases a button the helper left held.
       printed = await target.end();
     }
@@ -498,7 +579,7 @@ async function failures(test, binaries) {
     const said = test.says ? await overlay.said() : null;
     // The overlay's notification covers the screen a moment after it is posted: the next
     // case's target is to find the cover there, and wait for it to go.
-    if (said) await sleep(BANNER_WAIT_MS);
+    if (said?.text) await sleep(BANNER_WAIT_MS);
     const ran = await run.end();
     const seen = printed.filter((line) => line.type);
     const [buttons, expected] = [seen.filter((event) => event.type !== "move"), test.events(x, y)];
@@ -506,6 +587,7 @@ async function failures(test, binaries) {
     stoppedAt = printed.find((line) => "stopped" in line)?.stopped ?? stoppedAt;
     const afterStop = seen.filter((event) => event.at >= stoppedAt && event.type !== "up");
     const upAfterStop = seen.find((event) => event.type === "up")?.at - stoppedAt;
+    const killed = run.endedAt() - stoppedAt;
     return [
       ended && ended.status !== test.status && `the helper exited ${ended.status}, not ${test.status}${ended.stderr && `, with "${ended.stderr}"`}`,
       ended && ended.status === test.status && test.stderr && !test.stderr.test(ended.stderr) && `the helper's error was "${ended.stderr}"`,
@@ -517,7 +599,10 @@ async function failures(test, binaries) {
         && `not shown that Stop came before the release: the button-up reached the target ${upAfterStop.toFixed(1)} ms after the token was removed, under ${test.upAfterStopMs}`,
       held && `the button was left held, and ${held.released ? "has been released" : "could not be released"}`,
       test.says && said === null && `the overlay was still up ${OVERLAY_WAIT_MS} ms after Stop${unpressed}`,
-      test.says && said !== null && !test.says.test(said) && `the overlay said ${JSON.stringify(said)}, not ${test.says}${unpressed}`,
+      test.says && said !== null && !test.says.test(said.text) && `the overlay said ${JSON.stringify(said.text)}, not ${test.says}${unpressed}`,
+      test.afterRun && said?.at < run.endedAt() && `the overlay said ${JSON.stringify(said.text)} before the run had ended`,
+      test.killedMs && !(killed >= test.killedMs[0] && killed <= test.killedMs[1]) && `the run ended ${killed} ms after Stop, not ${test.killedMs.join(" to ")}`,
+      unposted && `the second notification wasn't posted: ${unposted}`,
       ran !== (test.run ?? 0) && `the run ended with ${ran}, not ${test.run ?? 0}`,
     ].filter(Boolean);
   } finally {

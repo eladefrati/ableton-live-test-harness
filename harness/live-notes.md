@@ -173,7 +173,11 @@ unexpected.
   waiting for it to go leaves the wait once the run is stopped, posting nothing: stopped 1 s
   into the wait it exited 0.12 s later, and left alone it waited 4.9 s and clicked (remote
   Mac, 2026-11-13). `checks/pointer-target.swift` reports its window only once no cover is
-  up, so that a case of the check doesn't start under the banner of the case before.
+  up, so that a case of the check doesn't start under the banner of the case before. On the
+  remote Mac the cover went 5.3 s after a notification was posted (one run), and a second
+  notification, started 2.5 to 4.5 s after the first, kept it up with no gap until 5.3 to
+  5.4 s after the second was posted, in 5 of 5 (the window list read every 20 ms, the
+  display kept on; macOS 26, 2026-11-14).
 - harness-computer-use's pill is a window of its own (title "harness-computer-use pill"), a
   non-activating panel that takes a click on its Stop without taking the front. Unlike the
   glow, the click guard doesn't skip it: a point under the pill is refused, with an error
@@ -199,19 +203,17 @@ unexpected.
   `checks/press-stop.swift` does) was taken as a click on it: the overlay removed the token,
   said Stopped 0.09 s after the press was started and was gone 0.3 s later, once its
   notification was posted. The press itself returned -25204 (cannot complete) in 2 of 2, as
-  the overlay ended before it answered (remote Mac, macOS 26, 2026-11-13).
+  the overlay ended before it answered (remote Mac, macOS 26, 2026-11-13). While the
+  overlay waited for a run that ignored the signal of its last resort, below, the press
+  returned 1.6 s after it was started, the overlay still up, in 5 of 5, with -25204 the
+  once that was read (remote Mac, macOS 26, 2026-11-14).
 - With the token's folder unwritable (mode 500), where Stop couldn't remove the token, the
   overlay said Stopped all the same, the run reading as stopped just then (remote Mac,
   macOS 26, 2026-11-13). It said so 0.07 s after the press was started and left the token
   and the run in place, where the token would let the run click again once the folder
   could be written to. Stop now goes by whether the token went, removed by it or gone
-  already, with its folder or without, not by whether the run can read it: with the folder
-  unwritable the run had died by SIGTERM 0.07 to 0.08 s after the press was started, and
-  the overlay said that the run was ended 0.05 s later, in three runs
-  (`checks/pointer-guards.js`, remote Mac, 2026-11-14). In Live, with a real click posted
-  on Stop after a press had thrown for the unwritable folder, the run died by SIGTERM about
-  0.03 s after the button came up, in 2 of 2, and no mouse event followed, also once the
-  folder could be written to again (remote Mac, Live 12.4.25b1, 2026-11-14).
+  already, with its folder or without, not by whether the run can read it: a token still
+  there takes Stop's last resort, below.
 - A real click posted on the pill's Stop, the button down and up as mouse events at its
   place, stops the run as the Accessibility press does: the token went 5 and 15 ms after
   the button came up, and a press that waited under a notification's cover threw 208 and
@@ -242,12 +244,41 @@ unexpected.
   stopped with `done`, the menu was closed and the chooser's value unchanged. A press
   stopped while it waited for the Info View, with another app in front by then, threw
   without bringing Live forward (remote Mac, Live 12.4.25b1, 2026-11-13).
-- When the token is still there after Stop tried to remove it (the user-immutable flag on
-  it, `chflags uchg`), Stop ends the run's helper and the run by signal. With a helper waiting
-  under a notification's cover, the run had died by SIGTERM and its helper was gone 0.10 to
-  0.11 s after the press was started, with no mouse event posted, and the overlay said that
-  the run was ended 0.05 to 0.06 s later, in three runs. A run that outlives SIGTERM was
-  killed, after the 2 s it is given (`checks/pointer-guards.js`, remote Mac, 2026-11-13).
+- When the token was still there after Stop tried to remove it (its folder unwritable, or
+  the user-immutable flag on the token, `chflags uchg`), Stop ended the run's helper and
+  the run by signal: SIGTERM, and SIGKILL for a run still there 2 s later. The run died
+  before its clean-up. With the folder unwritable it had died 0.07 to 0.08 s after the press
+  was started, and with the token immutable and a helper waiting under a notification's
+  cover 0.10 to 0.11 s after, its helper gone and no mouse event posted, in three runs each
+  (`checks/pointer-guards.js`, remote Mac, 2026-11-13 and 14). In Live, with a real click
+  posted on Stop after a press had thrown for the unwritable folder, the run died by
+  SIGTERM about 0.03 s after the button came up, in 2 of 2, and left its track in Live; no
+  mouse event followed, also once the folder could be written to again (remote Mac, Live
+  12.4.25b1, 2026-11-14).
+- Stop's last resort now sends the run SIGUSR2 and keeps the border up until the run has
+  ended; a run still there 5 s after the signal is killed (ADR-0012 says why that signal,
+  and why 5 s). On the signal the run counts itself stopped, whatever its token says,
+  passes the signal on to the helpers it has running, and goes on, so that a check fails at
+  the press that throws and still cleans up; `device-ui.swift` handles the signal from its
+  start and stops as after Stop. With the token immutable and a helper waiting under a
+  notification's cover, the helper had exited with status 3 0.11 to 0.12 s after the press
+  was started, with no mouse event posted, and the check's run, which ends once its helper
+  has, 0.12 to 0.13 s after; the overlay said Stopped 0.03 to 0.04 s after the run's end.
+  With the folder unwritable and no helper running, the run had ended 0.08 to 0.09 s after
+  the press was started, and the overlay said Stopped 0.04 to 0.06 s later. A run that
+  ignored the signal was killed 5.10 to 5.15 s after the press was started; its helper,
+  kept under the cover by a second notification, was gone within 0.11 s of the kill with no
+  mouse event posted, and the overlay said that the run was ended 0.05 to 0.07 s after the
+  kill. Without the second notification the cover goes before the kill, and the helper of a
+  run that doesn't act on the signal is free to click until the kill (ADR-0012). Four runs
+  each (`checks/pointer-guards.js`, remote Mac, 2026-11-14).
+- A helper sent that signal itself stopped as after Stop. One waiting under a
+  notification's cover exited with status 3 4 to 13 ms later. One holding a click's button
+  posted the button up 6 to 8 ms after the signal, which cuts the hold short (73 to 81 ms
+  after a token removed at the same point), and exited with status 4, the click having
+  happened. One holding a drag's button, before its move, posted the button up 5 to 13 ms
+  after the signal and no drag event, and exited with status 3. Four runs each
+  (`checks/pointer-guards.js`, remote Mac, 2026-11-14).
 - Stop pressed once the run has ended says that the run has ended, not Stopped, though the
   token's removal reads as stopped. The overlay looks for its run every 0.25 s and then says
   the same by itself, so a press that comes late proves nothing: with Stop's own look for

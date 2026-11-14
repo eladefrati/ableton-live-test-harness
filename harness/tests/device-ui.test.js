@@ -1032,18 +1032,24 @@ test("the dialog says that the glow will show or, with no border built, that not
   ]);
 });
 
-// The error a call of the machine rejects with when its helper, a stand-in, writes `said` to
-// stderr and exits with `status`.
-async function helperEnding(status, said) {
+// Runs `body`, given the helper, with the machine's helper a stand-in: a shell script of `lines`.
+async function withHelper(lines, body) {
   const [build, wake] = [tools.helperBinary, mac.wakeDisplay];
-  tools.helperBinary = async () => standIn(`echo "${said}" >&2`, `exit ${status}`);
+  const helper = standIn(...lines);
+  tools.helperBinary = async () => helper;
   mac.wakeDisplay = async () => {};
   try {
-    return await liveWindows().then(() => assert.fail("the helper's failure didn't reject"), (error) => error);
+    return await body(helper);
   } finally {
     [tools.helperBinary, mac.wakeDisplay] = [build, wake];
   }
 }
+
+// The error a call of the machine rejects with when its helper is a stand-in of `lines`.
+const helperFailing = (...lines) => withHelper(lines, () => liveWindows().then(() => assert.fail("the helper's failure didn't reject"), (error) => error));
+
+// The same when the stand-in writes `said` to stderr and exits with `status`.
+const helperEnding = (status, said) => helperFailing(`echo "${said}" >&2`, `exit ${status}`);
 
 test("a helper that exits 4, stopped with only a button's release left, rejects with done; one that exits 3 or 1 doesn't", async () => {
   const error = await helperEnding(4, "harness-computer-use was stopped from its pill: this run clicks no more, and the click had happened");
@@ -1150,6 +1156,88 @@ test("a run that has shown its border still ends by itself", async () => {
     require("node:child_process").execFile(process.execPath, ["-e", run, standIn("echo shown", STAYS)], { timeout: 10000 }, (error, stdout) => (error ? reject(error) : resolve(stdout)));
   });
   assert.equal(printed, "shown\n");
+});
+
+// A run of its own within this process: a fresh copy of device-ui.js, so that the tests after
+// don't inherit what Stop's signal does to a run for good. The copies loaded before don't
+// hear the SIGUSR2 emitted meanwhile.
+async function inFreshRun(body) {
+  const file = require.resolve("../device-ui.js");
+  const [loaded, listeners] = [require.cache[file], process.listeners("SIGUSR2")];
+  process.removeAllListeners("SIGUSR2");
+  delete require.cache[file];
+  try {
+    await body(require(file));
+  } finally {
+    process.removeAllListeners("SIGUSR2");
+    for (const listener of listeners) process.on("SIGUSR2", listener);
+    require.cache[file] = loaded;
+  }
+}
+
+test("a run listens for Stop's signal from when it makes its click token, once, however often the token is asked for or a border shown", () => inFreshRun(async (ui) => {
+  assert.equal(process.listenerCount("SIGUSR2"), 0);
+  ui.clickToken();
+  ui.clickToken();
+  for (const border of [1, 2].map(() => standIn("echo shown", STAYS))) await ui.showComputerUse(border);
+  assert.equal(process.listenerCount("SIGUSR2"), 1);
+}));
+
+test("after Stop's signal the run counts as stopped from its pill, though its token can be read and the token's folder written to", () => inFreshRun((ui) => {
+  const token = ui.clickToken();
+  assert.equal(ui.stopped(), null);
+  process.emit("SIGUSR2");
+  assert.equal(ui.stopped(), STOPPED);
+  fs.accessSync(path.dirname(token), fs.constants.W_OK | fs.constants.X_OK);
+  fs.closeSync(fs.openSync(token, "r"));
+}));
+
+test("after Stop's signal no press of the run hovers or clicks, and a capture doesn't bring Live to the front", () => inFreshRun(async (ui) => {
+  const system = fakeMachine({ info: "Knob" });
+  // A machine that asks, and whose run is stopped when this copy of the module is.
+  Object.assign(system, { hostname: () => "another-mac", ask: async () => true, showComputerUse: async () => { ui.clickToken(); }, stopped: ui.stopped });
+  const device = await ui.openDeviceUi(fakeLive(), { track: 1, device: 1, controls: { Knob: { x: 50, y: 36, info: "Knob" } } }, system);
+  await device.press("Knob");
+  process.emit("SIGUSR2");
+  const before = system.calls.length;
+  await assert.rejects(device.press("Knob"), { message: `${STOPPED}. Not clicked` });
+  assert.equal(system.calls.length, before);
+  assert.equal(clicks(system).length, 1);
+  const editor = Object.assign(fakePluginMachine(), { stopped: ui.stopped });
+  const window = await ui.openPluginWindow(pluginLive(), PLUGIN, editor);
+  await assert.rejects(window.capture("/out/editor.png"), { message: `${STOPPED}. Live not brought to the front` });
+  assert.equal(editor.calls.includes("focus"), false);
+}));
+
+test("Stop's signal is passed on to a helper that is running, and the run goes on", () => inFreshRun((ui) => withHelper(
+  ["trap 'echo \"[]\"; exit 0' USR2", ': > "$0.started"', "while :; do sleep 0.05; done"],
+  async (helper) => {
+    ui.clickToken();
+    const windows = ui.liveWindows();
+    windows.catch(() => {});
+    try {
+      await until(() => fs.existsSync(`${helper}.started`));
+      process.emit("SIGUSR2");
+      assert.deepEqual(await Promise.race([windows, pause(3000).then(() => "the helper wasn't signalled")]), []);
+    } finally {
+      if (!gone(helper)) process.kill(Number(fs.readFileSync(`${helper}.pid`, "utf8")));
+    }
+  },
+)));
+
+test("a helper that Stop's signal ended, before it could handle it, fails its call as stopped, saying that it had posted nothing", async () => {
+  const error = await helperFailing("kill -USR2 $$");
+  assert.equal(error instanceof DeviceUiError, true);
+  assert.equal(error.message, `${STOPPED}, and the helper had posted nothing`);
+  assert.equal("done" in error, false);
+});
+
+test("a run that listens for Stop's signal still ends by itself", async () => {
+  const run = `require(${JSON.stringify(path.join(__dirname, "..", "device-ui.js"))}).clickToken(); console.log(process.listenerCount("SIGUSR2"))`;
+  const printed = await new Promise((resolve, reject) => {
+    require("node:child_process").execFile(process.execPath, ["-e", run], { timeout: 10000 }, (error, stdout) => (error ? reject(error) : resolve(stdout)));
+  });
+  assert.equal(printed, "1\n");
 });
 
 const hasDeveloperTools = (() => {
