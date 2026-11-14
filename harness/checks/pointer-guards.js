@@ -3,7 +3,7 @@
 
 // Checks what device-ui.swift posts and what it refuses, with real mouse events and no Live:
 // each case shows a window of its own (pointer-target.swift), runs the helper against it, and
-// compares how the helper ended with the button events the window received. It takes the
+// compares how the helper ended with the mouse events the window received. It takes the
 // pointer, so it refuses, posting nothing, anywhere but on the click host ("clickHost" in
 // harness/local.json). Exits 1 on failure.
 
@@ -33,6 +33,11 @@ process.on("exit", () => fs.rmSync(path.dirname(MARKER), { recursive: true, forc
 const STOPPED = 3;
 const STOPPED_ERROR = /^harness-computer-use was stopped from its pill: this run clicks no more, and the helper (held no button|released the button at [\d.]+, [\d.]+)$/;
 
+// How long the helper holds the button before a click's release, and after a drag's move
+// before its release (device-ui.swift).
+const CLICK_HOLD_MS = 70;
+const DRAG_HOLD_MS = 50;
+
 const click = (window, x, y) => ["click", window, x, y];
 // A drag 30 points right and 20 up, and the one drag event it posts.
 const drag = (window, x, y) => ["drag", window, x, y, 30, -20];
@@ -43,7 +48,12 @@ const DRAGGED = { type: "drag", dx: 30, dy: -20 };
 // how long after, and the helper's command, given the target's window and its centre. Then
 // what must come of it: the helper's exit status (the signal, if one ended it), its error,
 // how soon it ended, and the button events the target's windows received, by the fields
-// named.
+// named. In every case, once the run is stopped the target must receive no event but a
+// button-up, not a pointer's move either. A helper that ends as one that wasn't stopped looks
+// the same whether Stop came during its hold or never, so such a case also says how long
+// after the target made the marker the button-up must reach it: half the hold, which leaves
+// a loaded machine room. Under that, the marker may have come after the helper posted its
+// release, and the case fails as not shown.
 const CASES = [
   {
     name: "a click reaches the target",
@@ -97,6 +107,7 @@ const CASES = [
     target: [...RECT, "--stop", MARKER],
     command: click,
     status: 0,
+    upAfterStopMs: CLICK_HOLD_MS / 2,
     events: (x, y) => [{ type: "down", x, y }, { type: "up", x, y }],
   },
   {
@@ -112,6 +123,7 @@ const CASES = [
     target: [...RECT, "--stop-at-drag", MARKER],
     command: drag,
     status: 0,
+    upAfterStopMs: DRAG_HOLD_MS / 2,
     events: (x, y) => [{ type: "down", x, y }, { ...DRAGGED, x: x + 30, y: y - 20 }, { type: "up", x: x + 30, y: y - 20 }],
   },
   ...["SIGTERM", "SIGQUIT"].map((signal) => ({
@@ -176,14 +188,20 @@ async function failures(test, binaries) {
   const overlay = test.overlay ? spawn(binaries.overlay, [String(process.pid), MARKER, path.basename(__filename)], { stdio: "ignore" }) : null;
   try {
     fs.rmSync(MARKER, { force: true });
-    if (test.stopped) fs.writeFileSync(MARKER, "");
+    // When the run was stopped, on the clock the target's events carry.
+    let stoppedAt;
+    const stop = () => {
+      fs.writeFileSync(MARKER, "");
+      stoppedAt = Date.now();
+    };
+    if (test.stopped) stop();
     const target = await showTarget(binaries.target, test.target);
     const [x, y] = [target.x + target.w / 2, target.y + target.h / 2];
     if (test.banner) {
       await tools.run("osascript", ["-e", `display notification "${path.basename(__filename)}" with title "harness-computer-use"`]);
       await sleep(BANNER_WAIT_MS);
     }
-    const stop = test.stopAfterMs && setTimeout(() => fs.writeFileSync(MARKER, ""), test.stopAfterMs);
+    const timer = test.stopAfterMs && setTimeout(stop, test.stopAfterMs);
     const started = Date.now();
     let ended, took, printed;
     try {
@@ -191,17 +209,25 @@ async function failures(test, binaries) {
       took = Date.now() - started;
       await sleep(EVENT_WAIT_MS);
     } finally {
-      clearTimeout(stop);
+      clearTimeout(timer);
       // Ending the target also releases a button the helper left held.
       printed = await target.end();
     }
-    const [seen, expected] = [printed.filter((line) => line.type), test.events(x, y)];
+    const seen = printed.filter((line) => line.type);
+    const [buttons, expected] = [seen.filter((event) => event.type !== "move"), test.events(x, y)];
     const held = printed.find((line) => "released" in line);
+    stoppedAt = printed.find((line) => "stopped" in line)?.stopped ?? stoppedAt;
+    const afterStop = seen.filter((event) => event.at >= stoppedAt && event.type !== "up");
+    const upAfterStop = seen.find((event) => event.type === "up")?.at - stoppedAt;
     return [
       ended.status !== test.status && `the helper exited ${ended.status}, not ${test.status}${ended.stderr && `, with "${ended.stderr}"`}`,
       ended.status === test.status && test.stderr && !test.stderr.test(ended.stderr) && `the helper's error was "${ended.stderr}"`,
       took > test.withinMs && `the helper took ${took} ms, over ${test.withinMs}`,
-      !sameEvents(seen, expected) && `the target received ${JSON.stringify(seen)}, not ${JSON.stringify(expected)}`,
+      !sameEvents(buttons, expected) && `the target received ${JSON.stringify(buttons)}, not ${JSON.stringify(expected)}`,
+      afterStop.length && `after Stop the target received ${JSON.stringify(afterStop)}`,
+      test.upAfterStopMs && !fs.existsSync(MARKER) && "the stop marker was never made",
+      test.upAfterStopMs && fs.existsSync(MARKER) && !(upAfterStop >= test.upAfterStopMs)
+        && `not shown that Stop came before the release: the button-up reached the target ${upAfterStop.toFixed(1)} ms after the marker was made, under ${test.upAfterStopMs}`,
       held && `the button was left held, and ${held.released ? "has been released" : "could not be released"}`,
     ].filter(Boolean);
   } finally {

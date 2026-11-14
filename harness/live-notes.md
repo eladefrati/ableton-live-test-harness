@@ -181,8 +181,9 @@ unexpected.
   up at the press point and no drag event: each exited with status 3. One stopped while a
   click held the button posted the button up, so the click happened, and one stopped after
   its drag's move did too, so the drag happened: with only the release left, each exited
-  with status 0 (`checks/pointer-guards.js`, remote Mac, 2026-11-13). The run's next press
-  then throws.
+  with status 0, its button-up reaching the check's window 77 and 81 ms after the marker was
+  made in the click, 51 and 57 ms in the drag (`checks/pointer-guards.js`, remote Mac,
+  2026-11-13). The run's next press then throws.
 - With no window server, as for a process with no desktop session, a program gets no session
   (`CGSessionCopyCurrentDictionary()` is nil), no screens, and windows that say they are
   visible and never show, all with no error; `display dialog` fails there with -1713, "No

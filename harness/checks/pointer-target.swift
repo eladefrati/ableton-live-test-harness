@@ -6,15 +6,17 @@
 //                                     at that rectangle, in points from the screen's top left
 //   pointer-target --under <title>    at the rectangle of the window of that title, under it
 //
-// Prints {"window", "x", "y", "w", "h"} once the panel is on screen, then one line per button
-// event a window of its receives: {"type": "down" | "drag" | "up", "window", "x", "y", "dx",
-// "dy"}, the event's position in points from the screen's top left and its delta fields. With
+// Prints {"window", "x", "y", "w", "h"} once the panel is on screen, then one line per mouse
+// event a window of its receives: {"type": "move" | "down" | "drag" | "up", "window", "x", "y",
+// "dx", "dy", "at"}, the event's position in points from the screen's top left, its delta
+// fields, and when it was received, in ms. With
 // --cover it shows a second window over the panel when the pointer first moves in it. With
 // --return it moves the pointer back to where the button went down at every drag event, as a
 // knob of one of Live's devices does. When the button goes down, with --stop it creates <file>,
 // as Stop on harness-computer-use's pill creates a run's stop marker, and with --signal it
 // sends the signal of that name to the process that posted the event. With --stop-at-drag it
-// creates <file> at a drag event.
+// creates <file> at a drag event. Having created <file>, it prints {"stopped": <when, in ms>},
+// after the line of the event it created it at.
 //
 // SIGTERM ends it, and so does the end of the process that started it. If the left button is
 // held then, it posts the button up first and prints {"released": <whether that released it>}.
@@ -32,6 +34,9 @@ func printJSON(_ value: [String: Any]) {
     print(String(data: try! JSONSerialization.data(withJSONObject: value), encoding: .utf8)!)
 }
 
+// The time, in ms, on the clock pointer-guards.js reads too.
+func now() -> Double { Date().timeIntervalSince1970 * 1000 }
+
 final class Pad: NSView {
     var onFirstMove: (() -> Void)?
     var onDown: ((CGEvent) -> Void)?
@@ -41,16 +46,17 @@ final class Pad: NSView {
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
     override func mouseDown(with event: NSEvent) {
         pressed = event.cgEvent?.location ?? .zero
-        if let posted = event.cgEvent { onDown?(posted) }
         report("down", event)
+        if let posted = event.cgEvent { onDown?(posted) }
     }
     override func mouseDragged(with event: NSEvent) {
-        onDrag?()
         report("drag", event)
+        onDrag?()
         if returnsPointer { CGWarpMouseCursorPosition(pressed) }
     }
     override func mouseUp(with event: NSEvent) { report("up", event) }
     override func mouseMoved(with event: NSEvent) {
+        report("move", event)
         onFirstMove?()
         onFirstMove = nil
     }
@@ -61,7 +67,8 @@ final class Pad: NSView {
     func report(_ type: String, _ event: NSEvent) {
         guard let posted = event.cgEvent else { return }
         printJSON(["type": type, "window": window?.windowNumber ?? -1, "x": posted.location.x, "y": posted.location.y,
-                   "dx": posted.getIntegerValueField(.mouseEventDeltaX), "dy": posted.getIntegerValueField(.mouseEventDeltaY)])
+                   "dx": posted.getIntegerValueField(.mouseEventDeltaX), "dy": posted.getIntegerValueField(.mouseEventDeltaY),
+                   "at": now()])
     }
 }
 
@@ -79,6 +86,8 @@ func showPanel(_ rect: CGRect) -> (Panel, Pad) {
     panel.hidesOnDeactivate = false
     panel.collectionBehavior = [.canJoinAllSpaces, .stationary]
     let pad = Pad(frame: NSRect(origin: .zero, size: rect.size))
+    // A window that isn't key gets the pointer's moves only through a tracking area.
+    pad.addTrackingArea(NSTrackingArea(rect: .zero, options: [.mouseMoved, .activeAlways, .inVisibleRect], owner: pad))
     panel.contentView = pad
     panel.orderFrontRegardless()
     return (panel, pad)
@@ -115,7 +124,8 @@ func value(_ name: String) -> String? {
 }
 let (stopMarker, dragStopMarker) = (value("--stop"), value("--stop-at-drag"))
 func stop(_ marker: String?) {
-    if let marker { FileManager.default.createFile(atPath: marker, contents: nil) }
+    guard let marker, FileManager.default.createFile(atPath: marker, contents: nil) else { return }
+    printJSON(["stopped": now()])
 }
 let SIGNALS = ["SIGINT": SIGINT, "SIGQUIT": SIGQUIT, "SIGTERM": SIGTERM, "SIGHUP": SIGHUP]
 let sent = value("--signal").map { name -> Int32 in
@@ -143,10 +153,7 @@ pad.onDown = { posted in
 }
 pad.onDrag = { stop(dragStopMarker) }
 var over: Panel?
-if cover {
-    pad.addTrackingArea(NSTrackingArea(rect: .zero, options: [.mouseMoved, .activeAlways, .inVisibleRect], owner: pad))
-    pad.onFirstMove = { over = showPanel(rect).0 }
-}
+if cover { pad.onFirstMove = { over = showPanel(rect).0 } }
 // The window server lists the panel only once the run loop below has run: 50 to 70 ms after
 // it was ordered front, and a click posted before that went to the window under it.
 Timer.scheduledTimer(withTimeInterval: 0.01, repeats: true) { timer in

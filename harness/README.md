@@ -239,7 +239,8 @@ Node 18 or later. See [ADR-0001](../docs/adr/0001-fork-abletonosc.md) for the de
   a new one saved in a temp folder; the file the set was opened from is untouched.
 - `checks/pointer-guards.js`: checks what `device-ui.swift` posts and what it refuses, with
   real mouse events and no Live. Each case shows a window of its own
-  (`checks/pointer-target.swift`, which prints the button events it receives), runs the helper
+  (`checks/pointer-target.swift`, which prints the mouse events it receives, pointer moves
+  included, and when), runs the helper
   against it, and compares the helper's exit status and error and the events the window
   received: a click reaches the window; a window that comes over the point during a click's
   hover gets no click; a point under harness-computer-use's pill is refused; a drag is one
@@ -250,7 +251,11 @@ Node 18 or later. See [ADR-0001](../docs/adr/0001-fork-abletonosc.md) for the de
   before its move, brings the button up and posts nothing more; SIGTERM or SIGQUIT while a
   drag holds the button brings it up before the helper dies;
   Stop while the helper waits under a notification's banner ends the wait, for which the
-  check posts a notification, whose banner must show. It takes the
+  check posts a notification, whose banner must show. In every case the window may receive
+  nothing but a button-up once the run is stopped. Where a stopped click or drag must
+  complete, the button-up must reach the window at least half the helper's hold after the
+  marker was made (35 ms in a click, 25 ms after a drag's move): under that the case fails,
+  as it hasn't shown that Stop came before the release. It takes the
   pointer, so it runs only on the click host and refuses on any other machine, posting
   nothing. A case that leaves the button held releases it and fails.
 
