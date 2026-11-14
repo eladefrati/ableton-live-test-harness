@@ -44,9 +44,10 @@ Stop could fail, leaving a run that still clicked.
    file that exists while the run may click, in a folder of its own, named to the border and
    to every helper the run starts. Stop removes the token, takes the border down and says the
    mouse is free. The helper posts a mouse event only while it can tell that the run wasn't
-   stopped: the token can be read, and its folder can be written to, so that Stop can remove
-   it. Anything else counts as stopped: a token that is gone or can't be read, a folder that
-   is gone or can't be written to. The run reads the token the same way before each press.
+   stopped: the token can be read, and its folder can be written to and searched, so that
+   Stop can remove it. Anything else counts as stopped: a token that is gone or can't be
+   read, a folder that is gone or can't be written to or searched. The run reads the token
+   the same way before each press.
    The helper also posts only while the run that started it lives: a run that a signal
    killed leaves its token behind, and the border then says that the mouse is free. If
    the token is still there after Stop tried to remove it, Stop ends the run's helper and
@@ -94,7 +95,8 @@ Stop could fail, leaving a run that still clicked.
 - Stop needs nothing from the run: the helper reads the token itself, so a run busy in its
   own code is stopped as fast as an idle one.
 - A run stops clicking when anything else removes its token or the token's folder: it can't
-  tell that it wasn't stopped. Its error says which it was.
+  tell that it wasn't stopped. Its error says what it found, so for a token that something
+  else removed it says, as after Stop, that the run was stopped from its pill.
 - A click whose button was down when Stop came completes, since its release is the one event
   still posted, and so does a drag whose move was already posted. A drag stopped before its
   move is a click on the control: the button went down at the press point and came up where
