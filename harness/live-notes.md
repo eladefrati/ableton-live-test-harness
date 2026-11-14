@@ -176,6 +176,16 @@ unexpected.
   window (layer 0): the guard had taken it for one at the cursor's layer and left it out, so
   that one over the point would have gone unseen. No window was seen to report no layer, and
   none could be made to (not reproduced).
+- Live shows a plug-in's window only while the plug-in's track is selected: with two tracks
+  of one name, each with AUDelay, opening the second's window, which selects its track, left
+  one window of that title on screen, and the click guard, finding one, clicked; once that
+  track was deleted, the first's window wasn't on screen either (remote Mac, Live 12.4.25b1,
+  2026-11-14). So two windows of one title, which the guard refuses, can't be put on screen
+  by the harness, which opens a window only for a device whose name is the only one on its
+  track. AUDelay's window is 484 x 274 points, with its editor, 444 x 80, at the bottom, 194
+  points below the window's top. Moved to the screen's top through Accessibility, the window
+  stopped below the menu bar, 30 points down: the editor can't come under
+  harness-computer-use's pill.
 - While a notification banner shows, from any app, Notification Center holds a transparent
   window the size of the screen at layer 21, gone about 4 s after the banner appeared; the
   click guard read it as covering the point and refused (main Mac, macOS 26, 2026-11-13). The

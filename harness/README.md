@@ -341,6 +341,32 @@ Node 18 or later. See [ADR-0001](../docs/adr/0001-fork-abletonosc.md) for the de
   and the check takes about 159 s. It takes the
   pointer, so it runs only on the click host and refuses on any other machine, posting
   nothing. A case that leaves the button held releases it and fails.
+- `checks/editor-guards.js`: checks what the helper's `click-editor` and `drag-editor`
+  refuse, which `pointer-guards.js` can't run, since they take only a plug-in window of
+  Live's (ADR-0008). In Live, it adds an audio track with Apple's AUDelay, opens its window
+  and runs the helper against the editor's Dry/Wet Mix slider, with a click token as a
+  run's helpers have, once for each command in each case. It compares the helper's exit
+  status and error, the mouse events the helper posted (`checks/event-tap.swift`, a
+  listen-only event tap) and Dry/Wet Mix, read over OSC. A click and a drag reach the
+  editor, under harness-computer-use's border too, and the drag moves the slider as
+  measured. Each command is refused, posting nothing and leaving the value as it was, for a
+  window of another app over the point; for an editor that isn't the size given, by its
+  width or by its height; for a point on any of the editor's four edges, or left of it in
+  its window; for the plug-in's window closed; for a coordinate that is no number; and for
+  a notification's banner that keeps the screen covered past the 10 s the helper waits for
+  it to go. A window that comes over the point during the hover gets no button event and is
+  named in the error, the helper having posted only the hover's two moves: the tap
+  suspends the helper at its first move (SIGSTOP) until that window shows. A run whose
+  token is gone posts nothing and exits 3. A drag is refused too for a fraction of a point,
+  for no distance, for over 400 points, and for an end off the screen, a point past the
+  main display's top edge, or its left edge where the top is more than 400 points away, so
+  the check assumes no display beyond either. A case fails if the system turned the tap off
+  during it. Not run: the locked screen, which staging would lock the Mac; a point under
+  the pill, which AUDelay's editor can't reach, lying 194 points below the top of its
+  window; two windows of the editor's title, which Live doesn't show at once; and an
+  editor with other than one group in its window. It takes the pointer, so it runs only
+  on the click host, with Live open; it brings Live to the front, deletes its track at the
+  end, and takes about 80 s.
 
 Project checks live in each project's repo, in `tests/live/`, and use this folder as a
 library by path. Checks of a MIDI device run on `device-checks.js`; checks of audio or a
@@ -357,6 +383,7 @@ node harness/checks/example-transpose-check.js  # the same on device-checks.js (
 node harness/checks/plugin-record.js      # the plug-in path, on AUDelay (replaces a set the harness opened)
 node harness/checks/plugin-set.js <name>  # a plug-in's built set against Live's own (replaces a set the harness opened)
 node harness/checks/pointer-guards.js     # what the click helper posts and refuses (Live not needed; on the click host only)
+node harness/checks/editor-guards.js      # what the click helper refuses in a plug-in's editor, on AUDelay (on the click host only)
 node ~/dev/<repo>/tests/live/<check>.js              # a project's checks
 node ~/dev/<repo>/tests/live/<check>.js --keep       # leave its test tracks
 node ~/dev/<repo>/tests/live/<check>.js --tempo 97   # at another tempo (left so)

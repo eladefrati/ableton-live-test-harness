@@ -14,7 +14,12 @@ Before a commit that changes anything other than Markdown files, run
 `node harness/checks/pointer-guards.js` on the click host (Live not needed): the unit tests
 run the helper's callers on fakes, and the helper only where it refuses a drag for its
 distance and where it crops a picture, so only this check sees what the helper posts, what
-else it refuses, and what Stop on the overlay's pill does.
+else it refuses, and what Stop on the overlay's pill does. Before a commit that changes
+`harness/device-ui.swift`, `harness/checks/editor-guards.js`,
+`harness/checks/event-tap.swift` or `harness/checks/pointer-target.swift`, also run `node harness/checks/editor-guards.js` on the
+click host, with Live open: `pointer-guards.js` can't run the helper's `click-editor` and
+`drag-editor`, which take only a plug-in window of Live's, so only this check sees what
+those two refuse.
 A commit that changes how Live behaves
 under the harness, or what the harness refuses, adds it to `harness/live-notes.md` in the same commit: the next reader reads that file, not
 code comments or commit messages.
