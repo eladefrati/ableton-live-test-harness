@@ -728,8 +728,9 @@ async function unrefused(binary, pid) {
 }
 
 // Starts a process that ends at the first signal, as the child of one that never waits for
-// it: { pid, state, end }. `state` is what ps says of it: "Z" once it has ended and stays
-// unreaped, nothing once it is gone. `end` ends it and the process that started it.
+// it: { pid, state, end }. `state` is what ps says of it: it starts with Z once the process
+// has ended and stays unreaped ("Z+" when the check runs in a terminal's foreground), and is
+// empty once it is gone. `end` ends it and the process that started it.
 async function startUnreaped() {
   // The shell starts the process, says its id and becomes a sleep itself, which waits for
   // nothing.
@@ -773,7 +774,7 @@ async function unreapedFailures(test, binaries) {
     const said = await within(END_WAIT_MS, overlay.said());
     const state = run.state();
     return [
-      state !== "Z" && `the run wasn't left unreaped: ps gives its state as "${state}"`,
+      !state.startsWith("Z") && `the run wasn't left unreaped: ps gives its state as "${state}"`,
       said === null && `the overlay was still up ${END_WAIT_MS} ms after the run ended${unpressed}`,
       said !== null && !test.says.test(said.text) && `the overlay said ${JSON.stringify(said.text)}, not ${test.says}${unpressed}`,
     ].filter(Boolean);
