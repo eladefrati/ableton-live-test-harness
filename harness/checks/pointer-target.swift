@@ -2,7 +2,7 @@
 // that takes clicks without taking the front.
 //
 //   pointer-target <x> <y> <w> <h> [--cover] [--return] [--stop <file>] [--stop-at-drag <file>]
-//                  [--signal <name>]
+//                  [--signal <name>] [--signal-parent <name>]
 //                                     at that rectangle, in points from the screen's top left
 //   pointer-target --under <title>    at the rectangle of the window of that title, under it
 //
@@ -15,10 +15,11 @@
 // --return it moves the pointer back to where the button went down at every drag event, as a
 // knob of one of Live's devices does after an event with a vertical part. When the button goes
 // down, with --stop it removes <file>,
-// as Stop on harness-computer-use's pill removes a run's click token, and with --signal it
-// sends the signal of that name to the process that posted the event. With --stop-at-drag it
-// removes <file> at a drag event. Having removed <file>, it prints {"stopped": <when, in ms>},
-// after the line of the event it removed it at.
+// as Stop on harness-computer-use's pill removes a run's click token, with --signal it
+// sends the signal of that name to the process that posted the event, and with
+// --signal-parent to that process's parent alone, the run that started it. With
+// --stop-at-drag it removes <file> at a drag event. Having removed <file> or signalled the
+// parent, it prints {"stopped": <when, in ms>}, after the line of the event it did so at.
 //
 // SIGTERM ends it, and so does the end of the process that started it. If the left button is
 // held then, it posts the button up first and prints {"released": <whether that released it>}.
@@ -130,9 +131,18 @@ func stop(_ token: String?) {
     printJSON(["stopped": now()])
 }
 let SIGNALS = ["SIGINT": SIGINT, "SIGQUIT": SIGQUIT, "SIGTERM": SIGTERM, "SIGHUP": SIGHUP]
-let sent = value("--signal").map { name -> Int32 in
-    guard let number = SIGNALS[name] else { fail("--signal takes \(SIGNALS.keys.sorted().joined(separator: ", ")), not \(name)") }
-    return number
+func signalOption(_ option: String) -> Int32? {
+    value(option).map { name -> Int32 in
+        guard let number = SIGNALS[name] else { fail("\(option) takes \(SIGNALS.keys.sorted().joined(separator: ", ")), not \(name)") }
+        return number
+    }
+}
+let (sent, sentToParent) = (signalOption("--signal"), signalOption("--signal-parent"))
+// The parent of the process `pid`, or 0 if the system doesn't say.
+func parent(of pid: pid_t) -> pid_t {
+    var info = proc_bsdinfo()
+    let size = Int32(MemoryLayout<proc_bsdinfo>.size)
+    return proc_pidinfo(pid, PROC_PIDTBSDINFO, 0, &info, size) == size ? pid_t(info.pbi_ppid) : 0
 }
 let (cover, returnsPointer) = (flag("--cover"), flag("--return"))
 let rect: CGRect
@@ -141,7 +151,7 @@ if options.count == 2, options[0] == "--under" {
 } else {
     let numbers = options.compactMap { Double($0) }
     guard options.count == 4, numbers.count == 4
-    else { fail("usage: pointer-target <x> <y> <w> <h> [--cover] [--return] [--stop <file>] [--stop-at-drag <file>] [--signal <name>] | --under <title>") }
+    else { fail("usage: pointer-target <x> <y> <w> <h> [--cover] [--return] [--stop <file>] [--stop-at-drag <file>] [--signal <name>] [--signal-parent <name>] | --under <title>") }
     rect = CGRect(x: numbers[0], y: numbers[1], width: numbers[2], height: numbers[3])
 }
 
@@ -152,6 +162,10 @@ pad.onDown = { posted in
     let poster = pid_t(posted.getIntegerValueField(.eventSourceUnixProcessID))
     // Never 0, which would signal this program's own process group.
     if let sent, poster > 0 { kill(poster, sent) }
+    // Nor process 1, the parent of a poster whose own has ended.
+    if let sentToParent, poster > 0, case let run = parent(of: poster), run > 1, kill(run, sentToParent) == 0 {
+        printJSON(["stopped": now()])
+    }
 }
 pad.onDrag = { stop(dragToken) }
 var over: Panel?

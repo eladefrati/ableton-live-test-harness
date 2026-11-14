@@ -49,12 +49,14 @@ function unlockToken() {
 
 // What stops a run. The token removed, as Stop on the pill removes it, when a case names
 // nothing else; or a loss the run can't tell from that; or Stop pressed on the pill itself,
-// at once after the run's end if the presser is given the run to end.
+// at once after the run's end if the presser is given the run to end; or the run killed, by
+// a signal sent to it alone, which its helper doesn't get and which leaves the token there.
 const tokenRemoved = () => fs.rmSync(TOKEN);
 const folderGone = () => fs.rmSync(FOLDER, { recursive: true });
 const folderUnwritable = () => fs.chmodSync(FOLDER, 0o500);
 const tokenUnreadable = () => fs.chmodSync(TOKEN, 0o000);
 const stopPressed = (the) => the.pressStop();
+const runKilled = (the) => process.kill(the.run.pid, "SIGTERM");
 
 // How a helper that is stopped before its last event exits, and what it says: that Stop
 // removed the token, or why it can't tell that Stop didn't.
@@ -70,7 +72,8 @@ const stoppedError = (sentence = BY_STOP) => new RegExp(`^${literal(sentence)}, 
 // the click or the drag.
 const HAPPENED = 4;
 const happened = (gesture) => new RegExp(`^${literal(BY_STOP)}, and the helper released the button at [\\d.]+, [\\d.]+: the ${gesture} had happened$`);
-// How a helper ended whose run ended before it could say: by a signal that ended both.
+// How a helper ended whose run a signal ended before it could say: with its run, by that
+// signal too or by itself.
 const withRun = (signal) => `with its run (${signal})`;
 
 // What the overlay says as it ends: the run named as the overlay is given it.
@@ -206,6 +209,14 @@ const CASES = [
     status,
     events: (x, y) => [{ type: "down", x, y }, { type: "up", x, y }],
   })),
+  {
+    name: "the run killed while a drag holds the button, before its move: the button comes up at the press point, with no drag event",
+    target: [...RECT, "--signal-parent", "SIGTERM"],
+    command: drag,
+    status: withRun("SIGTERM"),
+    events: (x, y) => [{ type: "down", x, y }, { type: "up", x, y }],
+    run: "SIGTERM",
+  },
   // Last, the cases that end under a notification's cover, the check's own or the one the
   // overlay posts as it ends: the cover outlasts the case by a few seconds, and the target of
   // the next case waits for it to go. Without Stop the helper waits for the cover to go,
@@ -247,6 +258,21 @@ const CASES = [
     withinMs: 2500,
     events: () => [],
     says: SAID_STOPPED,
+  },
+  {
+    name: "the run killed while the helper waits for a notification's cover to go: the helper leaves the wait and ends, posting nothing, "
+      + "and the overlay says that the run has ended",
+    overlay: true,
+    banner: true,
+    target: RECT,
+    stopAfterMs: 1000,
+    loss: runKilled,
+    command: click,
+    status: withRun("SIGTERM"),
+    withinMs: 2500,
+    events: () => [],
+    says: SAID_RUN_ENDED,
+    run: "SIGTERM",
   },
   {
     name: "Stop on the pill removes the token: the overlay says Stopped and takes the border down, and a helper started then posts nothing",

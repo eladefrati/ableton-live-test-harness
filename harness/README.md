@@ -112,7 +112,9 @@ Node 18 or later. See [ADR-0001](../docs/adr/0001-fork-abletonosc.md) for the de
   removes the run's click token, a file the run and its click helper must be able to read
   before they click: a run that loses the token any other way (its folder removed, or made
   unwritable, so that Stop couldn't remove the token) can't tell that it wasn't stopped,
-  stops the same way, and says which it was. A stopped run doesn't bring Live to the front
+  stops the same way, and says which it was. The click helper also posts only while the run
+  that started it lives: one whose run a signal killed, which leaves the token behind, posts
+  nothing but the release of a button it holds. A stopped run doesn't bring Live to the front
   either, so a capture of a plug-in's window throws too. If Stop can't remove the token, it
   ends the run and its click helper by signal, and that run cleans nothing up. A run
   whose border can't show, or goes, however it ends, while the run goes
@@ -264,11 +266,12 @@ Node 18 or later. See [ADR-0001](../docs/adr/0001-fork-abletonosc.md) for the de
   the button, or once a drag's move is posted, leaves the
   click or the drag to complete, and the helper exits 4, saying that it had happened; Stop
   while a drag holds the button, before its move, brings the button up and posts nothing
-  more; SIGTERM or SIGQUIT while a
+  more, and so does the run killed then, by a signal sent to it alone; SIGTERM or SIGQUIT while a
   drag holds the button brings it up before the helper dies by SIGTERM, or exits with status
   131 after SIGQUIT;
   Stop while the helper waits under a notification's banner ends the wait, and so does the
-  loss of the token's folder, for which the
+  loss of the token's folder, and so does the run killed, by a signal sent to it alone (the
+  overlay then says that the run has ended), for which the
   check posts a notification, whose banner must show. Stop is also pressed on the pill
   itself, through Accessibility (`checks/press-stop.swift`): the overlay removes the token,
   says Stopped and goes, as it does when the token's folder can't be written to; when the
@@ -280,7 +283,7 @@ Node 18 or later. See [ADR-0001](../docs/adr/0001-fork-abletonosc.md) for the de
   token was removed (35 ms in a click, 25 ms after a drag's move): under that the case fails,
   as it hasn't shown that Stop came before the release. The cases that end under a
   notification's banner come last, each waiting for the banner of the case before to go,
-  and the check takes about a minute. It takes the
+  and the check takes about 75 s. It takes the
   pointer, so it runs only on the click host and refuses on any other machine, posting
   nothing. A case that leaves the button held releases it and fails.
 

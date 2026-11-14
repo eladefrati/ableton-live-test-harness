@@ -210,6 +210,18 @@ unexpected.
 - Ctrl-C typed into the terminal of a run (a pty) while its helper held the button reached
   the helper as SIGINT: the button came up 6 ms after it in a click, and 15 ms in a drag,
   before the drag's move, and the helper then died by SIGINT (remote Mac, 2026-11-13).
+- A run killed by a signal sent to it alone (SIGTERM) left its click token behind: it removes
+  the token's folder only on a normal exit. The border went 0.54 s after the kill, with the
+  notification that the mouse was free, and the helper that run had started, which could
+  still read the token, waited out a notification's cover and posted two moves, the button
+  down and the button up 5.4 s after the border went (remote Mac, Live 12.4.25b1,
+  2026-11-13). `device-ui.swift` now posts only while the process that started it is still
+  its parent: a run that has ended counts as stopped. A helper waiting under a
+  notification's cover was gone 0.16 to 0.21 s after its run was killed, with no mouse event
+  posted, and the overlay said that the run had ended 0.16 to 0.20 s after the kill; one
+  holding a drag's button, before its move, posted the button up, which reached the check's
+  window 74 to 80 ms after the kill, and no drag event, in three runs
+  (`checks/pointer-guards.js`, remote Mac, 2026-11-13).
 - In Live, a token removed 4 and 5 ms after the button of `choose`'s opening click went down
   left that click to complete: the release was the one mouse event after, `choose` threw as
   stopped with `done`, the menu was closed and the chooser's value unchanged. A press

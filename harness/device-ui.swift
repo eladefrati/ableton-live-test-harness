@@ -35,8 +35,10 @@
 // Once the run is stopped (ADR-0012), hover, click and drag post nothing but the release of a
 // button this helper holds, and exit 3 saying so. The run counts as stopped unless the helper
 // can tell that it wasn't: the click token named in HARNESS_COMPUTER_USE_TOKEN can be read,
-// and its folder written to. A click or a drag with only that release left has happened: the
-// helper posts it and exits 4, saying that too. A helper that fails, or is sent SIGINT,
+// and its folder written to. A run that has ended counts as stopped too, whatever became of
+// its token: the helper posts only while the process that started it is still its parent. A
+// click or a drag with only that release left has happened: the helper posts it and exits 4,
+// saying that too. A helper that fails, or is sent SIGINT,
 // SIGQUIT, SIGTERM or SIGHUP, while it holds the button releases it before it ends: by that
 // signal, or with status 131 after SIGQUIT.
 
@@ -51,12 +53,19 @@ let STOPPED_STATUS: Int32 = 3
 // Stopped with only a button's release left: the click or the drag happened.
 let HAPPENED_STATUS: Int32 = 4
 
-// Why this helper may post no more, or nil while it may: while the token can be opened for
-// reading and its folder can be written to and searched, so that Stop can remove the token.
-// Anything else counts as stopped, since the helper can't tell that the run wasn't;
-// device-ui.js and computer-use-overlay.swift read the token the same way. A helper given no
-// token, as on the click host, has no Stop to obey.
+// The run that started this helper: its parent as it starts. A run that a signal killed
+// leaves its token behind, and its helper gets process 1 for a parent.
+let RUN = getppid()
+
+// Why this helper may post no more, or nil while it may: while the run that started it is
+// still its parent, and the token can be opened for reading and its folder can be written to
+// and searched, so that Stop can remove the token. Anything else counts as stopped, since the
+// helper can't tell that the run wasn't; device-ui.js and computer-use-overlay.swift read the
+// token the same way. A helper given no token, as on the click host, has no Stop to obey, and
+// still posts no more once its run has ended.
 func stopped() -> String? {
+    // Process 1 from the start is a run that ended before the helper got going.
+    if RUN == 1 || getppid() != RUN { return "harness-computer-use's run has ended: this helper clicks no more" }
     guard let token = CLICK_TOKEN else { return nil }
     let folder = (token as NSString).deletingLastPathComponent
     func cantTell(_ why: String) -> String {
