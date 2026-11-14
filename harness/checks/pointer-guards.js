@@ -126,11 +126,12 @@ const CASES = [
     upAfterStopMs: DRAG_HOLD_MS / 2,
     events: (x, y) => [{ type: "down", x, y }, { ...DRAGGED, x: x + 30, y: y - 20 }, { type: "up", x: x + 30, y: y - 20 }],
   },
-  ...["SIGTERM", "SIGQUIT"].map((signal) => ({
-    name: `${signal} while a drag holds the button: the helper releases it at the press point, then dies by the signal`,
+  // A helper that died by a quit signal would leave a crash report, so it exits instead.
+  ...[["SIGTERM", "SIGTERM", "dies by the signal"], ["SIGQUIT", 131, "exits with status 131"]].map(([signal, status, ends]) => ({
+    name: `${signal} while a drag holds the button: the helper releases it at the press point, then ${ends}`,
     target: [...RECT, "--signal", signal],
     command: drag,
-    status: signal,
+    status,
     events: (x, y) => [{ type: "down", x, y }, { type: "up", x, y }],
   })),
   // Last: the banner's cover outlasts the case by a few seconds. Without Stop the helper

@@ -117,8 +117,9 @@ unexpected.
   down: it posts the button up where the pointer is, then dies by that signal. A helper that
   fails with the button down releases it the same way before it exits. A crash or SIGKILL
   still leaves the button held. macOS writes a crash report for a helper that dies by
-  SIGQUIT (`device-ui-<hash>-<time>.ips` in `~/Library/Logs/DiagnosticReports`), so each run
-  of `checks/pointer-guards.js` leaves one (remote Mac, 2026-11-13).
+  SIGQUIT (`device-ui-<hash>-<time>.ips` in `~/Library/Logs/DiagnosticReports`): a run of
+  `checks/pointer-guards.js` left one. After a SIGQUIT it held back the helper now exits
+  with status 131 instead, and a run of the check left none (remote Mac, 2026-11-13).
 - While a Max device's Map button waits for a target, the Info View still names the knob
   under the pointer on a device on another track, and the click makes the mapping: Auto
   Filter's Frequency, Dry/Wet and Resonance, with `settleMs` 1000 (remote Mac, 2026-11-11).

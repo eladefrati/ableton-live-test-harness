@@ -36,7 +36,8 @@
 // hover, click and drag post nothing but the release of a button this helper holds, and exit
 // 3 saying so. A click or a drag with only that release left has happened: the helper posts
 // it and exits 0. A helper that fails, or is sent SIGINT, SIGQUIT, SIGTERM or SIGHUP, while it
-// holds the button releases it before it ends.
+// holds the button releases it before it ends: by that signal, or with status 131 after
+// SIGQUIT.
 
 import ApplicationServices
 import Foundation
@@ -54,7 +55,7 @@ func stopped() -> Bool { STOP_MARKER.map { access($0, F_OK) == 0 } ?? false }
 // down has the event to release it with.
 var held: CGEvent? = nil
 // A signal that would end the helper, as Ctrl-C on the run does, is held back once the button
-// goes down: the helper releases the button first, then dies by that signal.
+// goes down: the helper releases the button first, then ends by that signal (obeySignal).
 let ENDING_SIGNALS = [SIGINT, SIGQUIT, SIGTERM, SIGHUP]
 var signalled: sig_atomic_t = 0
 
@@ -327,9 +328,13 @@ func buttonUp(_ point: CGPoint) {
     return point
 }
 
-// Dies by a signal that was held back, now that the button is up.
+// Ends by a signal that was held back, now that the button is up: dies by it, or after a quit
+// signal exits with the status a shell reports for that death. The system writes a crash
+// report for a program that dies by a quit signal, and a release that went as designed is no
+// crash (ADR-0012).
 func obeySignal() {
     guard signalled != 0 else { return }
+    if signalled == SIGQUIT { exit(128 + SIGQUIT) }
     signal(signalled, SIG_DFL)
     raise(signalled)
 }
