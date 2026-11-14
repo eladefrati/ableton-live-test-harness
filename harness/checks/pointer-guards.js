@@ -114,13 +114,13 @@ const CASES = [
     status: 0,
     events: (x, y) => [{ type: "down", x, y }, { ...DRAGGED, x: x + 30, y: y - 20 }, { type: "up", x: x + 30, y: y - 20 }],
   },
-  {
-    name: "SIGTERM while a drag holds the button: the helper releases it at the press point, then dies by the signal",
-    target: [...RECT, "--signal"],
+  ...["SIGTERM", "SIGQUIT"].map((signal) => ({
+    name: `${signal} while a drag holds the button: the helper releases it at the press point, then dies by the signal`,
+    target: [...RECT, "--signal", signal],
     command: drag,
-    status: "SIGTERM",
+    status: signal,
     events: (x, y) => [{ type: "down", x, y }, { type: "up", x, y }],
-  },
+  })),
   // Last: the banner's cover outlasts the case by a few seconds. Without Stop the helper
   // waits for the cover to go, 4.9 s in one run.
   {

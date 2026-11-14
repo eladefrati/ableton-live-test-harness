@@ -247,8 +247,8 @@ Node 18 or later. See [ADR-0001](../docs/adr/0001-fork-abletonosc.md) for the de
   fields, and one button-up, where the pointer then is; a helper started after Stop posts
   nothing; Stop while a click holds the button, or once a drag's move is posted, leaves the
   click or the drag to complete, and the helper exits 0; Stop while a drag holds the button,
-  before its move, brings the button up and posts nothing more; SIGTERM while a drag holds
-  the button brings it up before the helper dies;
+  before its move, brings the button up and posts nothing more; SIGTERM or SIGQUIT while a
+  drag holds the button brings it up before the helper dies;
   Stop while the helper waits under a notification's banner ends the wait, for which the
   check posts a notification, whose banner must show. It takes the
   pointer, so it runs only on the click host and refuses on any other machine, posting

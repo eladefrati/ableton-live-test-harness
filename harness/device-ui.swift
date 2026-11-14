@@ -35,8 +35,8 @@
 // Once the run is stopped (ADR-0009: the file named in HARNESS_COMPUTER_USE_STOP exists),
 // hover, click and drag post nothing but the release of a button this helper holds, and exit
 // 3 saying so. A click or a drag with only that release left has happened: the helper posts
-// it and exits 0. A helper that fails, or is sent SIGINT, SIGTERM or SIGHUP, while it holds
-// the button releases it before it ends.
+// it and exits 0. A helper that fails, or is sent SIGINT, SIGQUIT, SIGTERM or SIGHUP, while it
+// holds the button releases it before it ends.
 
 import ApplicationServices
 import Foundation
@@ -55,7 +55,7 @@ func stopped() -> Bool { STOP_MARKER.map { access($0, F_OK) == 0 } ?? false }
 var held: CGEvent? = nil
 // A signal that would end the helper, as Ctrl-C on the run does, is held back once the button
 // goes down: the helper releases the button first, then dies by that signal.
-let ENDING_SIGNALS = [SIGINT, SIGTERM, SIGHUP]
+let ENDING_SIGNALS = [SIGINT, SIGQUIT, SIGTERM, SIGHUP]
 var signalled: sig_atomic_t = 0
 
 func fail(_ message: String) -> Never {

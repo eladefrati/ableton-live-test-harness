@@ -111,11 +111,13 @@ unexpected.
 - A drag too short to move the pointer (`0 -1e-15`) crashed the helper after the button went
   down and left it held. A drag under 1 point on its longer axis is now refused (remote Mac,
   2026-11-13).
-- A helper ended by SIGTERM while a drag held the button left it held. `device-ui.swift` now
-  holds SIGINT, SIGTERM and SIGHUP back while the button is down: it posts the button up
-  where the pointer is, then dies by that signal. A helper that fails with the button down
-  releases it the same way before it exits. A crash or SIGKILL still leaves the button held
-  (remote Mac, 2026-11-13).
+- A helper ended by SIGTERM or SIGQUIT while a drag held the button left it held.
+  `device-ui.swift` now holds SIGINT, SIGQUIT, SIGTERM and SIGHUP back while the button is
+  down: it posts the button up where the pointer is, then dies by that signal. A helper that
+  fails with the button down releases it the same way before it exits. A crash or SIGKILL
+  still leaves the button held. macOS writes a crash report for a helper that dies by
+  SIGQUIT (`device-ui-<hash>-<time>.ips` in `~/Library/Logs/DiagnosticReports`), so each run
+  of `checks/pointer-guards.js` leaves one (remote Mac, 2026-11-13).
 - While a Max device's Map button waits for a target, the Info View still names the knob
   under the pointer on a device on another track, and the click makes the mapping: Auto
   Filter's Frequency, Dry/Wet and Resonance, with `settleMs` 1000 (remote Mac, 2026-11-11).

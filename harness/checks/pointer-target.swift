@@ -2,7 +2,7 @@
 // that takes clicks without taking the front.
 //
 //   pointer-target <x> <y> <w> <h> [--cover] [--return] [--stop <file>] [--stop-at-drag <file>]
-//                  [--signal]
+//                  [--signal <name>]
 //                                     at that rectangle, in points from the screen's top left
 //   pointer-target --under <title>    at the rectangle of the window of that title, under it
 //
@@ -13,8 +13,8 @@
 // --return it moves the pointer back to where the button went down at every drag event, as a
 // knob of one of Live's devices does. When the button goes down, with --stop it creates <file>,
 // as Stop on harness-computer-use's pill creates a run's stop marker, and with --signal it
-// sends SIGTERM to the process that posted the event. With --stop-at-drag it creates <file> at
-// a drag event.
+// sends the signal of that name to the process that posted the event. With --stop-at-drag it
+// creates <file> at a drag event.
 //
 // SIGTERM ends it, and so does the end of the process that started it. If the left button is
 // held then, it posts the button up first and prints {"released": <whether that released it>}.
@@ -117,14 +117,19 @@ let (stopMarker, dragStopMarker) = (value("--stop"), value("--stop-at-drag"))
 func stop(_ marker: String?) {
     if let marker { FileManager.default.createFile(atPath: marker, contents: nil) }
 }
-let (cover, returnsPointer, signals) = (flag("--cover"), flag("--return"), flag("--signal"))
+let SIGNALS = ["SIGINT": SIGINT, "SIGQUIT": SIGQUIT, "SIGTERM": SIGTERM, "SIGHUP": SIGHUP]
+let sent = value("--signal").map { name -> Int32 in
+    guard let number = SIGNALS[name] else { fail("--signal takes \(SIGNALS.keys.sorted().joined(separator: ", ")), not \(name)") }
+    return number
+}
+let (cover, returnsPointer) = (flag("--cover"), flag("--return"))
 let rect: CGRect
 if options.count == 2, options[0] == "--under" {
     rect = windowTitled(options[1])
 } else {
     let numbers = options.compactMap { Double($0) }
     guard options.count == 4, numbers.count == 4
-    else { fail("usage: pointer-target <x> <y> <w> <h> [--cover] [--return] [--stop <file>] [--stop-at-drag <file>] [--signal] | --under <title>") }
+    else { fail("usage: pointer-target <x> <y> <w> <h> [--cover] [--return] [--stop <file>] [--stop-at-drag <file>] [--signal <name>] | --under <title>") }
     rect = CGRect(x: numbers[0], y: numbers[1], width: numbers[2], height: numbers[3])
 }
 
@@ -134,7 +139,7 @@ pad.onDown = { posted in
     stop(stopMarker)
     let poster = pid_t(posted.getIntegerValueField(.eventSourceUnixProcessID))
     // Never 0, which would signal this program's own process group.
-    if signals, poster > 0 { kill(poster, SIGTERM) }
+    if let sent, poster > 0 { kill(poster, sent) }
 }
 pad.onDrag = { stop(dragStopMarker) }
 var over: Panel?
