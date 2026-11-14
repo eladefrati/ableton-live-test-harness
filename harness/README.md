@@ -309,6 +309,8 @@ Node 18 or later. See [ADR-0001](../docs/adr/0001-fork-abletonosc.md) for the de
   to, where the run reads as stopped already; a run that ignores the signal keeps the
   border up with the pill, is killed 10 s
   after Stop, not sooner, and only then does the overlay say that the run was ended;
+  pressed again 5 s into that wait, on the button that then reads Stopping, it changes
+  nothing: the run is still killed 10 s after the first press;
   pressed as the run ends, it says
   that the run has ended. Stop is pressed on the pill during a gesture too, where the pill
   reads Stopping and the overlay
@@ -332,7 +334,7 @@ Node 18 or later. See [ADR-0001](../docs/adr/0001-fork-abletonosc.md) for the de
   suspended with the button down, not before the token went: under that the case fails,
   as it hasn't shown that Stop came before the release. The cases that end under a
   notification's banner come last, each waiting for the banner of the case before to go,
-  and the check takes about 125 s. It takes the
+  and the check takes about 138 s. It takes the
   pointer, so it runs only on the click host and refuses on any other machine, posting
   nothing. A case that leaves the button held releases it and fails.
 

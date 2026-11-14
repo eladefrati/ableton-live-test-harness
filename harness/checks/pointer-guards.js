@@ -142,7 +142,8 @@ const dragBy = (dx, dy) => (window, x, y) => ["drag", window, x, y, dx, dy];
 // exit status (the signal, if one ended it), its error, how soon it ended, the button events
 // the target's windows received, by the fields named, and the pointer's moves where a case
 // names them, what the overlay must show while a run that Stop stopped goes on (the pill
-// alone, or the pill and the border, the pill's button reading Stopping), all that the
+// alone, or the pill and the border, the pill's button reading Stopping), how long after
+// Stop it is pressed again, on the button that then reads Stopping, all that the
 // overlay says as it ends,
 // whether it may say so only once the run has ended, how long after Stop the run must be
 // killed, at the least and at the most, and the signal that ends the run, if one does. In
@@ -502,6 +503,23 @@ const CASES = [
     killedMs: [KILL_AFTER_MS, KILL_AFTER_MS + KILL_SLACK_MS],
     run: "SIGKILL",
   },
+  // A second press that counted would signal the run again and give it 10 s more.
+  {
+    name: "Stop pressed again on the pill, which reads Stopping, 5 s into its last resort over a run that ignores the signal: "
+      + "the run is still killed 10 s after the first press, not later, and the overlay says that the run was ended",
+    overlay: true,
+    immutable: true,
+    deaf: true,
+    target: RECT,
+    stopped: true,
+    loss: stopPressed,
+    againAfterMs: 5000,
+    events: () => [],
+    says: SAID_ENDED_RUN,
+    afterRun: true,
+    killedMs: [KILL_AFTER_MS, KILL_AFTER_MS + KILL_SLACK_MS],
+    run: "SIGKILL",
+  },
   {
     name: "Stop on the pill when the token's folder can't be written to, where the run reads as stopped already: "
       + "the run ends by itself, and only then does the overlay say Stopped",
@@ -843,6 +861,10 @@ async function failures(test, binaries) {
       return lost;
     };
     if (test.stopped) await lose();
+    // Stop pressed a second time, and why it couldn't be, if it couldn't.
+    let unpressedAgain = "";
+    const again = test.againAfterMs
+      && sleep(test.againAfterMs).then(() => tools.run(binaries.press, [overlay.pid])).catch((error) => { unpressedAgain = error.message; });
     const target = await showTarget(binaries.target, test.target);
     const [x, y] = [target.x + target.w / 2, target.y + target.h / 2];
     // The helper the target froze. The run is stopped then, and the helper goes on once the
@@ -881,6 +903,7 @@ async function failures(test, binaries) {
     // the signal, or the overlay ends it.
     if (test.stopping === "pill") await run.end();
     const said = test.says ? await overlay.said() : null;
+    await again;
     // The overlay's notification covers the screen a moment after it is posted: the next
     // case's target is to find the cover there, and wait for it to go.
     if (said?.text) await sleep(BANNER_WAIT_MS);
@@ -906,6 +929,7 @@ async function failures(test, binaries) {
         && `not shown that Stop came before the release: the button-up reached the target ${upAfterStop.toFixed(1)} ms after the token was removed, under ${test.upAfterStopMs}`,
       held && `the button was left held, and ${held.released ? "has been released" : "could not be released"}`,
       ...stopping,
+      unpressedAgain && `Stop couldn't be pressed again: ${unpressedAgain}`,
       test.says && said === null && `the overlay was still up ${OVERLAY_WAIT_MS} ms after Stop${unpressed}`,
       test.says && said !== null && !test.says.test(said.text) && `the overlay said ${JSON.stringify(said.text)}, not ${test.says}${unpressed}`,
       test.afterRun && said?.at < run.endedAt() - EXIT_NEWS_MS && `the overlay said ${JSON.stringify(said.text)} before the run had ended`,

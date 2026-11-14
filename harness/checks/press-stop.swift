@@ -1,6 +1,6 @@
 // Presses Stop on harness-computer-use's pill for pointer-guards.js, as a click on it would:
 // through Accessibility, the button labelled "Stop" in the windows of the overlay <pid>
-// (computer-use-overlay.swift).
+// (computer-use-overlay.swift), or "Stopping", as it is labelled once it has been pressed.
 //
 //   press-stop <pid> [<run>]
 //
@@ -25,7 +25,8 @@ func attribute(_ element: AXUIElement, _ name: String) -> AnyObject? {
 }
 
 func stopButton(in element: AXUIElement, depth: Int) -> AXUIElement? {
-    if attribute(element, kAXRoleAttribute) as? String == kAXButtonRole, attribute(element, kAXDescriptionAttribute) as? String == "Stop" {
+    if attribute(element, kAXRoleAttribute) as? String == kAXButtonRole,
+       ["Stop", "Stopping"].contains(attribute(element, kAXDescriptionAttribute) as? String) {
         return element
     }
     guard depth > 0 else { return nil }
