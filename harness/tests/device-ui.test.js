@@ -1112,20 +1112,35 @@ test("showComputerUse ends a border that says nothing in time, and rejects", asy
   await until(() => gone(silent));
 });
 
-test("a border that goes after it has shown is warned of once, unless it ended as it does by itself", async () => {
-  for (const [ends, warning] of [
-    [["sleep 0.2", "exit 1"], "warn harness-computer-use's border has gone (status 1). The run clicks without it"],
-    [["exit 1"], "warn harness-computer-use's border has gone (status 1). The run clicks without it"],
-    [["sleep 0.2", "kill -9 $$"], "warn harness-computer-use's border has gone (SIGKILL). The run clicks without it"],
-    [["sleep 0.2", "exit 0"], null],
+// What the run warns of while it shows a border, a stand-in that says it has shown and then
+// ends as `ends` has it, until that border has gone.
+async function warningsOfBorder(...ends) {
+  const shown = standIn("echo shown", ...ends);
+  return warningsOf(async () => {
+    await showComputerUse(shown);
+    await until(() => gone(shown));
+    await pause(100);
+  });
+}
+
+test("a border that goes after it has shown, while the run goes on and wasn't stopped, is warned of once, however it ended", async () => {
+  for (const [ends, how] of [
+    [["sleep 0.2", "exit 1"], "status 1"],
+    [["exit 1"], "status 1"],
+    [["sleep 0.2", "kill -9 $$"], "SIGKILL"],
+    [["sleep 0.2", "exit 0"], "status 0"],
   ]) {
-    const shown = standIn("echo shown", ...ends);
-    const warnings = await warningsOf(async () => {
-      await showComputerUse(shown);
-      await until(() => gone(shown));
-      await pause(100);
-    });
-    assert.deepEqual(warnings, warning ? [warning] : []);
+    assert.deepEqual(await warningsOfBorder(...ends), [`warn harness-computer-use's border has gone (${how}). The run clicks without it`]);
+  }
+});
+
+test("a border that goes once the run is stopped is not warned of, however it ended", async () => {
+  for (const status of [0, 1]) {
+    try {
+      assert.deepEqual(await warningsOfBorder("sleep 0.2", 'rm "$2"', `exit ${status}`), []);
+    } finally {
+      fs.writeFileSync(clickToken(), "");
+    }
   }
 });
 

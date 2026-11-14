@@ -115,8 +115,8 @@ Node 18 or later. See [ADR-0001](../docs/adr/0001-fork-abletonosc.md) for the de
   stops the same way, and says which it was. A stopped run doesn't bring Live to the front
   either, so a capture of a plug-in's window throws too. If Stop can't remove the token, it
   ends the run and its click helper by signal, and that run cleans nothing up. A run
-  whose border can't show, or goes while the run goes
-  on, says so on stderr in a line starting `warn harness-computer-use`, and clicks without
+  whose border can't show, or goes, however it ends, while the run goes
+  on and wasn't stopped, says so on stderr in a line starting `warn harness-computer-use`, and clicks without
   it; when the border couldn't be built, the dialog says, in place of the glow, that nothing
   on screen will show that the run may take the pointer, and that there will be no Stop.
   The dialog, the pill and the

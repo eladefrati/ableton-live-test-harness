@@ -361,8 +361,9 @@ async function buildComputerUse() {
 
 // Starts the overlay and resolves once it says its windows are on screen. Rejects with the
 // reason the overlay gives if it ends before that, and ends it and rejects if it says nothing
-// for `shownMs`. One that goes later, other than as it ends by itself, is warned of: the
-// person has lost the pill and its Stop. Nothing of the overlay keeps this process running.
+// for `shownMs`. One that goes later, however it ends, while the run goes on and wasn't
+// stopped, is warned of: the person has lost the pill and its Stop. Nothing of the overlay
+// keeps this process running.
 async function showComputerUse(binary, { shownMs = OVERLAY_SHOWN_MS } = {}) {
   const run = runName();
   const overlay = spawn(binary, [String(process.pid), clickToken(), ...(run ? [run] : [])], { detached: true, stdio: ["ignore", "pipe", "pipe"] });
@@ -389,8 +390,9 @@ async function showComputerUse(binary, { shownMs = OVERLAY_SHOWN_MS } = {}) {
     overlay.stderr.destroy();
     overlay.unref();
   }
+  // Not after Stop, when the border goes by itself and the run clicks no more.
   const gone = (code, signal) => {
-    if (code !== 0) console.error(`warn harness-computer-use's border has gone (${signal ?? `status ${code}`}). The run clicks without it`);
+    if (!stopped()) console.error(`warn harness-computer-use's border has gone (${signal ?? `status ${code}`}). The run clicks without it`);
   };
   // It may have ended already, its exit known here before its last words were read.
   if (overlay.exitCode !== null || overlay.signalCode !== null) gone(overlay.exitCode, overlay.signalCode);
