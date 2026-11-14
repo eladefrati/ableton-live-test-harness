@@ -116,7 +116,9 @@ Node 18 or later. See [ADR-0001](../docs/adr/0001-fork-abletonosc.md) for the de
   run and its click helper by signal, and that run cleans nothing up. A run
   whose border can't show, or goes while the run goes
   on, says so on stderr in a line starting `warn harness-computer-use`, and clicks without
-  it. The dialog, the pill and the
+  it; when the border couldn't be built, the dialog says, in place of the glow, that nothing
+  on screen will show that the run may take the pointer, and that there will be no Stop.
+  The dialog, the pill and the
   notification name a check in `tests/live/` as
   `tests/live/<check>.js`, another script by its file, and code run with `node -e` or given
   on stdin not at all.

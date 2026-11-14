@@ -7,7 +7,7 @@ const os = require("node:os");
 const path = require("node:path");
 const {
   DeviceUiError, openDeviceUi, readControls, readPanelWidth, pointControls, controlPoint, findTitle, infoTitle, readClickHost, runName, runScript,
-  MEASURED_DEVICES, POINTER_CALLS, MACHINE_CALLS, stopped, clickToken, buildComputerUse, showComputerUse, liveWindows,
+  MEASURED_DEVICES, POINTER_CALLS, MACHINE_CALLS, stopped, clickToken, buildComputerUse, showComputerUse, liveWindows, askToClick,
 } = require("../device-ui.js");
 
 const chunk = (tag, payload) => {
@@ -280,6 +280,16 @@ test("a border that can't be built is left out, and the run asks and clicks with
   await (await open(system)).press("Button");
   assert.equal(system.calls.includes("border"), false);
   assert.equal(clicks(system).length, 1);
+});
+
+test("the run tells the dialog whether its border was built", async () => {
+  for (const [binary, built] of [["border binary", true], [null, false]]) {
+    const system = fakeMachine();
+    const told = [];
+    Object.assign(system, { hostname: () => "another-mac", buildComputerUse: async () => binary, ask: async (...border) => { told.push(border); return true; } });
+    await (await open(system)).press("Button");
+    assert.deepEqual(told, [[built]]);
+  }
 });
 
 test("after Stop on the pill, no press of the run hovers or clicks again", async () => {
@@ -981,6 +991,26 @@ test("showComputerUse leaves this process's environment as it was", async () => 
   const before = { ...process.env };
   await showComputerUse(standIn("echo shown", STAYS));
   assert.deepEqual({ ...process.env }, before);
+});
+
+test("the dialog says that the glow will show or, with no border built, that nothing on screen will show the run may take the pointer and that there will be no Stop", async () => {
+  const run = tools.run;
+  const texts = [];
+  tools.run = async (command, args) => {
+    assert.equal(command, "osascript");
+    texts.push(args.at(-1));
+    return "button returned:Allow, gave up:false\n";
+  };
+  try {
+    assert.equal(await askToClick("tests/live/check.js", true), true);
+    assert.equal(await askToClick(null, false), true);
+  } finally {
+    tools.run = run;
+  }
+  assert.deepEqual(texts, [
+    "harness-computer-use wants to click in Live on this Mac for tests/live/check.js. It moves the pointer until the run ends, while a purple glow shows around the screen.",
+    "harness-computer-use wants to click in Live on this Mac. It moves the pointer until the run ends. Nothing on screen will show that it may take the pointer, and there will be no Stop.",
+  ]);
 });
 
 // The error a call of the machine rejects with when its helper, a stand-in, writes `said` to

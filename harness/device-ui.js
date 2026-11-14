@@ -259,10 +259,13 @@ function runName(script = runScript()) {
 }
 
 // Asks the person at this Mac whether the run may click; true only for Allow. Don't Allow is
-// the cancel button, which osascript reports as error -128.
-async function askToClick(script) {
+// the cancel button, which osascript reports as error -128. `border` is whether the border
+// was built: with none, the person is told so before they answer (ADR-0012). Exported for the
+// tests.
+async function askToClick(script, border) {
   const text = `harness-computer-use wants to click in Live on this Mac${script ? ` for ${script}` : ""}. `
-    + "It moves the pointer until the run ends, while a purple glow shows around the screen.";
+    + (border ? "It moves the pointer until the run ends, while a purple glow shows around the screen."
+      : "It moves the pointer until the run ends. Nothing on screen will show that it may take the pointer, and there will be no Stop.");
   const dialog = [
     "on run argv",
     "  activate",
@@ -401,7 +404,7 @@ const hostname = () => os.hostname().replace(/\.local$/, "");
 const machine = {
   hostname,
   clickHost: () => readClickHost(),
-  ask: () => askToClick(runName()),
+  ask: (border) => askToClick(runName(), border),
   buildComputerUse,
   showComputerUse,
   stopped,
@@ -487,7 +490,7 @@ async function permit(system) {
     const host = system.hostname();
     if (host !== system.clickHost()) {
       const overlay = await system.buildComputerUse();
-      if (!(await system.ask())) throw new DeviceUiError(`Clicks in Live on ${host} weren't allowed (ADR-0006). Not clicked`);
+      if (!(await system.ask(overlay !== null))) throw new DeviceUiError(`Clicks in Live on ${host} weren't allowed (ADR-0006). Not clicked`);
       if (overlay) await system.showComputerUse(overlay).catch((error) => warnNoBorder(error.message));
     }
     allowed.add(system);
@@ -842,5 +845,5 @@ async function openPluginWindow(live, { track, device, size, controls = {} }, sy
 module.exports = {
   DeviceUiError, openDeviceUi, openPluginWindow, captureWindow, liveWindows, readControls, readPanelWidth, pointControls, controlPoint,
   findTitle, infoTitle, readClickHost, hostname, runName, runScript, MEASURED_DEVICES, POINTER_CALLS, MACHINE_CALLS,
-  stopped, clickToken, buildComputerUse, showComputerUse,
+  stopped, clickToken, buildComputerUse, showComputerUse, askToClick,
 };
