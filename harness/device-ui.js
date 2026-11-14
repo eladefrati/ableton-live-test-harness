@@ -283,15 +283,27 @@ const OVERLAY_SOURCE = path.join(__dirname, "computer-use-overlay.swift");
 const STOP_MARKER = "HARNESS_COMPUTER_USE_STOP";
 const stopped = () => Boolean(process.env[STOP_MARKER]) && fs.existsSync(process.env[STOP_MARKER]);
 
-async function showComputerUse() {
-  const binary = await tools.helperBinary(OVERLAY_SOURCE);
+const warnNoBorder = (reason) => console.error(`warn harness-computer-use couldn't show its border: ${reason}`);
+
+// Builds the helper and the overlay, ahead of the dialog: the wait for a build comes before
+// the person is asked, and the border shows as soon as they allow. Resolves with the
+// overlay's binary, or with null, after a warning, if only the overlay can't be built.
+async function buildComputerUse() {
+  await helperBinary();
+  return tools.helperBinary(OVERLAY_SOURCE).catch((error) => {
+    warnNoBorder(error.message);
+    return null;
+  });
+}
+
+async function showComputerUse(binary) {
   // Not in the harness's temp folder, which relaunch.js and quit.js empty.
   const folder = fs.mkdtempSync(path.join(os.tmpdir(), "harness-computer-use-"));
   process.on("exit", () => fs.rmSync(folder, { recursive: true, force: true }));
   process.env[STOP_MARKER] = path.join(folder, "stopped");
   const run = runName();
   const overlay = spawn(binary, [String(process.pid), process.env[STOP_MARKER], ...(run ? [run] : [])], { detached: true, stdio: "ignore" });
-  overlay.on("error", (error) => console.error(`warn harness-computer-use couldn't show its border: ${error.message}`));
+  overlay.on("error", (error) => warnNoBorder(error.message));
   overlay.unref();
 }
 
@@ -299,6 +311,7 @@ const machine = {
   hostname: () => os.hostname().replace(/\.local$/, ""),
   clickHost: () => readClickHost(),
   ask: () => askToClick(runName()),
+  buildComputerUse,
   showComputerUse,
   stopped,
   // A slept display has no windows to capture.
@@ -372,16 +385,17 @@ const allowed = new WeakSet();
 
 // Before a run's first hover: on the click host at once, on any other machine after the
 // person at it allows the run's clicks (ADR-0006). The answer holds for the rest of the run,
-// and while it does a purple border shows there (ADR-0009). The border only informs: a run
-// that can't show it still clicks, with a warning. After Stop on the pill (ADR-0009) it
-// throws, as the helper does in a press under way: the run goes on, so a check fails there
-// and still cleans up.
+// and while it does a purple border shows there (ADR-0009), built before the person is asked.
+// The border only informs: a run that can't show it still clicks, with a warning. After Stop
+// on the pill (ADR-0009) it throws, as the helper does in a press under way: the run goes
+// on, so a check fails there and still cleans up.
 async function permit(system) {
   if (!allowed.has(system)) {
     const host = system.hostname();
     if (host !== system.clickHost()) {
+      const overlay = await system.buildComputerUse();
       if (!(await system.ask())) throw new DeviceUiError(`Clicks in Live on ${host} weren't allowed (ADR-0006). Not clicked`);
-      await system.showComputerUse().catch((error) => console.error(`warn harness-computer-use couldn't show its border: ${error.message}`));
+      if (overlay) await system.showComputerUse(overlay).catch((error) => warnNoBorder(error.message));
     }
     allowed.add(system);
   }

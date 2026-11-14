@@ -58,6 +58,7 @@ function fakeMachine({ info = "Button", titles = [line(`> ${TITLE}`, 1800, 1400)
     hostname: () => "click-mac",
     clickHost: () => "click-mac",
     wake: async () => {},
+    buildComputerUse: async () => "border binary",
     showComputerUse: async () => { calls.push("border"); },
     stopped: () => false,
     focus: async () => { calls.push("focus"); onFocus(calls); },
@@ -212,23 +213,51 @@ test("no click on a control the build lacks or one with no Info View title", asy
   assert.equal(system.calls.length, 0);
 });
 
-test("a press on the click host doesn't ask", async () => {
-  const system = { ...fakeMachine(), ask: async () => assert.fail("asked on the click host") };
+test("a press on the click host doesn't ask, and builds nothing ahead of the press", async () => {
+  const system = {
+    ...fakeMachine(),
+    ask: async () => assert.fail("asked on the click host"),
+    buildComputerUse: async () => assert.fail("built on the click host"),
+  };
   const ui = await open(system);
   await ui.press("Button");
   assert.equal(clicks(system).length, 1);
 });
 
-test("a press on another machine asks once, before the hover, and clicks after Allow", async () => {
+test("a press on another machine builds, asks and shows the border it built, once, before the hover, and clicks after Allow", async () => {
   const system = fakeMachine();
-  Object.assign(system, { hostname: () => "another-mac", ask: async () => { system.calls.push("ask"); return true; } });
+  Object.assign(system, {
+    hostname: () => "another-mac",
+    buildComputerUse: async () => { system.calls.push("build"); return "border binary"; },
+    ask: async () => { system.calls.push("ask"); return true; },
+    showComputerUse: async (binary) => { system.calls.push(`border from ${binary}`); },
+  });
   const ui = await open(system);
   await ui.press("Button");
   await ui.press("Button");
-  assert.equal(system.calls.filter((call) => call === "ask").length, 1);
-  assert.deepEqual(system.calls.slice(0, 2), ["ask", "border"]);
-  assert.equal(system.calls.filter((call) => call === "border").length, 1);
+  assert.deepEqual(system.calls.slice(0, 3), ["build", "ask", "border from border binary"]);
+  const times = (name) => system.calls.filter((call) => call === name).length;
+  assert.deepEqual([times("build"), times("ask"), times("border from border binary")], [1, 1, 1]);
   assert.equal(clicks(system).length, 2);
+});
+
+test("a helper that can't be built fails the press before anyone is asked", async () => {
+  const system = fakeMachine();
+  Object.assign(system, {
+    hostname: () => "another-mac",
+    buildComputerUse: async () => { throw new DeviceUiError("swiftc failed"); },
+    ask: async () => assert.fail("asked with no helper to click with"),
+  });
+  await assert.rejects((await open(system)).press("Button"), /swiftc failed/);
+  assert.equal(system.calls.length, 0);
+});
+
+test("a border that can't be built is left out, and the run asks and clicks without it", async () => {
+  const system = fakeMachine();
+  Object.assign(system, { hostname: () => "another-mac", ask: async () => true, buildComputerUse: async () => null });
+  await (await open(system)).press("Button");
+  assert.equal(system.calls.includes("border"), false);
+  assert.equal(clicks(system).length, 1);
 });
 
 test("after Stop on the pill, no press of the run hovers or clicks again", async () => {
@@ -265,7 +294,7 @@ test("Stop between a press's hover and its click stops the click", async () => {
 
 // The machine's calls that never move the pointer or press its button, so need no permit.
 const OTHER_CALLS = [
-  "hostname", "clickHost", "ask", "showComputerUse", "stopped", "wake", "focus", "window", "windows", "capture", "read", "captureCrop",
+  "hostname", "clickHost", "ask", "buildComputerUse", "showComputerUse", "stopped", "wake", "focus", "window", "windows", "capture", "read", "captureCrop",
   "pluginWindow", "editor", "frontmost", "escape", "liveInFront", "typeEscape", "giveBack", "captureRect",
 ];
 
@@ -457,6 +486,7 @@ function fakePluginMachine({ open = false, shown = [EDITOR] } = {}) {
     hostname: () => "click-mac",
     clickHost: () => "click-mac",
     wake: async () => {},
+    buildComputerUse: async () => "border binary",
     showComputerUse: async () => { calls.push("border"); },
     stopped: () => false,
     focus: async () => { calls.push("focus"); },
@@ -761,6 +791,43 @@ test("Stop between choose's Info View check and its opening click stops the clic
 });
 
 const tools = require("../tools.js");
+
+// Runs `body` with the build of the Swift source named `failing` failing, and every other
+// build resolving with its source's name. Resolves with what was warned meanwhile.
+async function withBuilds(failing, body) {
+  const [build, warn] = [tools.helperBinary, console.error];
+  const warnings = [];
+  tools.helperBinary = async (source) => {
+    if (path.basename(source) === failing) throw new Error(`swiftc failed on ${failing}`);
+    return path.basename(source, ".swift");
+  };
+  console.error = (message) => warnings.push(message);
+  try {
+    await body();
+  } finally {
+    [tools.helperBinary, console.error] = [build, warn];
+  }
+  return warnings;
+}
+
+test("buildComputerUse resolves with the border's binary once the helper and the border are built", async () => {
+  const warnings = await withBuilds(null, async () => assert.equal(await machine.buildComputerUse(), "computer-use-overlay"));
+  assert.deepEqual(warnings, []);
+});
+
+test("buildComputerUse warns and resolves with no border when only the border can't be built", async () => {
+  const warnings = await withBuilds("computer-use-overlay.swift", async () => assert.equal(await machine.buildComputerUse(), null));
+  assert.equal(warnings.length, 1);
+  assert.match(warnings[0], /^warn harness-computer-use couldn't show its border: swiftc failed on computer-use-overlay\.swift/);
+});
+
+test("buildComputerUse rejects when the helper can't be built", async () => {
+  const warnings = await withBuilds("device-ui.swift", async () => {
+    await assert.rejects(machine.buildComputerUse(), (error) => error instanceof DeviceUiError && /swiftc failed on device-ui\.swift/.test(error.message));
+  });
+  assert.deepEqual(warnings, []);
+});
+
 const hasDeveloperTools = (() => {
   try { require("node:child_process").execFileSync("xcode-select", ["-p"], { stdio: "ignore" }); return true; } catch { return false; }
 })();

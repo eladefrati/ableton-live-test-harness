@@ -99,7 +99,8 @@ Node 18 or later. See [ADR-0001](../docs/adr/0001-fork-abletonosc.md) for the de
   captures its panel; does the same in a plug-in's own window (ADR-0008). Its clicks, with
   the asking and the border below, are **harness-computer-use**.
   On the machine `local.json` names as `clickHost` it clicks at once; on any other, a run's
-  first press shows a dialog, and the run clicks only after Allow; Don't Allow or no answer
+  first press builds the click helper and the border, if they aren't built, then shows a
+  dialog, and the run clicks only after Allow; Don't Allow or no answer
   in 2 minutes throws `DeviceUiError` (ADR-0006). From Allow until the run's process ends, a
   breathing purple glow in from the screen's edges, with a pill naming the run, shows that the
   run may take the pointer; a notification says when it has ended (`computer-use-overlay.swift`,
