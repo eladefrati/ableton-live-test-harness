@@ -353,6 +353,13 @@ unexpected.
   was an arrow 4.2 and 6.9 s into the last resort's wait, and so it was with the overlay as
   it was before, 5.1 and 7.9 s in (`screencapture -C`; that it shows a wait cursor when
   there is one wasn't tried). Remote Mac, Live 12.4.25b1, macOS 26, 2026-11-14.
+- Stop pressed before the overlay had said that its windows were on screen took the glow
+  down, so the overlay never found all its windows listed: it ended with status 1 two
+  seconds after it began to look, with no notification, and its run would have warned that
+  it clicks with no border. It now waits only for the windows that are still up, says
+  shown, and stays until the run has ended. Seen with a copy of the overlay that looks for
+  its windows once a second, where it looks every 0.05 s, and Stop pressed through
+  Accessibility before its first look, twice (remote Mac, 2026-11-14).
 - A helper sent that signal itself stopped as after Stop. One waiting under a
   notification's cover exited with status 3 4 to 13 ms later. One holding a click's button
   posted the button up 6 to 8 ms after the signal, which cuts the hold short (73 to 81 ms

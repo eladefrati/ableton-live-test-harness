@@ -337,14 +337,15 @@ for screen in NSScreen.screens {
 }
 windows.forEach { $0.orderFrontRegardless() }
 
-// Says "shown" once the window server lists every window: NSWindow.isVisible is true even
-// with no window server.
+// Says "shown" once the window server lists every window that is up: NSWindow.isVisible is
+// true even with no window server, and false only for the glow that Stop, pressed before
+// this, has taken down.
 let SHOWN_SECONDS = 2.0
 let started = Date()
 Timer.scheduledTimer(withTimeInterval: 0.05, repeats: true) { timer in
     let list = CGWindowListCopyWindowInfo([.optionOnScreenOnly], kCGNullWindowID) as? [[String: Any]] ?? []
     let listed = Set(list.compactMap { $0[kCGWindowNumber as String] as? Int })
-    if MainActor.assumeIsolated({ windows.allSatisfy { listed.contains($0.windowNumber) } }) {
+    if MainActor.assumeIsolated({ windows.filter(\.isVisible).allSatisfy { listed.contains($0.windowNumber) } }) {
         timer.invalidate()
         print("shown")
         fflush(stdout)
