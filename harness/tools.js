@@ -45,10 +45,7 @@ const marked = new Set();
 async function helperBinary(source, cache = HELPER_CACHE) {
   const hash = crypto.createHash("sha256").update(fs.readFileSync(source)).digest("hex").slice(0, 16);
   const binary = path.join(cache, `${path.basename(source, ".swift")}-${hash}`);
-  if (fs.existsSync(binary)) {
-    markUsed(binary);
-    return binary;
-  }
+  if (marked.has(binary) ? fs.existsSync(binary) : markUsed(binary)) return binary;
   // xcode-select fails without developer tools; swiftc would open the install dialog.
   await run("xcode-select", ["-p"]).catch(() => {
     throw new Error(`Building ${source} needs Xcode or the Command Line Tools (xcode-select --install)`);
@@ -66,14 +63,18 @@ async function helperBinary(source, cache = HELPER_CACHE) {
   return binary;
 }
 
-// Sets the build's access and modification times to now, once per process.
+// Sets the build's access and modification times to now, on this process's first lookup, and
+// says whether the build is there: one that is gone, as one another process has just pruned,
+// is built again. Times it can't set are left as they are.
 function markUsed(binary) {
-  if (marked.has(binary)) return;
-  marked.add(binary);
   const now = new Date();
   try {
     fs.utimesSync(binary, now, now);
-  } catch {}
+  } catch (error) {
+    if (error.code === "ENOENT" || !fs.existsSync(binary)) return false;
+  }
+  marked.add(binary);
+  return true;
 }
 
 // Deletes what in `cache` was last used more than UNUSED_DAYS ago, leftover partial builds

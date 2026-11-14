@@ -95,6 +95,26 @@ test("helperBinary deletes, after it builds, what no process has used for 7 days
   assert.equal(await run(builtOne), "one\n");
 });
 
+test("a build that another process deletes as this process first finds it is built again",
+  { skip: !hasDeveloperTools && "no developer tools", timeout: 300000 }, async (t) => {
+  const folder = fs.mkdtempSync(path.join(os.tmpdir(), "tools-test-"));
+  t.after(() => fs.rmSync(folder, { recursive: true, force: true }));
+  const cache = path.join(folder, "cache");
+  const source = path.join(folder, "one.swift");
+  fs.writeFileSync(source, 'print("one")\n');
+  const built = await helperBinary(source, cache);
+  // In a process of its own, which hasn't found the build yet: the build is deleted just as
+  // the process marks it, as a prune in another process would.
+  const found = require("node:child_process").execFileSync(process.execPath, ["-e", `
+    const fs = require("node:fs");
+    const utimes = fs.utimesSync;
+    fs.utimesSync = (file, ...times) => { fs.rmSync(file, { force: true }); return utimes(file, ...times); };
+    require(process.argv[1]).helperBinary(process.argv[2], process.argv[3]).then((binary) => console.log(binary));
+  `, require.resolve("../tools.js"), source, cache], { encoding: "utf8" });
+  assert.equal(found.trim(), built);
+  assert.equal(await run(built), "one\n");
+});
+
 test("escapeXml escapes what an attribute or element can't hold as it is", () => {
   assert.equal(escapeXml(`a & b < c > "d"`), "a &amp; b &lt; c &gt; &quot;d&quot;");
 });
