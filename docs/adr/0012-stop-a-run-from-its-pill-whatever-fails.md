@@ -110,6 +110,12 @@ Stop could fail, leaving a run that still clicked.
   itself, so a run busy in its own code is stopped as fast as an idle one. The last resort
   does need the run, to act on the signal: until a run that doesn't is killed, 5 s later, it
   can still click, and the border stays up.
+- An event the helper was about to post when Stop came is still posted: the post follows the
+  helper's look at the token at once, and nothing orders the two against Stop's removal of
+  it. The notification that the mouse is free comes about 0.3 s after the removal.
+- A Stop that comes while Live is being activated still finds Live brought to the front: the
+  run looks for Stop once more just before it tells Live to activate, not after. The Escape
+  that closes a menu after Stop is typed by the script that finds Live in front, in one go.
 - A run stops clicking when anything else removes its token or the token's folder: it can't
   tell that it wasn't stopped. Its error says what it found, so for a token that something
   else removed it says, as after Stop, that the run was stopped from its pill.
