@@ -83,7 +83,7 @@ unexpected.
   control that had opened it (3 points); moved onto it from 15 points away, it named it again.
   `device-ui.swift`'s hover starts 15 points left of the point and 10 above it, 18 points
   away (remote Mac, Live 12.4.25b1, 2026-11-13).
-- Posted drags turn controls like the mouse (ADR-0010). A knob of one of Live's own devices
+- Posted drags turn controls like the mouse (ADR-0013). A knob of one of Live's own devices
   has 126 steps over its range and turns one step per point the pointer moves up, starting
   from the nearest step: from 0.5, 62 points up gave 0.9921 and 63 gave 1.0, and from 0, 126
   gave 1.0 (Auto Filter's Frequency, Resonance and Dry/Wet). The knob reads one thing from a

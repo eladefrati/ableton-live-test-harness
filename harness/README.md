@@ -117,7 +117,7 @@ Node 18 or later. See [ADR-0001](../docs/adr/0001-fork-abletonosc.md) for the de
   `openDeviceUi(live, {track, device, build})` takes the controls from the
   `.amxd`; `ui.press(name)` or `ui.press(tabName, item)` clicks, `ui.drag(name, {up, right})`
   turns a control by dragging it that many whole points with the button down, in one move
-  (ADR-0010; a fraction of a point throws `DeviceUiError`; Auto Filter's knobs turn one of
+  (ADR-0013; a fraction of a point throws `DeviceUiError`; Auto Filter's knobs turn one of
   their 126 steps per point up, `live-notes.md`),
   `ui.choose(name, item)` opens the menu a control opens (a chooser) and clicks the one row
   that reads `item`, closing the menu with Escape if none or two do or anything else fails once the menu's control was clicked (ADR-0011), and `ui.text([x, y, w, h])`
@@ -141,7 +141,7 @@ Node 18 or later. See [ADR-0001](../docs/adr/0001-fork-abletonosc.md) for the de
   A plug-in's own window, where its editor opens (ADR-0008):
   `openPluginWindow(live, {track, device, size, controls})` selects the device and opens the
   window if it isn't open (through Accessibility, no pointer), and resolves with an object
-  whose `press(name)` clicks a control, `drag(name, {up, right})` turns one (ADR-0010; mainly
+  whose `press(name)` clicks a control, `drag(name, {up, right})` turns one (ADR-0013; mainly
   what dragging is for, as Live's own devices are set over OSC), `capture(file)` saves a PNG of the editor without
   Live's title bar, and `close()` closes the window. `size` is the editor's `[w, h]` and
   `controls` is `{name: {x, y}}`, each control's centre, both in points from the editor's top
