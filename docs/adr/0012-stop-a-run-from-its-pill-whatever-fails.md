@@ -56,7 +56,7 @@ Stop could fail, leaving a run that still clicked.
    that signal the run counts itself stopped, whatever its token says, passes the signal on
    to a helper it has running, which stops as after Stop, and carries on: a check fails at
    the press that throws and still cleans up, over OSC, which needs no pointer. The border
-   stays up until the run has ended, by itself or, 5 s after the signal, killed; a killed
+   stays up until the run has ended, by itself or, 10 s after the signal, killed; a killed
    run's helpers stop because their run is gone. Only then does Stop say that the mouse is
    free. Stop has no outcome in which the run still clicks.
 6. **A stopped press throws, and says what it had done.** Once the run is stopped the helper
@@ -66,7 +66,7 @@ Stop could fail, leaving a run that still clicked.
    The press under way throws as stopped, and so does every later press of the run. If only
    the release was left, the click or the drag has happened: the press still throws as
    stopped, and its error says that it happened (`done`), so that whatever made the press
-   clears up what the click did (ADR-0014). The run isn't killed, unless it outlasts the 5 s
+   clears up what the click did (ADR-0014). The run isn't killed, unless it outlasts the 10 s
    of decision 5's last resort: a check fails at the press that throws and still runs its
    cleanup, where a kill would leave its tracks in Live. A stopped run takes nothing more from the person: it
    doesn't bring Live to the front either.
@@ -89,9 +89,12 @@ Stop could fail, leaving a run that still clicked.
   longer end by it, for Ctrl-C and for whatever else sends it. SIGUSR2 has no other meaning
   to the run or to node (SIGUSR1 starts node's debugger), nothing but Stop sends it, and it
   ends a run that doesn't handle it.
-- **A longer wait before the kill.** It is how long a run that doesn't act on the signal can
-  still click, so it is as short as a check's cleanup allows: deleting a check's tracks
-  took about 0.3 s, and 5 s leaves room for a check with more to undo.
+- **A shorter or a longer wait before the kill.** It is how long a run that doesn't act on
+  the signal can still click, so it is as short as a stopped run's end allows. A stopped
+  run first finishes the step it is in, since it throws at its next click: reading a menu
+  took 2.4 s, and a run stopped as that read began ended about 3 s after Stop, the 0.3 s of
+  deleting its tracks included. 5 s left too little room for a check with more to undo;
+  10 s is about three times what was measured.
 
 ## Consequences
 
@@ -108,7 +111,7 @@ Stop could fail, leaving a run that still clicked.
   border matters.
 - Stop needs nothing from the run while it can remove the token: the helper reads the token
   itself, so a run busy in its own code is stopped as fast as an idle one. The last resort
-  does need the run, to act on the signal: until a run that doesn't is killed, 5 s later, it
+  does need the run, to act on the signal: until a run that doesn't is killed, 10 s later, it
   can still click, and the border stays up.
 - An event the helper was about to post when Stop came is still posted: the post follows the
   helper's look at the token at once, and nothing orders the two against Stop's removal of
@@ -124,7 +127,7 @@ Stop could fail, leaving a run that still clicked.
   move is a click on the control: the button went down at the press point and came up where
   the pointer then was. Its error doesn't say `done`, since the drag didn't happen.
 - A run killed in Stop's last resort leaves its tracks in Live. That includes a run that
-  stopped clicking when told to and then went on for more than 5 s.
+  stopped clicking when told to and then went on for more than 10 s.
 - A helper outlives its run only to release a button it holds: a press that hadn't reached
   its click when the run was killed doesn't click.
 - An interrupt, quit, hangup or termination signal that reaches the helper while it holds the
