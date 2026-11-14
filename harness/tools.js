@@ -29,19 +29,24 @@ function run(cmd, args = [], { env, started } = {}) {
 // macos.js), which relaunch.js empties after building a plug-in's set: the first build with
 // an empty module cache took 53 s on the remote Mac.
 const HELPER_CACHE = path.join(os.tmpdir(), "ableton-harness-tools");
-// How long a build stays in the cache unused. A build's modification time is its last use:
-// an unchanged source keeps its hash, and its build, for weeks.
+// How long a build stays in the cache unused. A build's last use is the later of its access
+// and modification times: this module sets both when a process first finds the build, and an
+// older checkout of the harness, which sets neither, still updates the access time by
+// running it. An unchanged source keeps its hash, and its build, for weeks.
 const UNUSED_DAYS = 7;
+// The builds this process has marked used.
+const marked = new Set();
 
 // The path of the compiled helper for the Swift file `source`, built with swiftc if this
 // version of the source hasn't been. It is built under a name of its own and renamed into
-// place, so a run never finds half a binary. Each call marks the build used and deletes the
-// others in `cache` that no call has used for UNUSED_DAYS.
+// place, so a run never finds half a binary. After a build, the call deletes whatever in
+// `cache` no process has used for UNUSED_DAYS. Marking and deleting are best effort: neither
+// fails the call.
 async function helperBinary(source, cache = HELPER_CACHE) {
   const hash = crypto.createHash("sha256").update(fs.readFileSync(source)).digest("hex").slice(0, 16);
   const binary = path.join(cache, `${path.basename(source, ".swift")}-${hash}`);
-  if (markUsed(binary)) {
-    pruneUnused(cache, binary);
+  if (fs.existsSync(binary)) {
+    markUsed(binary);
     return binary;
   }
   // xcode-select fails without developer tools; swiftc would open the install dialog.
@@ -56,36 +61,36 @@ async function helperBinary(source, cache = HELPER_CACHE) {
   } finally {
     fs.rmSync(partial, { force: true });
   }
-  pruneUnused(cache, binary);
+  marked.add(binary);
+  pruneUnused(cache);
   return binary;
 }
 
-// Sets the build's modification time to now, its last use. False if there is no build: none
-// yet, or another process pruned it a moment ago.
+// Sets the build's access and modification times to now, once per process.
 function markUsed(binary) {
+  if (marked.has(binary)) return;
+  marked.add(binary);
   const now = new Date();
   try {
     fs.utimesSync(binary, now, now);
-    return true;
-  } catch (error) {
-    if (error.code === "ENOENT") return false;
-    throw error;
-  }
+  } catch {}
 }
 
-// Deletes what in `cache`, other than `inUse`, was last used more than UNUSED_DAYS ago,
-// leftover partial builds included. A build under way is newer. Another process may be
-// pruning the same files: one already gone is skipped.
-function pruneUnused(cache, inUse) {
+// Deletes what in `cache` was last used more than UNUSED_DAYS ago, leftover partial builds
+// included; a build under way, or just made, is newer. What can't be read or deleted, as
+// what another process deleted first, is left.
+function pruneUnused(cache) {
   const before = Date.now() - UNUSED_DAYS * 24 * 60 * 60 * 1000;
-  for (const name of fs.readdirSync(cache)) {
+  let names = [];
+  try {
+    names = fs.readdirSync(cache);
+  } catch {}
+  for (const name of names) {
     const file = path.join(cache, name);
-    if (file === inUse) continue;
     try {
-      if (fs.lstatSync(file).mtimeMs < before) fs.rmSync(file, { recursive: true, force: true });
-    } catch (error) {
-      if (error.code !== "ENOENT") throw error;
-    }
+      const { atimeMs, mtimeMs } = fs.lstatSync(file);
+      if (Math.max(atimeMs, mtimeMs) < before) fs.rmSync(file, { recursive: true, force: true });
+    } catch {}
   }
 }
 

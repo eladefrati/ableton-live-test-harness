@@ -42,36 +42,56 @@ test("run rejects with the reason a command couldn't start", async () => {
 const hasDeveloperTools = (() => {
   try { require("node:child_process").execFileSync("xcode-select", ["-p"], { stdio: "ignore" }); return true; } catch { return false; }
 })();
-test("helperBinary deletes the builds not used for 7 days, counting from their last use, never the one it returns",
+test("helperBinary deletes, after it builds, what no process has used for 7 days, by access or modification, and fails for none of it",
   { skip: !hasDeveloperTools && "no developer tools", timeout: 300000 }, async (t) => {
   const folder = fs.mkdtempSync(path.join(os.tmpdir(), "tools-test-"));
-  t.after(() => fs.rmSync(folder, { recursive: true, force: true }));
   const cache = path.join(folder, "cache");
+  const locked = path.join(cache, "locked-0123456789abcdef");
+  t.after(() => {
+    if (fs.existsSync(locked)) fs.chmodSync(locked, 0o700);
+    fs.rmSync(folder, { recursive: true, force: true });
+  });
   const [one, two] = ["one", "two"].map((name) => {
     const source = path.join(folder, `${name}.swift`);
     fs.writeFileSync(source, `print("${name}")\n`);
     return source;
   });
-  const DAY = 24 * 60 * 60;
-  const age = (file, days) => fs.utimesSync(file, Date.now() / 1000 - days * DAY, Date.now() / 1000 - days * DAY);
+  const daysAgo = (days) => Date.now() / 1000 - days * 24 * 60 * 60;
+  const age = (file, accessed, modified) => fs.utimesSync(file, daysAgo(accessed), daysAgo(modified));
+  const entry = (name, accessed, modified) => {
+    const file = path.join(cache, name);
+    fs.writeFileSync(file, "");
+    age(file, accessed, modified);
+    return name;
+  };
   const cached = () => fs.readdirSync(cache).sort();
 
-  const [builtOne, builtTwo] = [await helperBinary(one, cache), await helperBinary(two, cache)];
-  // Built a month ago and used since only by the call below: in use, so kept.
-  age(builtOne, 30);
-  age(builtTwo, 30);
-  const recent = path.join(cache, "recent-0123456789abcdef");
-  const stale = path.join(cache, "stale-0123456789abcdef");
-  fs.writeFileSync(recent, "");
-  fs.writeFileSync(stale, "");
-  age(recent, 6);
-  age(stale, 8);
-  assert.equal(await helperBinary(one, cache), builtOne);
-  assert.deepEqual(cached(), [path.basename(builtOne), path.basename(recent)].sort());
+  const builtOne = await helperBinary(one, cache);
+  age(builtOne, 30, 30);
+  const stale = entry("stale-0123456789abcdef", 8, 8);
+  // As an older checkout leaves its build: run a day ago, built a month ago.
+  const recentlyRun = entry("run-0123456789abcdef", 1, 30);
+  const changed = entry("changed-0123456789abcdef", 30, 6);
+  // Stale, and can't be deleted.
+  fs.mkdirSync(locked);
+  fs.writeFileSync(path.join(locked, "inside"), "");
+  age(locked, 8, 8);
+  fs.chmodSync(locked, 0o500);
+  const all = [path.basename(builtOne), stale, recentlyRun, changed, path.basename(locked)].sort();
 
-  // Two's build is gone, so it is built again; one's, a month old but used a moment ago, stays.
-  assert.equal(await helperBinary(two, cache), builtTwo);
-  assert.deepEqual(cached(), [path.basename(builtOne), path.basename(builtTwo), path.basename(recent)].sort());
+  // A build found in the cache deletes nothing.
+  assert.equal(await helperBinary(one, cache), builtOne);
+  assert.deepEqual(cached(), all);
+
+  // Another process finds one's build in the cache, which marks it used.
+  const found = require("node:child_process").execFileSync(process.execPath,
+    ["-e", "require(process.argv[1]).helperBinary(process.argv[2], process.argv[3]).then(console.log)", require.resolve("../tools.js"), one, cache],
+    { encoding: "utf8" });
+  assert.equal(found.trim(), builtOne);
+
+  // A new build deletes the stale entry, and the one it can't delete doesn't fail it.
+  const builtTwo = await helperBinary(two, cache);
+  assert.deepEqual(cached(), [...all.filter((name) => name !== stale), path.basename(builtTwo)].sort());
   assert.equal(await run(builtOne), "one\n");
 });
 

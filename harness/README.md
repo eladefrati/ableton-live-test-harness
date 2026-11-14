@@ -57,7 +57,8 @@ Node 18 or later. See [ADR-0001](../docs/adr/0001-fork-abletonosc.md) for the de
   `/Library/Audio/Plug-Ins/Components` and `/System/Library/Components` (exactly one
   effect, or it refuses; `AUDelay` works with no plug-in of your own), reads its parameters
   from the AU itself, in its `ParameterList` order (`au-parameters.swift`, built with
-  `swiftc` on first use and kept in the system temp folder's `ableton-harness-tools` until it goes 7 days unused),
+  `swiftc` on first use and kept in the system temp folder's `ableton-harness-tools`, where
+  `helperBinary` deletes any helper's build that no process has used for 7 days),
   has `auval -v` validate it, and starts each parameter at its default, the plug-in with
   no saved state.
   `checkPluginLoaded(live, name, parameters)` checks that Live lists them all and runs the
@@ -206,7 +207,10 @@ Node 18 or later. See [ADR-0001](../docs/adr/0001-fork-abletonosc.md) for the de
 - `tools.js` and `amxd.js`: shared by the modules above. `run(cmd, args, {env, started})` runs a
   command, in the environment `env` if one is given, and hands its process to `started` if
   one is given, for a caller that may have to signal it,
-  `helperBinary(source)` compiles a Swift helper once per version of its source,
+  `helperBinary(source)` compiles a Swift helper once per version of its source into
+  `ableton-harness-tools` in the system temp folder and, after each build it makes, deletes
+  every helper's build there that no process has used for 7 days (the later of its access
+  and modification times),
   `escapeXml(text)`; `patcherChunk(bytes)` finds the patcher in an `.amxd`.
 - `settings.js`: Live's settings, read from `Preferences.cfg` without touching Live's
   window. `recordBitDepth()` resolves with `{bits, float}` (16, 24, or 32 and float);
