@@ -1,12 +1,12 @@
 ---
 title: "ADR-0009: Show when the harness holds the mouse"
-status: Accepted
+status: Superseded by ADR-0012
 date: 2026-11-13
 ---
 
 # ADR-0009: Show when the harness holds the mouse
 
-**Status:** Accepted. Extends ADR-0006.
+**Status:** Superseded by ADR-0012. Extends ADR-0006.
 
 ## Context
 
@@ -27,21 +27,13 @@ at the Mac doesn't know when the mouse is theirs again.
 3. **The click guard skips the border.** Its windows cover the screen above every app and let
    every click through; the check that the window aimed at is topmost at the point (ADR-0004,
    ADR-0008) leaves out windows with the border's title owned by its program, and nothing else.
-4. **It only informs.** The run builds the border's program before it asks, and after Allow
-   waits for the border to say its windows are on screen. A run that can't show it (the build
-   fails, the program ends, or it says nothing for 5 s) warns and clicks anyway, and so does
-   a run whose border goes while it goes on: the person allowed the clicks, not the border.
-5. **Stop on the pill takes the mouse back.** It creates the run's stop marker, a file the run
-   named when it started the border, takes the border down, and then says the mouse is free.
-   The helper that posts the mouse events checks the marker before every event but the
-   release of a button it holds. Once the marker exists it posts nothing but that release: a
-   press under way stops before its hover, before its click or before a drag's move, and a
-   drag stopped before its move ends with the button up where the pointer then is, the press
-   point unless the mouse was moved. The press under way throws, unless only its release was
-   left: then the click or the drag has happened, and the press resolves. Every later press
-   of the run throws. The run isn't killed: a check fails at the press that throws and still
-   runs its cleanup, where a kill would leave its tracks in Live. The pill is a window of its
-   own that takes clicks, so the click guard refuses a point under it.
+4. **It only informs.** A run that can't show it warns and clicks anyway: the person allowed the
+   clicks, not the border.
+5. **Stop on the pill takes the mouse back.** It sends the run SIGUSR2 and takes the border
+   down; from then on every press of the run is refused, before its hover and again before its
+   click. The run isn't killed: a check fails at its next press and still runs its cleanup,
+   where a kill would leave its tracks in Live. The pill is a window of its own that takes
+   clicks, so the click guard refuses a point under it.
 
 ## Consequences
 
@@ -51,19 +43,3 @@ at the Mac doesn't know when the mouse is theirs again.
 - A window given the border's title by a program whose name starts like the border's would be
   skipped too: the guard stops accidents, as ADR-0006's dialog does, not a program set on
   clicking.
-- After a change to the helper or the border, a run's first press builds both before the
-  dialog: about 11 s, and 25 s or more with an empty module cache. The border is on screen
-  about 1.4 s after Allow.
-- A run with no desktop session can't show the dialog either, so it is refused before the
-  border matters.
-- Stop needs nothing from the run: the helper reads the marker itself, so a run busy in its
-  own code is stopped as fast as an idle one.
-- A click whose button was down when Stop came completes, since its release is the one event
-  still posted, and so does a drag whose move was already posted. Such a press resolves, so
-  the run knows it happened: one that opened a menu with it goes on to close the menu
-  (ADR-0011). A drag stopped before its move is a click on the control, and throws: the
-  button went down at the press point and came up where the pointer then was.
-- An interrupt, quit, hangup or termination signal that reaches the helper while it holds the
-  button, such as Ctrl-C or Ctrl-\ on the run, is held back until the helper has released the
-  button, which it then does at once. A kill (SIGKILL) or a crash of the helper still leaves
-  the button held.

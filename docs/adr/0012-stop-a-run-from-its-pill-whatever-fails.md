@@ -1,0 +1,104 @@
+---
+title: "ADR-0012: Show when the harness holds the mouse, and stop it from the pill whatever fails"
+status: Accepted
+date: 2026-11-13
+---
+
+# ADR-0012: Show when the harness holds the mouse, and stop it from the pill whatever fails
+
+**Status:** Accepted. Supersedes ADR-0009. Extends ADR-0006.
+
+## Context
+
+The harness's clicks with real mouse events, with the dialog that asks for them (ADR-0004,
+ADR-0006, ADR-0008), together are **harness-computer-use**. After Allow, the run may take the
+pointer at any moment until it ends, and nothing on screen says whether it still can: the person
+at the Mac doesn't know when the mouse is theirs again.
+
+ADR-0009 showed a border for that, with a Stop that sent the run a signal. Three things failed
+in use. The helper that posts the mouse events never saw the signal, so a press under way ran
+to its end after the notification said the mouse was free. The border's program was built
+after Allow, so it showed seconds late, and a border that never showed went unnoticed. And
+Stop could fail, leaving a run that still clicked.
+
+## Decision
+
+1. **A purple border around every screen while a run holds the mouse,** a soft glow in from the
+   edges that slowly breathes, with a frosted pill at the top naming harness-computer-use and
+   the run, from Allow until the run's process ends, then a notification that the mouse is free.
+   A program of its own (`computer-use-overlay.swift`) draws it and watches the run's process,
+   so it goes also when the run crashes or is killed. The dialog and the notification are titled
+   harness-computer-use. The dialog says the glow will show or, when the border's program
+   couldn't be built, that nothing on screen will show it and that there will be no Stop.
+2. **Only where the run asked.** The click host doesn't ask, and no one watches it.
+3. **The click guard skips the border.** Its windows cover the screen above every app and let
+   every click through; the check that the window aimed at is topmost at the point (ADR-0004,
+   ADR-0008) leaves out windows with the border's title owned by its program, and nothing else.
+   The pill is a window of its own that takes clicks, so the guard refuses a point under it.
+4. **The border only informs.** The run builds the border's program before it asks, and after
+   Allow waits for the border to say its windows are on screen. A run that can't show it (the
+   build fails, the program ends, or it says nothing for 5 s) warns and clicks anyway, and so
+   does a run whose border goes while the run goes on and wasn't stopped: the person allowed
+   the clicks, not the border.
+5. **Stop on the pill takes the mouse back, whatever fails.** The run keeps a click token: a
+   file that exists while the run may click, in a folder of its own, named to the border and
+   to every helper the run starts. Stop removes the token, takes the border down and says the
+   mouse is free. The helper posts a mouse event only while it can tell that the run wasn't
+   stopped: the token can be read, and its folder can be written to, so that Stop can remove
+   it. Anything else counts as stopped: a token that is gone or can't be read, a folder that
+   is gone or can't be written to. The run reads the token the same way before each press. If
+   the token can still be read after Stop tried to remove it, Stop ends the run's helper and
+   the run itself by signal: stopping comes before the run's cleanup. Stop has no outcome in
+   which the run still clicks.
+6. **A stopped press throws, and says what it had done.** Once the run is stopped the helper
+   posts nothing but the release of a button it holds: a press under way stops before its
+   hover, before its click or before a drag's move, and a drag stopped before its move ends
+   with the button up where the pointer then is, the press point unless the mouse was moved.
+   The press under way throws as stopped, and so does every later press of the run. If only
+   the release was left, the click or the drag has happened: the press still throws as
+   stopped, and its error says that it happened (`done`), so that whatever made the press
+   clears up what the click did (ADR-0014). The run isn't killed, decision 5's last resort
+   apart: a check fails at the press that throws and still runs its cleanup, where a kill
+   would leave its tracks in Live. A stopped run takes nothing more from the person: it
+   doesn't bring Live to the front either.
+
+## Considered
+
+- **A marker file that Stop creates.** No marker then reads as not stopped, so a folder that
+  is gone, a folder that can't be written to and a full disk each leave a Stop without effect,
+  unless more checks stand in for the marker. A token that Stop removes fails the other way:
+  every loss reads as stopped, and removing a file asks less of the system than creating one.
+- **The life of the border's program as the token.** The border only informs (decision 4), so
+  a border that dies mustn't stop the run.
+- **A signal from the pill as the only way.** It reaches the helper that runs then and no
+  later one, unless the run acts on it too, which a run busy in its own code doesn't. It
+  stays as the last resort, with the run ended as well.
+
+## Consequences
+
+- The border lasts the whole run, not each click: between clicks the run can take the pointer
+  again, so the mouse is free only once the run ends.
+- Captures of a window (`screencapture -l`) don't include it; a capture of the whole screen does.
+- A window given the border's title by a program whose name starts like the border's would be
+  skipped too: the guard stops accidents, as ADR-0006's dialog does, not a program set on
+  clicking.
+- After a change to the helper or the border, a run's first press builds both before the
+  dialog: about 11 s, and 25 s or more with an empty module cache. The border is on screen
+  about 1.4 s after Allow.
+- A run with no desktop session can't show the dialog either, so it is refused before the
+  border matters.
+- Stop needs nothing from the run: the helper reads the token itself, so a run busy in its
+  own code is stopped as fast as an idle one.
+- A run stops clicking when anything else removes its token or the token's folder: it can't
+  tell that it wasn't stopped. Its error says which it was.
+- A click whose button was down when Stop came completes, since its release is the one event
+  still posted, and so does a drag whose move was already posted. A drag stopped before its
+  move is a click on the control: the button went down at the press point and came up where
+  the pointer then was. Its error doesn't say `done`, since the drag didn't happen.
+- A run ended by Stop's last resort leaves its tracks in Live.
+- An interrupt, quit, hangup or termination signal that reaches the helper while it holds the
+  button, such as Ctrl-C or Ctrl-\ on the run, is held back until the helper has released the
+  button, which it then does at once. It then dies by that signal, except after a quit
+  signal, where it exits with status 131: the system writes a crash report for a program
+  that dies by one, and a release that went as designed is no crash. A kill (SIGKILL) or a
+  crash of the helper still leaves the button held.

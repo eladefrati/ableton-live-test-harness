@@ -104,7 +104,7 @@ Node 18 or later. See [ADR-0001](../docs/adr/0001-fork-abletonosc.md) for the de
   in 2 minutes throws `DeviceUiError` (ADR-0006). From Allow until the run's process ends, a
   breathing purple glow in from the screen's edges, with a pill naming the run, shows that the
   run may take the pointer; a notification says when it has ended (`computer-use-overlay.swift`,
-  ADR-0009). Stop on the pill takes the mouse back: the press under way stops, with a button
+  ADR-0012). Stop on the pill takes the mouse back: the press under way stops, with a button
   it holds released, and throws `DeviceUiError`, unless only its release was left, when the
   click or the drag has happened and the press resolves. The run's later presses throw, so a
   check fails at the press that throws and still cleans up. A run whose border can't show, or

@@ -158,7 +158,7 @@ unexpected.
   the normal (layer 0) windows doesn't see it: a click aimed at the device view under it would
   go to the plug-in. `device-ui.swift` refuses a click unless the window aimed at is topmost
   among the windows of every layer below the cursor's (remote Mac, Live 12.4.25b1, 2026-11-13).
-  The one exception is harness-computer-use's purple border (ADR-0009), at the screen-saver
+  The one exception is harness-computer-use's purple border (ADR-0012), at the screen-saver
   layer (1000) over every app, which lets clicks through. macOS reports its program's name cut
   short to 32 characters, so the guard matches the start of it with the border's title.
   A click's hover takes about 240 ms, and a window shown over the point in that time took the
@@ -177,7 +177,7 @@ unexpected.
   glow, the click guard doesn't skip it: a point under the pill is refused, with an error
   that names the pill.
 - Stop on the pill creates the run's stop marker, a file `device-ui.swift` looks for before
-  every mouse event it posts but a button-up (ADR-0009). A helper started after Stop posted
+  every mouse event it posts but a button-up (ADR-0012). A helper started after Stop posted
   nothing, and one stopped while a drag held the button, before its move, posted the button
   up at the press point and no drag event: each exited with status 3. One stopped while a
   click held the button posted the button up, so the click happened, and one stopped after
