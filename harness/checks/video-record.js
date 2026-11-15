@@ -4,7 +4,8 @@
 // Checks video.js and its helper in Live (ADR-0016): with Live playing, so its window
 // changes, it records Live's main window and the main display for a length of time, a video
 // around a command, one around a command given Ctrl-C, one that cli.js video stops on
-// SIGTERM, and one whose run is killed, and
+// SIGTERM, one of a window that closes (a panel of its own, pointer-target.swift), and one
+// whose run is killed, and
 // saves frames of each. Every video must be playable, as long as asked within a tolerance,
 // and have a frame at each time checked; the frames are left to look at with --out. Leaves
 // the transport stopped.
@@ -21,8 +22,11 @@ const { connect } = require("../live.js");
 const mac = require("../macos.js");
 const { liveMainWindow } = require("../device-ui.js");
 const { recordVideo, runVideoCommand, videoFrame } = require("../video.js");
+const tools = require("../tools.js");
 
 const CLI = path.join(__dirname, "..", "cli.js");
+const HELPER = path.join(__dirname, "..", "video.swift");
+const TARGET = path.join(__dirname, "pointer-target.swift");
 const VIDEO = path.join(__dirname, "..", "video.js");
 // A recording stops within this of when it was asked to (the helper says it started 0.3 to
 // 0.5 s after it ran, and the length counts from there).
@@ -154,6 +158,41 @@ const CASES = [
       const result = JSON.parse(out.trim().split("\n").pop());
       if (!near(result.seconds, 3)) throw new Error(`The video is ${result.seconds} s long`);
       return `${result.seconds.toFixed(2)} s; ${await frames(file, [1, 2.5])}`;
+    },
+  },
+  {
+    name: "a window that closes 2 s into its recording",
+    async run(folder) {
+      // A window of the check's own, which it can close: the helper records any window by id.
+      const file = path.join(folder, "closed.mov");
+      fs.rmSync(file, { force: true });
+      const target = spawn(await tools.helperBinary(TARGET), ["200", "200", "300", "200"], { stdio: ["ignore", "pipe", "pipe"] });
+      try {
+        const shown = await new Promise((resolve, reject) => {
+          let said = "";
+          target.stdout.on("data", (data) => {
+            said += data;
+            const line = said.split("\n").find((l) => l.startsWith("{"));
+            if (line) resolve(JSON.parse(line));
+          });
+          target.on("close", (code) => reject(new Error(`pointer-target ended with status ${code}`)));
+        });
+        const { child, ended } = await node(["-e", `
+          const { spawn } = require("node:child_process");
+          const helper = spawn(${JSON.stringify(await tools.helperBinary(HELPER))}, ["record", ${JSON.stringify(file)}, "window", "${shown.window}", "10"], { stdio: ["ignore", "pipe", "inherit"] });
+          helper.stdout.pipe(process.stdout);
+          helper.on("close", (code) => { process.exitCode = code; });`], "recording");
+        await sleep(2000);
+        target.kill("SIGTERM");
+        const { code, out } = await Promise.race([ended, sleep(15000).then(() => { child.kill("SIGINT"); throw new Error("The recording went on after its window closed"); })]);
+        if (code !== 0) throw new Error(`The helper ended with status ${code}`);
+        const result = JSON.parse(out.trim().split("\n").pop());
+        if (!result.early) throw new Error(`The result doesn't say the recording ended early: ${JSON.stringify(result)}`);
+        if (!near(result.seconds, 2)) throw new Error(`The video is ${result.seconds} s long`);
+        return `${result.seconds.toFixed(2)} s, early: ${result.early}; ${await frames(file, [1])}`;
+      } finally {
+        target.kill("SIGTERM");
+      }
     },
   },
   {

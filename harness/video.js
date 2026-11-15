@@ -84,7 +84,8 @@ function parseVideoArgs(argv) {
 // Starts recording to `file` (a .mov; its folder is made, a file there replaced) and resolves
 // once the helper says it records, with { file, pid, stop(), done() }: `pid` is the helper's,
 // stop() ends the recording now, done() waits for it to end by itself, and both resolve with
-// { file, seconds, bytes }, the video's length and size, or reject with the helper's reason.
+// { file, seconds, bytes }, the video's length and size, with `early`, the reason, when it
+// ended before it was stopped (its window closed), or reject with the helper's reason.
 async function recordVideo(file, { window, screen = false, seconds = MAX_SECONDS } = {}, system = machine) {
   requireMacOS15(system);
   if (screen && window !== undefined) throw new VideoError("Record a window or the screen, not both");

@@ -6,7 +6,8 @@
 //
 // record writes H.264 in a .mov, at most 30 frames a second, the pointer included. A window is
 // recorded alone, behind other windows too; the display with everything on it. It prints
-// "recording" once the file has started, and on stopping one JSON line: {"seconds", "bytes"}.
+// "recording" once the file has started, and on stopping one JSON line: {"seconds", "bytes"},
+// with "early", the reason, when the stream ended before it was stopped (its window closed).
 // It stops after <seconds>, on SIGINT, SIGTERM or SIGHUP, or when the process that started it
 // ends, and finishes the file each time. A file it was writing when it was killed is whole up
 // to then: SCRecordingOutput writes it as it goes (a recorder killed 5 s in left 5 s). While
@@ -45,6 +46,8 @@ final class Recorder: NSObject, SCStreamDelegate, SCStreamOutput, SCRecordingOut
     var stream: SCStream?
     var output: SCRecordingOutput?
     var stopping = false
+    // Why the stream ended before it was stopped, if it did.
+    var early: String?
 
     init(file: URL, seconds: Double) {
         self.file = file
@@ -91,10 +94,14 @@ final class Recorder: NSObject, SCStreamDelegate, SCStreamOutput, SCRecordingOut
 
     func stream(_ stream: SCStream, didOutputSampleBuffer buffer: CMSampleBuffer, of type: SCStreamOutputType) {}
 
-    // A window that closes ends the stream: the file is finished as on a stop.
+    // A window that closes ends the stream: the file is finished as on a stop, and the result
+    // says why it ended early.
     func stream(_ stream: SCStream, didStopWithError error: Error) {
         FileHandle.standardError.write(Data("The recording stopped: \(error.localizedDescription)\n".utf8))
-        DispatchQueue.main.async { if !self.stopping { self.awaitFinish() } }
+        DispatchQueue.main.async {
+            self.early = error.localizedDescription
+            if !self.stopping { self.awaitFinish() }
+        }
     }
 
     // The length counts from here, where the file starts. On the main queue, so "recording"
@@ -114,12 +121,15 @@ final class Recorder: NSObject, SCStreamDelegate, SCStreamOutput, SCRecordingOut
     // The length is read from the file: recordedDuration came in whole seconds.
     func recordingOutputDidFinishRecording(_ output: SCRecordingOutput) {
         let file = self.file
+        let early = self.early
         Task {
             let bytes = (try? FileManager.default.attributesOfItem(atPath: file.path)[.size] as? Int) ?? 0
             guard let duration = try? await AVURLAsset(url: file).load(.duration) else {
                 fail("The recording finished, but \(file.path) can't be read as a video")
             }
-            printJSON(["seconds": duration.seconds, "bytes": bytes])
+            var result: [String: Any] = ["seconds": duration.seconds, "bytes": bytes]
+            if let early { result["early"] = early }
+            printJSON(result)
             exit(0)
         }
     }
