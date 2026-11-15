@@ -197,9 +197,10 @@ async function recordVideo(file, { window, screen = false, seconds = MAX_SECONDS
 // length given, Ctrl-C or SIGTERM. The command runs in a process
 // group of its own, with no input: each Ctrl-C, SIGTERM, SIGHUP or SIGQUIT the run gets reaches
 // that whole group once, from here, as a terminal's would, and the recording goes on until the
-// command has ended. However the run ends, short of SIGKILL, the command's group is sent
-// SIGTERM as it does. A recording that fails as it stops is reported as `error`, with the
-// command's status still returned.
+// command has ended. What the command leaves running in its group is sent SIGTERM as the
+// command ends, or as the run exits first, on its own or on an uncaught error; a run ended by
+// a signal it doesn't handle (SIGKILL, SIGUSR2, an abort) leaves it running. A recording that
+// fails as it stops is reported as `error`, with the command's status still returned.
 async function runVideoCommand({ file, seconds, window, screen, command = [] }, system = machine) {
   const video = await recordVideo(file, { seconds, window, screen }, system);
   // Until this line, what happens isn't in the video.
@@ -216,15 +217,23 @@ async function runVideoCommand({ file, seconds, window, screen, command = [] }, 
     }
   }
   let child;
+  // Once the command has ended, its group is signalled no more: with nothing left in it, its
+  // number is free for another process's group.
+  let ended = false;
   // The command leads its group: a shell or a runner it starts has processes of its own.
   const pass = (signal) => {
     try {
-      if (child?.pid) process.kill(-child.pid, signal);
+      if (child?.pid && !ended) process.kill(-child.pid, signal);
     } catch {}
   };
   const signals = ["SIGINT", "SIGTERM", "SIGHUP", "SIGQUIT"];
   signals.forEach((signal) => process.on(signal, pass));
-  const end = () => pass("SIGTERM");
+  // What is left in the command's group is ended as the command ends, while the group still
+  // holds its number, or with this run, whichever comes first.
+  const end = () => {
+    pass("SIGTERM");
+    ended = true;
+  };
   process.on("exit", end);
   try {
     const status = await new Promise((resolve) => {
@@ -233,6 +242,7 @@ async function runVideoCommand({ file, seconds, window, screen, command = [] }, 
         console.error(`${command[0]} couldn't run: ${error.message}`);
         resolve(127);
       });
+      child.on("exit", end);
       child.on("close", (code, signal) => resolve(code ?? 128 + os.constants.signals[signal]));
     });
     // The command's status is the run's result: a recording that fails as it stops (its
@@ -246,8 +256,6 @@ async function runVideoCommand({ file, seconds, window, screen, command = [] }, 
   } finally {
     signals.forEach((signal) => process.off(signal, pass));
     process.off("exit", end);
-    // What the command left running in its group.
-    end();
   }
 }
 

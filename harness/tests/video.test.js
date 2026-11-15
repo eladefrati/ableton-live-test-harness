@@ -328,6 +328,45 @@ test("SIGQUIT on a recording around a command reaches the command", { timeout: 2
   assert.equal(JSON.parse(fs.readFileSync(path.join(helper.folder, "command.json"), "utf8")).count, 1);
 });
 
+test("what a command leaves running in its group is ended as the command ends, before the recording stops, and the group is signalled no more after", { timeout: 20000 }, async (t) => {
+  // Told to stop, the helper notes it, and 500 ms later whether the command's leftover still runs.
+  const helper = fakeHelper(t, `
+const fs = require("node:fs");
+const at = (name) => require("node:path").join(__dirname, name);
+process.on("SIGINT", () => {
+  fs.writeFileSync(at("stopping"), "");
+  setTimeout(() => {
+    let alive = true;
+    try { process.kill(Number(fs.readFileSync(at("left.pid"), "utf8")), 0); } catch { alive = false; }
+    fs.writeFileSync(at("left-alive"), String(alive));
+    console.log(JSON.stringify({ seconds: 1, bytes: 1 }));
+    process.exit(0);
+  }, 500);
+});
+console.log("recording");
+setInterval(() => {}, 1000);
+`);
+  const at = (name) => path.join(helper.folder, name);
+  t.after(() => { try { process.kill(Number(fs.readFileSync(at("left.pid"), "utf8")), "SIGKILL"); } catch {} });
+  // The signals sent to a process group from here.
+  const kill = process.kill;
+  const toGroups = [];
+  process.kill = (pid, signal) => {
+    if (pid < 0) toGroups.push(signal);
+    return kill.call(process, pid, signal);
+  };
+  t.after(() => { process.kill = kill; });
+  // The leftover ignores SIGHUP, so only the end of the group can end it.
+  const running = runVideoCommand({ file: out(helper), screen: true,
+    command: ["/bin/sh", "-c", `(trap "" HUP; exec sleep 30) & echo $! > "${at("left.pid")}"; exit 0`] }, fakeSystem(helper));
+  assert.ok(await until(() => fs.existsSync(at("stopping"))), "the recording was told to stop");
+  // A SIGHUP to the run while the recording stops, after the command has ended.
+  process.emit("SIGHUP", "SIGHUP");
+  assert.equal((await running).status, 0);
+  assert.equal(fs.readFileSync(at("left-alive"), "utf8"), "false", "the command's leftover was ended before the recording stopped");
+  assert.deepEqual(toGroups, ["SIGTERM"], "one SIGTERM to the command's group, as it ended, and nothing after");
+});
+
 test("a run that dies while it records around a command takes the command's processes with it", { timeout: 20000 }, async (t) => {
   const helper = fakeHelper(t, RECORDS_UNTIL_SIGINT);
   // The shell's command ignores SIGINT, so only the end of the run can end it.
