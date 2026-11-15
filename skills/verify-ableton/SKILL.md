@@ -136,38 +136,48 @@ ends, a purple border around their screen shows the run may take the pointer, an
 its pill takes the mouse back, failing the run at the press under way, or at its next one (ADR-0012).
 These clicks, the asking and the border are harness-computer-use: a request by that name
 means this section. Bring
-Live to the front only when a step needs it: keystrokes through System Events go to the frontmost app. To see Live, capture
-its window in the background, which works with Live behind other windows:
-`node ~/dev/ableton-live-test-harness/harness/cli.js capture <png>`. That shows Live's
-main window only. A dialog or panel is a window of its own: `cli.js windows` lists Live's
-windows with their ids, and `cli.js capture <png> --window <id>` captures one. A plug-in's
-own window (its editor) shows only while Live is in front: open and capture it with
-`cli.js plugin-window <track> <device> <png>`, and press its controls with
-`openPluginWindow` (`harness/README.md`), never by clicking the device's title bar or with
-`screencapture` of your own. To show something change, record a video of Live's window around
-what changes it: `cli.js video -- <command>`, such as `-- node tests/live/<check>.js`, or
-`recordVideo` in a check's code; `cli.js video --seconds <n>` records for a length of time,
-from when it says `recording` on stderr. `--window <id>` records another of Live's windows,
-and `--screen` the whole display, for what the window leaves out: menus, dialogs and other
-windows over it, and harness-computer-use's pill (`harness/README.md`). Before acting on a Live window, list Live's windows (System
-Events) so a panel on top isn't missed. A dialog the Live API can't answer: capture it and
-ask the user, naming it.
+Live to the front only when a step needs it: keystrokes through System Events go to the frontmost app. Before acting on a Live window, list Live's windows (System
+Events) so a panel on top isn't missed. A dialog the Live API can't answer: capture it
+("Captures") and ask the user, naming it.
+
+## Captures
+
+To see Live, or to show the user what it did, capture it: a still for a fixed state, one
+video for a change over time, not a burst of stills. Captures work in the background, with
+Live behind other windows, and are for any project, not part of harness-computer-use.
+
+One rule on paths: give a capture no path when it is proof, and it goes to the harness's
+captures folder, whose path the command prints; give it a path of the user's when it is to
+be kept, a manual's screenshot say.
+
+- A still: `node ~/dev/ableton-live-test-harness/harness/cli.js capture` takes Live's main
+  window. A dialog or panel is a window of its own: `cli.js windows` lists Live's windows
+  with their ids, and `cli.js capture --window <id>` takes one. A plug-in's own window (its
+  editor) shows only while Live is in front: open and capture it with `cli.js plugin-window
+  <track> <device>`, and press its controls with `openPluginWindow` (`harness/README.md`),
+  never by clicking the device's title bar. Never `screencapture` of your own.
+- A video: record around what changes Live, `cli.js video -- <command>`, such as `-- node
+  tests/live/<check>.js`, or with `recordVideo` in a check's code; `cli.js video --seconds
+  <n>` records for a length of time, from when it says `recording` on stderr. It records
+  Live's main window; `--window <id>` records another of Live's windows, and `--screen` the
+  whole display, for what the window leaves out: menus, dialogs and other windows over it,
+  and harness-computer-use's pill (`harness/README.md`).
+- You can't watch a video: before calling one proof, save its frames from before and after
+  the change with `cli.js video-frame <mov> <seconds>`, look at them, and report the video
+  with the times you checked and what each frame shows.
+
+A capture is proof to show once, not part of the project. Give the user its path with "in
+Finder, press Cmd+Shift+G and paste this path", or open it for them, and delete it once they
+have watched it, unless they say to keep it; then move it to a path of theirs. Delete the
+frames you saved only to look at once you have looked. Anything left in the captures folder
+is deleted once a capture is saved there more than 7 days later.
 
 ## Evidence
 
 A check's output is the evidence: one PASS/FAIL line per case with matched, missing and
 extra notes and the worst timing error in ms, and the missing/extra notes on a failure.
 Report the result in one line and show failures in full; the rest is in the run's log (see
-"Run logs"). Where the evidence is on screen, a fixed state gets a still (`cli.js capture`)
-and a change over time one video (`cli.js video`), not a burst of stills. You can't watch a
-video: before calling one proof, save its frames from before and after the change with
-`cli.js video-frame <mov> <seconds>`, look at them, and report the video with the times you
-checked and what each frame shows. A capture is proof to show once, not part of the project:
-give it no path, and it goes to the harness's captures folder, whose path the command
-prints. Give the user that path with "in Finder, press Cmd+Shift+G and paste this path", or
-open it for them, and delete it once they have watched it, unless they say to keep it. To
-keep one, move it to a path of theirs, or record it there from the start; the captures
-folder deletes what is older than 7 days. A check that never failed proves little: when you add a
+"Run logs"). Where the evidence is on screen, it is a still or a video ("Captures"). A check that never failed proves little: when you add a
 case, show it failing once on a wrong expectation. A Live fix is proven when the check that
 reproduced the bug passes twice, the second time with a different input, tempo or transport
 state; no more runs unless one fails. Where timing matters (steps, swing, note lengths), a
