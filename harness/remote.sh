@@ -82,7 +82,7 @@ bring_back_logs() {
 # Move the remote's captures to this Mac's captures folder (harness/captures.js), naming each
 # on stderr: only finished ones, not a video still being recorded, and none whose name is
 # already here, so nothing here is overwritten. What stays comes back after a later run, or
-# is deleted there after 7 days.
+# is deleted there once a capture is saved there more than 7 days after it.
 bring_back_captures() {
   local listed
   listed=$(ssh "$host" "$remote_path; cd ~/dev/$harness && node harness/captures.js finished") || {
@@ -108,17 +108,23 @@ bring_back_captures() {
     fi
   done
   (( $#send )) || return 0
-  local list moved
+  local list moved rsync_status=0
   list=$(mktemp -t remote-captures) || return 0
   print -rl -- $send > $list
-  if mkdir -p "$here" && moved=$(rsync -a --ignore-existing --remove-source-files --files-from="$list" --out-format="%n" \
-      "$host:$there/" "$here/"); then
-    for name in ${(f)moved}; do
-      (( ${send[(Ie)$name]} )) && print -u2 "remote.sh: brought back $here/$name"
-    done
+  # Each file rsync names it has copied is named here, also when it then fails on another: a
+  # failed openrsync left what it had copied on the remote too, where a later run finds the
+  # name already here.
+  if mkdir -p "$here"; then
+    moved=$(rsync -a --ignore-existing --remove-source-files --files-from="$list" --out-format="%n" \
+      "$host:$there/" "$here/") || rsync_status=$?
   else
-    print -u2 "remote.sh: could not bring the remote's captures back from $host; the next run will retry"
+    rsync_status=1
   fi
+  for name in ${(f)moved}; do
+    (( ${send[(Ie)$name]} )) && print -u2 "remote.sh: brought back $here/$name"
+  done
+  (( rsync_status == 0 )) \
+    || print -u2 "remote.sh: could not bring the remote's captures back from $host, or not all of them; the next run will retry those not here"
   rm -f $list
 }
 
