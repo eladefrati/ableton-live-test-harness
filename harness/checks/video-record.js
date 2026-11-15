@@ -85,22 +85,25 @@ async function frames(file, times, { still = false } = {}) {
 }
 
 // Runs Node with `args`, its output collected; resolves, once it has said `line` on stdout or
-// stderr (at once without one), with the process and `ended`, which resolves with its exit
-// and output. `detached` gives it a process group of its own, as a terminal's job has.
+// stderr (at once without one), with the process, `ended`, which resolves with its exit and
+// output once its output has closed, and `exited`, which resolves with its exit and the output
+// so far as it exits. A video helper it started holds its stderr, so `ended` waits for that
+// helper too. `detached` gives it a process group of its own, as a terminal's job has.
 function node(args, line, { detached = false } = {}) {
   const child = spawn(process.execPath, args, { stdio: ["ignore", "pipe", "pipe"], detached });
   let [out, err] = ["", ""];
   const ended = new Promise((resolve) => child.on("close", (code, signal) => resolve({ code, signal, out, err })));
+  const exited = new Promise((resolve) => child.on("exit", (code, signal) => resolve({ code, signal, out, err })));
   return new Promise((resolve, reject) => {
     child.stdout.on("data", (data) => {
       out += data;
-      if (line && out.includes(line)) resolve({ child, ended });
+      if (line && out.includes(line)) resolve({ child, ended, exited });
     });
     child.stderr.on("data", (data) => {
       err += data;
-      if (line && err.includes(line)) resolve({ child, ended });
+      if (line && err.includes(line)) resolve({ child, ended, exited });
     });
-    if (!line) resolve({ child, ended });
+    if (!line) resolve({ child, ended, exited });
     ended.then(({ code, signal }) => reject(new Error(`It ended before it said "${line}" (${signal ?? `status ${code}`}): ${err.trim()}`)));
   });
 }
@@ -198,7 +201,8 @@ const CASES = [
       try {
         await sleep(3000);
         child.kill("SIGTERM");
-        run = await ended;
+        // The helper finishes the file within 10 s of being told to stop.
+        run = await within(ended, 30000, "cli.js video was still running 30 s after SIGTERM");
       } finally {
         // cli.js and its recording, if anything above failed before they ended.
         if (child.exitCode === null && child.signalCode === null) child.kill("SIGINT");
@@ -307,11 +311,12 @@ const CASES = [
     async run(folder) {
       const file = path.join(folder, "killed.mov");
       fs.rmSync(file, { force: true });
-      const { child, ended } = await node(["-e", `require(${JSON.stringify(VIDEO)}).recordVideo(${JSON.stringify(file)})
+      const { child, exited } = await node(["-e", `require(${JSON.stringify(VIDEO)}).recordVideo(${JSON.stringify(file)})
         .then((video) => { console.log("recording " + video.pid); setInterval(() => {}, 1000); })`], "recording ");
       await sleep(3000);
       child.kill("SIGKILL");
-      const helper = Number((await ended).out.match(/recording (\d+)/)[1]);
+      // Not once its output closes: the helper holds its stderr until it ends.
+      const helper = Number((await exited).out.match(/recording (\d+)/)[1]);
       // The helper finishes the file once it sees the run gone, and ends; one that doesn't is
       // stopped here, so it doesn't record on for 10 minutes.
       await retry(async () => {
