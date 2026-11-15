@@ -114,9 +114,9 @@ Node 18 or later. See [ADR-0001](../docs/adr/0001-fork-abletonosc.md) for the de
   running (ADR-0015). The stop key, Control-Option-Command-Space (⌃⌥⌘Space, which the pill
   shows before its Stop and the dialog names), presses Stop on the pill through the
   button's own action and needs no pointer: while the border's program runs, no app gets
-  that key, Live included, and an app that has claimed the same key gets it too (ADR-0017).
-  A border that couldn't claim it shows no key, and the run says so on stderr in a line
-  starting `warn harness-computer-use` and clicks on. If only the press's release was
+  that key, Live included (ADR-0017). The key is claimed exclusively: a border that couldn't
+  claim it, as when another program or another run's border holds it, shows no key, and
+  the run says so on stderr in a line starting `warn harness-computer-use` and clicks on. If only the press's release was
   left, the click or the drag has happened: `error.done` is `true` on that press's error, and
   set on no other, so a check that must undo what a click did reads it in its cleanup. Stop
   removes the run's click token, a file the run and its click helper must be able to read
@@ -411,7 +411,10 @@ Node 18 or later. See [ADR-0001](../docs/adr/0001-fork-abletonosc.md) for the de
   the pill. Pressed as soon as the overlay has claimed it, before its windows show, it must
   be taken as an early Stop; and pressed with another app in front (`checks/key-target.swift`,
   which prints the keys it gets), the pill must show it, it must stop the run, and the app
-  must not get it while the overlay is up, and must once the overlay has gone. First of
+  must not get it while the overlay is up, and must once the overlay has gone, also when the
+  overlay was killed (SIGKILL). With two overlays up, each over a run of its own, the
+  second's claim on the key must be refused: its pill shows no key and its Stop still
+  stops its run, and one press of the key stops only the first run. First of
   all the overlay is started with the process id 0, and with -1, for its run: it must
   refuse, saying nothing and exiting 1 with its usage. After every case it is started over a run
   that has ended and that nothing has waited for, which still answers signal 0: it must say

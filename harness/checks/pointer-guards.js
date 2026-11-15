@@ -769,13 +769,13 @@ const RUN = `
     console.log(JSON.stringify({ helper: helper.pid }));
   });`;
 
-// Starts such a run: { pid, helper, signalHelper, endedAt, end }. `helper` runs the helper and
+// Starts such a run, with the click token `token`: { pid, helper, signalHelper, endedAt, end }. `helper` runs the helper and
 // resolves with how it ended, or, when the run ends before it says, with whether the helper
 // ended with it. `signalHelper` sends that helper a signal. `endedAt` is when the run ended,
 // null until it has. `end` ends the run and resolves with its exit status, or the signal that
 // ended it.
-function startRun(helper, deaf) {
-  const child = spawn(process.execPath, ["-e", RUN, helper, TOKEN, ...(deaf ? ["deaf"] : [])], { stdio: ["pipe", "pipe", "inherit"] });
+function startRun(helper, deaf, token = TOKEN) {
+  const child = spawn(process.execPath, ["-e", RUN, helper, token, ...(deaf ? ["deaf"] : [])], { stdio: ["pipe", "pipe", "inherit"] });
   let [endedAt, helperPid] = [null, null];
   const ended = new Promise((resolve) => child.on("exit", (code, signal) => {
     endedAt = Date.now();
@@ -826,16 +826,20 @@ function orphaned(binaries, args) {
   });
 }
 
-// Starts the overlay over the run `pid` and resolves once it says its windows are on screen:
-// { pid, stopping, said, end }. `stopping` resolves with when the overlay said that Stop was
+// Starts the overlay over the run `pid`, with the click token `token`, and resolves once it
+// says its windows are on screen: { pid, keyRefused, stopping, said, end }. `keyRefused` is
+// why it couldn't claim the stop key, as it said before "shown", or null. `stopping` resolves with when the overlay said that Stop was
 // pressed ("stopping"), if it does. `said` resolves, once the overlay has ended and so taken
 // its windows down, with all else it said as it did and when it began to ({ text, at }), or
-// with null if it doesn't end in time. `end` ends one that is still up, which doesn't notify.
-async function showOverlay(binary, pid) {
-  const child = spawn(binary, [String(pid), TOKEN, path.basename(__filename)], { stdio: ["ignore", "pipe", "inherit"] });
+// with null if it doesn't end in time. `end` ends one that is still up, which doesn't notify,
+// by SIGTERM or the signal it is given.
+async function showOverlay(binary, pid, token = TOKEN) {
+  const child = spawn(binary, [String(pid), token, path.basename(__filename)], { stdio: ["ignore", "pipe", "inherit"] });
   const ended = new Promise((resolve) => child.on("exit", resolve));
   const line = linesOf(child);
-  if ((await line()) !== "shown") throw new Error("The overlay ended before its windows showed");
+  let [first, keyRefused] = [await line(), null];
+  while (first?.startsWith("no stop key: ")) [keyRefused, first] = [first.slice("no stop key: ".length), await line()];
+  if (first !== "shown") throw new Error("The overlay ended before its windows showed");
   let saidStopping;
   const stopping = new Promise((resolve) => { saidStopping = resolve; });
   // Read from now on, not when asked for, so that `at` is when the overlay said it.
@@ -855,10 +859,11 @@ async function showOverlay(binary, pid) {
   })();
   return {
     pid: child.pid,
+    keyRefused,
     stopping: () => stopping,
     said: () => within(OVERLAY_WAIT_MS, last),
-    async end() {
-      child.kill();
+    async end(signal = "SIGTERM") {
+      child.kill(signal);
       await ended;
     },
   };
@@ -1011,8 +1016,9 @@ async function earlyKeyFailures(binaries) {
 
 // The stop key pressed with another app in front, as Live is in a run (key-target.swift):
 // the pill shows the key, the key stops the run and that app doesn't get it while the overlay
-// is up. Once the overlay has gone, the key is that app's again.
-async function keyTargetFailures(binaries) {
+// is up. Once the overlay has gone, the key is that app's again. With `killed` the overlay
+// is killed (SIGKILL) before the key is pressed, which must then go to that app.
+async function keyTargetFailures(binaries, { killed = false } = {}) {
   fs.mkdirSync(FOLDER, { recursive: true });
   fs.writeFileSync(TOKEN, "");
   const run = startRun(binaries.helper);
@@ -1032,6 +1038,17 @@ async function keyTargetFailures(binaries) {
     overlay = await showOverlay(binaries.overlay, run.pid);
     const { texts } = JSON.parse(await tools.run(binaries.state, [overlay.pid]));
     const stopKeys = () => keys.filter((key) => key.key === binaries.stopKey.code).length;
+    const showsKey = !texts.includes(binaries.stopKey.symbols) && `the pill's texts were ${JSON.stringify(texts)}, with no ${JSON.stringify(binaries.stopKey.symbols)}`;
+    if (killed) {
+      await overlay.end("SIGKILL");
+      await pressStopKey(binaries);
+      await sleep(EVENT_WAIT_MS);
+      return [
+        showsKey,
+        stopKeys() !== 1 && `the app in front got the stop key ${stopKeys()} times once the overlay had been killed, not once`,
+        !fs.existsSync(TOKEN) && "the key removed the token with the overlay killed",
+      ].filter(Boolean);
+    }
     await pressStopKey(binaries);
     const stopping = await within(END_WAIT_MS, overlay.stopping());
     await sleep(EVENT_WAIT_MS);
@@ -1043,7 +1060,7 @@ async function keyTargetFailures(binaries) {
     await sleep(EVENT_WAIT_MS);
     const afterwards = stopKeys() - whileUp;
     return [
-      !texts.includes(binaries.stopKey.symbols) && `the pill's texts were ${JSON.stringify(texts)}, with no ${JSON.stringify(binaries.stopKey.symbols)}`,
+      showsKey,
       stopping === null && "the overlay didn't say that it was stopping after the key",
       tokenLeft && "the click token was still there after the key",
       whileUp && `the app in front got the stop key ${whileUp} times while the overlay was up`,
@@ -1057,6 +1074,47 @@ async function keyTargetFailures(binaries) {
     await targetEnded;
     await run.end();
     unlockToken();
+  }
+}
+
+// Two runs, each with its overlay and its own token: the first overlay holds the stop key, so
+// the second's exclusive claim is refused (ADR-0017). The second must say so before it shows,
+// show no key on its pill and still stop its run from its pill's Stop; one press of the key
+// must stop only the first run.
+async function twoOverlaysFailures(binaries) {
+  const second = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "pointer-guards-")), "token");
+  fs.mkdirSync(FOLDER, { recursive: true });
+  fs.writeFileSync(TOKEN, "");
+  fs.writeFileSync(second, "");
+  const runs = [startRun(binaries.helper), startRun(binaries.helper, false, second)];
+  const overlays = [];
+  try {
+    overlays.push(await showOverlay(binaries.overlay, runs[0].pid));
+    overlays.push(await showOverlay(binaries.overlay, runs[1].pid, second));
+    const texts = await Promise.all(overlays.map(async (overlay) => JSON.parse(await tools.run(binaries.state, [overlay.pid])).texts));
+    const refused = new RegExp(`^another program holds ${literal(binaries.stopKey.words)}$`);
+    await pressStopKey(binaries);
+    const firstStopping = await within(END_WAIT_MS, overlays[0].stopping());
+    const secondStopping = await within(EVENT_WAIT_MS, overlays[1].stopping());
+    const [firstTokenLeft, secondTokenLeft] = [fs.existsSync(TOKEN), fs.existsSync(second)];
+    let unpressed = "";
+    await tools.run(binaries.press, [overlays[1].pid]).catch((error) => { unpressed = error.message; });
+    const pillStopping = await within(END_WAIT_MS, overlays[1].stopping());
+    return [
+      overlays[0].keyRefused && `the first overlay couldn't claim the stop key: ${overlays[0].keyRefused}`,
+      !texts[0].includes(binaries.stopKey.symbols) && `the first pill's texts were ${JSON.stringify(texts[0])}, with no ${JSON.stringify(binaries.stopKey.symbols)}`,
+      !refused.test(overlays[1].keyRefused ?? "") && `the second overlay's claim wasn't refused as held by another program: it said ${JSON.stringify(overlays[1].keyRefused)}`,
+      texts[1].includes(binaries.stopKey.symbols) && `the second pill shows the stop key, which its overlay couldn't claim: ${JSON.stringify(texts[1])}`,
+      (firstStopping === null || firstTokenLeft) && "the key didn't stop the first run",
+      (secondStopping !== null || !secondTokenLeft) && "the key stopped the second run too",
+      unpressed && `Stop couldn't be pressed on the second pill: ${unpressed}`,
+      (pillStopping === null || fs.existsSync(second)) && "Stop on the second pill didn't stop its run",
+    ].filter(Boolean);
+  } finally {
+    for (const overlay of overlays) await overlay.end();
+    for (const run of runs) await run.end();
+    unlockToken();
+    fs.rmSync(path.dirname(second), { recursive: true, force: true });
   }
 }
 
@@ -1084,6 +1142,7 @@ async function failures(test, binaries) {
       stoppedAt = tokenWentAt() ?? stoppedAt;
     };
     const pressKey = async () => {
+      if (overlay.keyRefused) unpressed = `: the overlay couldn't claim the stop key (${overlay.keyRefused})`;
       stoppedAt = Date.now();
       await pressStopKey(binaries).catch((error) => { unpressed = `: ${error.message}`; });
       stoppedAt = tokenWentAt() ?? stoppedAt;
@@ -1223,6 +1282,9 @@ async function main() {
       + "then shown once the pill is listed, with the border left out and the pill reading Stopping", await earlyKeyFailures(binaries));
     report("the stop key with another app in front: the pill shows the key, the key stops the run, the app doesn't get it while the "
       + "overlay is up, and gets it once the overlay has gone", await keyTargetFailures(binaries));
+    report("the stop key with another app in front once the overlay has been killed (SIGKILL): the app gets it", await keyTargetFailures(binaries, { killed: true }));
+    report("two overlays: the second's claim on the stop key is refused, its pill shows no key and its Stop still works, and one press of "
+      + "the key stops only the first run", await twoOverlaysFailures(binaries));
   } finally {
     display.stop();
   }

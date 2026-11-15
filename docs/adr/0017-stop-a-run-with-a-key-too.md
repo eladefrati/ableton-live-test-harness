@@ -17,15 +17,17 @@ so reaching Stop means competing with the run for the pointer. A key needs no po
 ## Decision
 
 1. **A key presses Stop.** While the border's program runs, Control-Option-Command-Space is
-   Stop on its pill: the press goes to the pill's button through the button's own action, so
-   it does all that Stop does, in the same order. The token goes first; in Stop's last resort
+   Stop on its pill: the press is sent as the pill's button sends a click, through its action
+   to its target, so it does all that Stop does, in the same order. The token goes first; in Stop's last resort
    the run is signalled first. Then the pill reads Stopping, with the same cap and last resort
    (ADR-0012, ADR-0015). Once Stop is pressed, by the key or on the pill, the key does nothing
    more, as a press on Stopping does nothing.
-2. **The border's program claims it, with no permission.** It registers a system hot key
-   (`RegisterEventHotKey`) once the pill is made, before its windows show, and holds it until
-   it ends. The key then goes to it and to no app: Live doesn't get it while a run shows its
-   pill, and gets it again once the border's program has ended.
+2. **The border's program claims it, exclusively, with no permission.** It registers a
+   system hot key (`RegisterEventHotKey`, exclusive) once the pill is made, before its
+   windows show, and holds it until it ends, giving it up first as it does. The key then goes
+   to it and to no app or other program: Live doesn't get it while a run shows its pill, and
+   gets it again once the border's program has ended. A program that holds the key already
+   keeps it, and the claim fails.
 3. **The key is a choice, not a constraint.** One constant in `computer-use-overlay.swift`
    holds its key code and modifiers. The words the dialog uses and the hint on the pill are
    made from that constant, and so is the key that `checks/pointer-guards.js` presses. It is
@@ -37,9 +39,15 @@ so reaching Stop means competing with the run for the pointer. A key needs no po
    the pill, or the key, takes the mouse back. When it wasn't, the dialog says that there will
    be no Stop and no stop key.
 5. **A key that can't be claimed only goes without saying so on the pill.** The pill then
-   leaves its hint out, and the run warns and clicks on: Stop on the pill still stops it.
+   leaves its hint out, and the run warns and clicks on: Stop on the pill still stops it. So
+   it is for a second run on the Mac while a first shows its pill: one press stops the first
+   run only.
 
 ## Considered
+
+- **A shared claim.** Without the exclusive option a key claimed by two programs goes to
+  both, with no error to either: another program's action on the key would happen with
+  every Stop, a second run's pill would stop with the first's, and neither could be told.
 
 - **A global key monitor, an event tap or the keyboard's raw input.** Each needs
   Accessibility or Input Monitoring for the border's program. The program is built again
@@ -63,10 +71,10 @@ Probed on the remote Mac (macOS 26), with a stand-in app in front and keys poste
   the key. Once that program had ended, the app in front got the key.
 - It worked with a mouse button held down in the front app's window, the button-up still
   coming after, and with secure input on in the front app.
-- A key claimed by two programs went to both, with no error to either; claimed against
-  Spotlight's ⌘Space, it went to the program and Spotlight opened too. So a clash with
-  another app's shortcut can't be found: the other app's action happens as well. And one
-  press stops every run on the Mac that shows a pill.
+- Claimed without the exclusive option, a key claimed by two programs went to both, with no
+  error to either; claimed against Spotlight's ⌘Space, it went to the program and Spotlight
+  opened too. Spotlight's key is one of macOS's own shortcuts, not a hot key a program
+  registers, and the exclusive option isn't expected to keep it out; that wasn't tried.
 - A claimed plain Escape (key code 53) caught an Escape posted with no modifiers.
 
 Not proven:

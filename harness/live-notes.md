@@ -462,11 +462,11 @@ unexpected.
   down in the front app's window, 2 ms after it was posted, the button-up arriving after,
   and with secure input on in the front app. Claimed by two programs it went to both, with
   no error to either, and claimed against Spotlight's ⌘Space it went to the program and
-  Spotlight opened too: a clash with another app's shortcut can't be found, and one press
-  stops every run on the Mac that shows a pill. A claimed plain Escape caught an Escape
-  posted with no modifiers; the harness types its Escape, to close a menu, through System
-  Events, which wasn't tried (remote Mac, macOS 26, 2026-11-15). Not tried: a real
-  keyboard, and Live in front.
+  Spotlight opened too; that was without the exclusive option, with which the overlay now
+  claims the key, so that a program that holds it already makes the claim fail. A claimed
+  plain Escape caught an Escape posted with no modifiers; the harness types its Escape, to
+  close a menu, through System Events, which wasn't tried (remote Mac, macOS 26,
+  2026-11-15). Not tried: a real keyboard, and Live in front.
 - With no window server, as for a process with no desktop session, a program gets no session
   (`CGSessionCopyCurrentDictionary()` is nil), no screens, and windows that say they are
   visible and never show, all with no error; `display dialog` fails there with -1713, "No

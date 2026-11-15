@@ -295,11 +295,13 @@ async function showTarget(binary, options) {
 
 // Starts harness-computer-use's overlay over this check's process and resolves once its
 // windows are on screen: { end }, which ends it without a notification. Nothing presses its
-// Stop.
+// Stop, nor its stop key, so a line saying that it couldn't claim the key is passed over.
 async function showOverlay(binary) {
   const child = spawn(binary, [String(process.pid), TOKEN, path.basename(__filename)], { stdio: ["ignore", "pipe", "inherit"] });
   const ended = new Promise((resolve) => child.on("exit", resolve));
-  const first = await readline.createInterface({ input: child.stdout })[Symbol.asyncIterator]().next();
+  const lines = readline.createInterface({ input: child.stdout })[Symbol.asyncIterator]();
+  let first = await lines.next();
+  while (first.value?.startsWith("no stop key: ")) first = await lines.next();
   if (first.value !== "shown") throw new Error("The overlay ended before its windows showed");
   return {
     async end() {
