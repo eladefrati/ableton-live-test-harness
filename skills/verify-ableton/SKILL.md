@@ -144,11 +144,12 @@ windows with their ids, and `cli.js capture <png> --window <id>` captures one. A
 own window (its editor) shows only while Live is in front: open and capture it with
 `cli.js plugin-window <track> <device> <png>`, and press its controls with
 `openPluginWindow` (`harness/README.md`), never by clicking the device's title bar or with
-`screencapture` of your own. To show something change, record a video of Live's window with
-`cli.js video <mov> --seconds <n>`, or `cli.js video <mov> -- <command>` around a check, or
-`recordVideo` in a check's code; `--window <id>` records another of Live's windows, and
-`--screen` the whole display, for what the window leaves out, such as harness-computer-use's
-pill (`harness/README.md`). Before acting on a Live window, list Live's windows (System
+`screencapture` of your own. To show something change, record a video of Live's window around
+what changes it: `cli.js video -- <command>`, such as `-- node tests/live/<check>.js`, or
+`recordVideo` in a check's code; `cli.js video --seconds <n>` records for a length of time,
+from when it says `recording` on stderr. `--window <id>` records another of Live's windows,
+and `--screen` the whole display, for what the window leaves out: menus, dialogs and other
+windows over it, and harness-computer-use's pill (`harness/README.md`). Before acting on a Live window, list Live's windows (System
 Events) so a panel on top isn't missed. A dialog the Live API can't answer: capture it and
 ask the user, naming it.
 
@@ -160,8 +161,13 @@ Report the result in one line and show failures in full; the rest is in the run'
 "Run logs"). Where the evidence is on screen, a fixed state gets a still (`cli.js capture`)
 and a change over time one video (`cli.js video`), not a burst of stills. You can't watch a
 video: before calling one proof, save its frames from before and after the change with
-`cli.js video-frame <mov> <seconds> <png>`, look at them, and report the video with the
-times you checked and what each frame shows. A check that never failed proves little: when you add a
+`cli.js video-frame <mov> <seconds>`, look at them, and report the video with the times you
+checked and what each frame shows. A capture is proof to show once, not part of the project:
+give it no path, and it goes to the harness's captures folder, whose path the command
+prints. Give the user that path with "in Finder, press Cmd+Shift+G and paste this path", or
+open it for them, and delete it once they have watched it, unless they say to keep it. To
+keep one, move it to a path of theirs, or record it there from the start; the captures
+folder deletes what is older than 7 days. A check that never failed proves little: when you add a
 case, show it failing once on a wrong expectation. A Live fix is proven when the check that
 reproduced the bug passes twice, the second time with a different input, tempo or transport
 state; no more runs unless one fails. Where timing matters (steps, swing, note lengths), a
@@ -201,10 +207,10 @@ any command there from this Mac:
 ```
 
 It copies the working copies of the harness and `~/dev/<repo>` to the remote first, replacing what's there, then runs the
-command in `~/dev/<repo>` there; its exit status is the command's. Stills and videos taken
-there come back to this Mac when they are in `tests/live/captures/`: give that path,
-relative to the repo. They aren't committed: the project keeps that folder out of git with
-a line in its `.gitignore`; add one if it has none. A build made on the
+command in `~/dev/<repo>` there; its exit status is the command's. Stills, videos and frames
+taken there with no path come back to this Mac's captures folder, and `remote.sh` names each
+at its path here: show the user that path, not the remote's. Ctrl-C on `remote.sh` stops its
+`cli.js video` there too. A build made on the
 remote (a plug-in's, say) goes outside `~/dev/<repo>`, which the next run replaces; delete
 it when the work is done. The project's builds folder
 must be in the remote's Places (see "Running on a second Mac" in `harness/README.md`).
