@@ -31,8 +31,14 @@ let FINISH_SECONDS = 10.0
 // The process that started this one, taken first: the recording stops when it ends.
 let PARENT = getppid()
 
+// fputs, not FileHandle: with SIGPIPE ignored, FileHandle's write raises an exception, which
+// aborts this, when nothing reads stderr any more.
+func complain(_ message: String) {
+    fputs(message + "\n", stderr)
+}
+
 func fail(_ message: String) -> Never {
-    FileHandle.standardError.write(Data((message + "\n").utf8))
+    complain(message)
     exit(1)
 }
 
@@ -102,7 +108,7 @@ final class Recorder: NSObject, SCStreamDelegate, SCStreamOutput, SCRecordingOut
     // A window that closes ends the stream: the file is finished as on a stop, and the result
     // says why it ended early.
     func stream(_ stream: SCStream, didStopWithError error: Error) {
-        FileHandle.standardError.write(Data("The recording stopped: \(error.localizedDescription)\n".utf8))
+        complain("The recording stopped: \(error.localizedDescription)")
         DispatchQueue.main.async {
             self.early = error.localizedDescription
             if !self.stopping { self.awaitFinish() }

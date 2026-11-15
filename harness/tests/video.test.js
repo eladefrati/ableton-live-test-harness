@@ -474,3 +474,13 @@ test("the helper refuses arguments it can't use, with its usage, and a video it 
   assert.equal(missing.error?.code, 1);
   assert.match(missing.stderr, /^Can't read .*no-such-video\.mov as a video/);
 });
+
+test("the helper's errors end it with status 1 once nothing reads its stderr, as when its run has gone",
+  { skip: (!hasDeveloperTools && "no developer tools") || (before15 && "the helper needs macOS 15"), timeout: 300000 }, async () => {
+  const binary = await require("../tools.js").helperBinary(path.join(__dirname, "..", "video.swift"));
+  const child = spawn(binary, ["frame", path.join(os.tmpdir(), "no-such-video.mov"), "1", path.join(os.tmpdir(), "no-such-frame.png")],
+    { stdio: ["ignore", "ignore", "pipe"] });
+  child.stderr.destroy();
+  const [code, signal] = await new Promise((resolve) => child.on("exit", (...ended) => resolve(ended)));
+  assert.deepEqual({ code, signal }, { code: 1, signal: null });
+});
