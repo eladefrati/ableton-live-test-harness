@@ -65,7 +65,6 @@ struct Modifier {
 }
 let CONTROL = Modifier(mask: controlKey, name: "control", word: "Control", symbol: "\u{2303}")
 let OPTION = Modifier(mask: optionKey, name: "option", word: "Option", symbol: "\u{2325}")
-let SHIFT = Modifier(mask: shiftKey, name: "shift", word: "Shift", symbol: "\u{21E7}")
 let COMMAND = Modifier(mask: cmdKey, name: "command", word: "Command", symbol: "\u{2318}")
 // The key that stops the run as Stop on the pill does (ADR-0017). A choice, not a constraint:
 // changed here alone, it changes the pill's hint, the dialog's words and the key that
