@@ -1,13 +1,13 @@
 ---
 title: "ADR-0015: Keep the pill up, reading Stopping, while a stopped run ends"
-status: Accepted
+status: Accepted; extended by ADR-0017
 date: 2026-11-14
 ---
 
 # ADR-0015: Keep the pill up, reading Stopping, while a stopped run ends
 
-**Status:** Accepted. Supersedes, in ADR-0012 decision 5, what Stop takes down and when it
-says that the mouse is free.
+**Status:** Accepted; extended by ADR-0017. Supersedes, in ADR-0012 decision 5, what Stop
+takes down and when it says that the mouse is free.
 
 ## Context
 
