@@ -6,7 +6,9 @@
 // window of its own (pointer-target.swift), runs the helper against it, and compares how the
 // helper ended with the mouse events the window received. First it starts the overlay with
 // the process ids it must refuse for a run, and last over a run that has ended and that
-// nothing has waited for. The helper's click and drag at a window are run. Its click-editor
+// nothing has waited for. Stop is also pressed by its key (ADR-0017), posted as a keyboard's
+// events, and last the key is pressed with another app in front, which must not get it while
+// the overlay is up and must once it has gone. The helper's click and drag at a window are run. Its click-editor
 // and drag-editor aren't: they take only a window of Live's, whose editor they read from
 // Live through Accessibility. Nor is any command run with the screen locked. It takes the
 // pointer, so it
@@ -86,6 +88,8 @@ const folderGone = () => fs.rmSync(FOLDER, { recursive: true });
 const folderUnwritable = () => fs.chmodSync(FOLDER, 0o500);
 const tokenUnreadable = () => fs.chmodSync(TOKEN, 0o000);
 const stopPressed = (the) => the.pressStop();
+// Stop pressed by its key, as the overlay's --stop-key gives it.
+const keyPressed = (the) => the.pressKey();
 const helperSignalled = (the) => the.run.signalHelper("SIGUSR2");
 const runKilled = (the) => process.kill(the.run.pid, "SIGTERM");
 
@@ -120,7 +124,7 @@ const SAID_ENDED_RUN = new RegExp(`^${RUN_NAME} was ended: its click token could
 // may kill it, and to kill, 0 is the caller's own process group and -1 every process the user
 // may signal.
 const NO_RUNS = [0, -1];
-const OVERLAY_USAGE = "usage: computer-use-overlay <pid> <click-token> [<run>]";
+const OVERLAY_USAGE = "usage: computer-use-overlay <pid> <click-token> [<run>] | --stop-key";
 
 // How long the helper holds the button before a click's release, and after a drag's move
 // before its release (device-ui.swift).
@@ -595,6 +599,86 @@ const CASES = [
     says: SAID_RUN_ENDED,
     run: "SIGTERM",
   },
+  // The stop key does what Stop on the pill does, through the button's own action
+  // (ADR-0017): each case is one of Stop's above, with the key pressed in its place.
+  {
+    name: "the stop key during a click's hover, the helper frozen at its first move: it posts nothing more, "
+      + "the pill reads Stopping while the run goes on, and the overlay says Stopped once the run has ended",
+    overlay: true,
+    target: [...RECT, "--freeze", "move"],
+    loss: keyPressed,
+    command: click,
+    status: STOPPED,
+    stderr: stoppedError(),
+    moves: (x, y) => [firstMove(x, y)],
+    events: () => [],
+    stopping: "pill",
+    says: SAID_STOPPED,
+    afterRun: true,
+  },
+  {
+    name: "the stop key while a click holds the button, the helper frozen with it down: the click completes, the helper ends as stopped, "
+      + "saying the click had happened, the pill reads Stopping while the run goes on, and the overlay says Stopped once the run has ended",
+    overlay: true,
+    target: [...RECT, "--freeze", "down"],
+    loss: keyPressed,
+    command: click,
+    status: HAPPENED,
+    stderr: happened("click"),
+    upAfterStopMs: 0,
+    events: (x, y) => [{ type: "down", x, y }, { type: "up", x, y }],
+    stopping: "pill",
+    says: SAID_STOPPED,
+    afterRun: true,
+  },
+  {
+    name: "the stop key while a drag holds the button, before its move, the helper frozen with it down: the button comes up at the "
+      + "press point, with no drag event, the pill reads Stopping while the run goes on, and the overlay says Stopped once the run has ended",
+    overlay: true,
+    target: [...RECT, "--freeze", "down"],
+    loss: keyPressed,
+    command: drag,
+    status: STOPPED,
+    stderr: stoppedError(),
+    events: (x, y) => [{ type: "down", x, y }, { type: "up", x, y }],
+    stopping: "pill",
+    says: SAID_STOPPED,
+    afterRun: true,
+  },
+  {
+    name: "the stop key when the token can't be removed and the run ignores the signal: the border stays up and the pill reads "
+      + "Stopping, the run is killed 10 s after the key, not sooner, and only then does the overlay say that the run was ended",
+    overlay: true,
+    immutable: true,
+    deaf: true,
+    target: RECT,
+    stopped: true,
+    loss: keyPressed,
+    events: () => [],
+    stopping: "border",
+    says: SAID_ENDED_RUN,
+    afterRun: true,
+    killedMs: [KILL_AFTER_MS, KILL_AFTER_MS + KILL_SLACK_MS],
+    run: "SIGKILL",
+  },
+  // A second press that counted would signal the run again and give it 10 s more.
+  {
+    name: "the stop key pressed again, 5 s into Stop's last resort over a run that ignores the signal, with the pill reading Stopping: "
+      + "the run is still killed 10 s after the first press, not later, and the overlay says that the run was ended",
+    overlay: true,
+    immutable: true,
+    deaf: true,
+    target: RECT,
+    stopped: true,
+    loss: keyPressed,
+    againAfterMs: 5000,
+    againByKey: true,
+    events: () => [],
+    says: SAID_ENDED_RUN,
+    afterRun: true,
+    killedMs: [KILL_AFTER_MS, KILL_AFTER_MS + KILL_SLACK_MS],
+    run: "SIGKILL",
+  },
 ];
 
 // The overlay over a run that has ended and that its parent hasn't waited for: such a run
@@ -884,6 +968,98 @@ async function stoppingFailures(shows, overlay, binary) {
   ].filter(Boolean);
 }
 
+// Presses the stop key, as the overlay's --stop-key gives it (`binaries.stopKey`), with the
+// press-key options `extra`.
+const pressStopKey = (binaries, ...extra) => tools.run(binaries.key, [binaries.stopKey.code, ...binaries.stopKey.modifiers, ...extra]);
+
+// The stop key pressed as soon as the overlay has claimed it, before it says that its windows
+// are on screen: the overlay must take it as an early Stop on the pill (live-notes.md), saying
+// "stopping" first, then "shown" once the pill is listed, with the border left out and the
+// pill reading Stopping.
+async function earlyKeyFailures(binaries) {
+  fs.mkdirSync(FOLDER, { recursive: true });
+  fs.writeFileSync(TOKEN, "");
+  const run = startRun(binaries.helper);
+  const child = spawn(binaries.overlay, [String(run.pid), TOKEN, path.basename(__filename)], { stdio: ["ignore", "pipe", "inherit"] });
+  const ended = new Promise((resolve) => child.on("exit", resolve));
+  const line = linesOf(child);
+  try {
+    const unpressed = pressStopKey(binaries, "--until-gone", TOKEN).then(() => "", (error) => error.message);
+    const [first, second] = [await within(END_WAIT_MS, line()), await within(END_WAIT_MS, line())];
+    const why = await unpressed;
+    let shown = null;
+    try {
+      shown = JSON.parse(await tools.run(binaries.state, [child.pid]));
+    } catch (error) {
+      return [`what the overlay shows couldn't be read: ${error.message}`];
+    }
+    return [
+      why && `the stop key couldn't be pressed: ${why}`,
+      first !== "stopping" && `the overlay said ${JSON.stringify(first)} first, not "stopping": the key wasn't taken before its windows showed`,
+      second !== "shown" && `the overlay then said ${JSON.stringify(second)}, not "shown"`,
+      shown.windows.includes(OVERLAY_TITLE) && "the border was up once the token was gone",
+      !shown.windows.includes(PILL_TITLE) && "the pill wasn't on screen",
+      shown.button !== "Stopping" && `the pill's button read ${JSON.stringify(shown.button)}, not "Stopping"`,
+    ].filter(Boolean);
+  } finally {
+    child.kill();
+    await ended;
+    await run.end();
+    unlockToken();
+  }
+}
+
+// The stop key pressed with another app in front, as Live is in a run (key-target.swift):
+// the pill shows the key, the key stops the run and that app doesn't get it while the overlay
+// is up. Once the overlay has gone, the key is that app's again.
+async function keyTargetFailures(binaries) {
+  fs.mkdirSync(FOLDER, { recursive: true });
+  fs.writeFileSync(TOKEN, "");
+  const run = startRun(binaries.helper);
+  const target = spawn(binaries.keyTarget, [], { stdio: ["ignore", "pipe", "inherit"] });
+  const targetEnded = new Promise((resolve) => target.on("exit", resolve));
+  const keys = [];
+  let front = null;
+  readline.createInterface({ input: target.stdout }).on("line", (line) => {
+    const said = JSON.parse(line);
+    if ("front" in said) front = said.front;
+    else keys.push(said);
+  });
+  let overlay = null;
+  try {
+    for (const deadline = Date.now() + END_WAIT_MS; front === null && Date.now() < deadline;) await sleep(20);
+    if (!front) return [`key-target ${front === null ? "didn't say whether it" : "didn't"} take the front`];
+    overlay = await showOverlay(binaries.overlay, run.pid);
+    const { texts } = JSON.parse(await tools.run(binaries.state, [overlay.pid]));
+    const stopKeys = () => keys.filter((key) => key.key === binaries.stopKey.code).length;
+    await pressStopKey(binaries);
+    const stopping = await within(END_WAIT_MS, overlay.stopping());
+    await sleep(EVENT_WAIT_MS);
+    const whileUp = stopKeys();
+    const tokenLeft = fs.existsSync(TOKEN);
+    await run.end();
+    const said = await overlay.said();
+    await pressStopKey(binaries);
+    await sleep(EVENT_WAIT_MS);
+    const afterwards = stopKeys() - whileUp;
+    return [
+      !texts.includes(binaries.stopKey.symbols) && `the pill's texts were ${JSON.stringify(texts)}, with no ${JSON.stringify(binaries.stopKey.symbols)}`,
+      stopping === null && "the overlay didn't say that it was stopping after the key",
+      tokenLeft && "the click token was still there after the key",
+      whileUp && `the app in front got the stop key ${whileUp} times while the overlay was up`,
+      said === null && `the overlay was still up ${OVERLAY_WAIT_MS} ms after the run had ended`,
+      said !== null && !SAID_STOPPED.test(said.text) && `the overlay said ${JSON.stringify(said.text)}, not ${SAID_STOPPED}`,
+      afterwards !== 1 && `the app in front got the stop key ${afterwards} times once the overlay had gone, not once`,
+    ].filter(Boolean);
+  } finally {
+    if (overlay) await overlay.end();
+    target.kill();
+    await targetEnded;
+    await run.end();
+    unlockToken();
+  }
+}
+
 const sameEvents = (seen, expected) => seen.length === expected.length
   && expected.every((event, i) => Object.entries(event).every(([field, value]) => seen[i][field] === value));
 
@@ -907,9 +1083,14 @@ async function failures(test, binaries) {
       await tools.run(binaries.press, [overlay.pid, ...after]).catch((error) => { unpressed = `: ${error.message}`; });
       stoppedAt = tokenWentAt() ?? stoppedAt;
     };
+    const pressKey = async () => {
+      stoppedAt = Date.now();
+      await pressStopKey(binaries).catch((error) => { unpressed = `: ${error.message}`; });
+      stoppedAt = tokenWentAt() ?? stoppedAt;
+    };
     let lost = null;
     const lose = () => {
-      lost = Promise.resolve().then(() => (test.loss ?? tokenRemoved)({ run, pressStop })).then(() => { stoppedAt ??= Date.now(); });
+      lost = Promise.resolve().then(() => (test.loss ?? tokenRemoved)({ run, pressStop, pressKey })).then(() => { stoppedAt ??= Date.now(); });
       // Thrown once the helper has ended, not as an unhandled rejection in the timer below.
       lost.catch(() => {});
       return lost;
@@ -923,7 +1104,7 @@ async function failures(test, binaries) {
     // Stop pressed a second time: when the press returned, or why it couldn't be made.
     let [againAt, unpressedAgain] = [null, ""];
     const again = test.againAfterMs
-      && sleep(test.againAfterMs).then(() => tools.run(binaries.press, [overlay.pid]))
+      && sleep(test.againAfterMs).then(() => (test.againByKey ? pressStopKey(binaries) : tools.run(binaries.press, [overlay.pid])))
         .then(() => { againAt = Date.now(); }, (error) => { unpressedAgain = error.message; });
     // The helper the target froze. The run is stopped then, and the helper goes on once the
     // token is gone, or STOP_WAIT_MS later: whatever fails, it isn't left frozen.
@@ -1019,11 +1200,13 @@ async function main() {
   const binaries = {};
   const sources = {
     helper: "device-ui", target: "checks/pointer-target", overlay: "computer-use-overlay", press: "checks/press-stop", orphan: "checks/run-orphaned",
-    state: "checks/overlay-state",
+    state: "checks/overlay-state", key: "checks/press-key", keyTarget: "checks/key-target",
   };
   for (const [name, source] of Object.entries(sources)) {
     binaries[name] = await tools.helperBinary(path.join(HARNESS, `${source}.swift`));
   }
+  // The key the overlay claims, from the one place that holds it.
+  binaries.stopKey = JSON.parse(await tools.run(binaries.overlay, ["--stop-key"]));
   // The helper refuses while the display sleeps: the session reports the screen locked.
   const display = await mac.keepDisplayOn();
   const report = (name, failed) => {
@@ -1036,6 +1219,10 @@ async function main() {
     }
     for (const test of CASES) report(test.name, await failures(test, binaries));
     for (const test of UNREAPED) report(test.name, await unreapedFailures(test, binaries));
+    report("the stop key pressed before the overlay says that its windows are on screen is taken as an early Stop: it says stopping, "
+      + "then shown once the pill is listed, with the border left out and the pill reading Stopping", await earlyKeyFailures(binaries));
+    report("the stop key with another app in front: the pill shows the key, the key stops the run, the app doesn't get it while the "
+      + "overlay is up, and gets it once the overlay has gone", await keyTargetFailures(binaries));
   } finally {
     display.stop();
   }

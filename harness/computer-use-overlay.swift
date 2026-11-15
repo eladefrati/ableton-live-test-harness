@@ -8,15 +8,25 @@
 // the run has ended. A run still going END_SECONDS after Stop is left running if its token
 // is gone, and the overlay ends; one that was signalled is killed, and the overlay ends once
 // it has gone (ADR-0015).
+// The stop key, STOP_KEY, is Stop on the pill while this program runs (ADR-0017): a press
+// is a press on the pill's button, through its action, and no app gets the key meanwhile.
+// The pill shows the key beside its Stop.
 // The glow lets every click through; nothing here takes the front.
 //
 //   computer-use-overlay <pid> <click-token> [<run>]
+//   computer-use-overlay --stop-key
+//
+// With --stop-key it prints the stop key as JSON and ends: {"code", "modifiers", "words",
+// "symbols"}, its key code, its modifiers' names, and the key in words and in symbols, for
+// the dialog shown before the border and for the check that presses it. It needs no window
+// server.
 //
 // A <pid> of 0 or below is refused with the usage, as one that is no number is: Stop's last
 // resort signals <pid> and kills it if it stays, and to kill, 0 is this program's own
 // process group and -1 every process the user may signal.
 //
-// Prints "shown" once the window server lists its windows, "stopping" once Stop is pressed
+// Prints "no stop key: <why>" first if it couldn't claim the stop key, which the pill then
+// doesn't show; "shown" once the window server lists its windows, "stopping" once Stop is pressed
 // and has removed the token or signalled the run, and, as it ends, the message it notifies.
 // A Stop that removes the token before "shown" takes the glow down: "shown" then follows
 // "stopping", once the pill is listed.
@@ -28,6 +38,7 @@
 // program owns. It doesn't skip the pill, which takes clicks.
 
 import AppKit
+import Carbon.HIToolbox
 
 let OVERLAY_TITLE = "harness-computer-use overlay"
 let PILL_TITLE = "harness-computer-use pill"
@@ -47,8 +58,27 @@ func fail(_ message: String) -> Never {
     exit(1)
 }
 
+// The modifiers a stop key may have, in the order macOS names them: each one's mask for a
+// hot key, and its name, word and symbol.
+let MODIFIERS: [(name: String, mask: Int, word: String, symbol: String)] = [
+    ("control", controlKey, "Control", "\u{2303}"), ("option", optionKey, "Option", "\u{2325}"),
+    ("shift", shiftKey, "Shift", "\u{21E7}"), ("command", cmdKey, "Command", "\u{2318}")]
+// The key that stops the run as Stop on the pill does (ADR-0017). A choice, not a constraint:
+// changed here alone, it changes the pill's hint, the dialog's words and the key that
+// checks/pointer-guards.js presses. Space is in one place on every keyboard layout, and
+// nothing in Live's shortcut list uses these modifiers together.
+let STOP_KEY = (code: kVK_Space, name: "Space", modifiers: ["control", "option", "command"])
+let STOP_MODIFIERS = MODIFIERS.filter { STOP_KEY.modifiers.contains($0.name) }
+let STOP_KEY_WORDS = (STOP_MODIFIERS.map { $0.word } + [STOP_KEY.name]).joined(separator: "-")
+let STOP_KEY_SYMBOLS = STOP_MODIFIERS.map { $0.symbol }.joined() + STOP_KEY.name
+
 let arguments = CommandLine.arguments
-guard (3...4).contains(arguments.count), let pid = pid_t(arguments[1]), pid > 0 else { fail("usage: computer-use-overlay <pid> <click-token> [<run>]") }
+if arguments.count == 2 && arguments[1] == "--stop-key" {
+    let key: [String: Any] = ["code": STOP_KEY.code, "modifiers": STOP_MODIFIERS.map { $0.name }, "words": STOP_KEY_WORDS, "symbols": STOP_KEY_SYMBOLS]
+    print(String(data: try! JSONSerialization.data(withJSONObject: key), encoding: .utf8)!)
+    exit(0)
+}
+guard (3...4).contains(arguments.count), let pid = pid_t(arguments[1]), pid > 0 else { fail("usage: computer-use-overlay <pid> <click-token> [<run>] | --stop-key") }
 let token = arguments[2]
 let run = arguments.count == 4 ? arguments[3] : ""
 let RUN_ENDED = "\(run.isEmpty ? "The run" : run) has ended: the mouse is yours again."
@@ -236,14 +266,37 @@ final class Stopper: NSObject {
 }
 let stopper = Stopper(target: pid, token: token, name: run)
 
+// The pill's Stop, which the stop key presses.
+var stopButton: NSButton?
+
+// Claims the stop key as a system hot key, which needs no permission: while this program
+// holds it, the key comes here and goes to no app. A press calls the action of the pill's
+// Stop, as a click on it does; once pressed, that does nothing more. Another program that
+// claims the same key gets it too, with no error to either (ADR-0017). Resolves with why it
+// couldn't, or nil once it has.
+func claimStopKey() -> String? {
+    var pressed = EventTypeSpec(eventClass: OSType(kEventClassKeyboard), eventKind: UInt32(kEventHotKeyPressed))
+    let handled = InstallEventHandler(GetApplicationEventTarget(), { _, _, _ in
+        MainActor.assumeIsolated { if let stopButton { stopper.stop(stopButton) } }
+        return noErr
+    }, 1, &pressed, nil, nil)
+    guard handled == noErr else { return "InstallEventHandler returned \(handled)" }
+    var hotKey: EventHotKeyRef?
+    let mask = STOP_MODIFIERS.reduce(0) { $0 | $1.mask }
+    let claimed = RegisterEventHotKey(UInt32(STOP_KEY.code), UInt32(mask), EventHotKeyID(signature: 0x68637573, id: 1),
+                                      GetApplicationEventTarget(), 0, &hotKey)
+    return claimed == noErr ? nil : "RegisterEventHotKey returned \(claimed)"
+}
+
 // A panel that takes a click without taking the front from the app in front.
 final class PillPanel: NSPanel {
     override var canBecomeKey: Bool { false }
     override var canBecomeMain: Bool { false }
 }
 
-// A dark frosted pill: a pulsing dot, harness-computer-use and the run, and Stop.
-func pill(on screen: NSScreen) -> NSPanel {
+// A dark frosted pill: a pulsing dot, harness-computer-use and the run, and Stop, with the
+// stop key before it, dim, if `key`.
+func pill(on screen: NSScreen, key: Bool) -> NSPanel {
     let text = NSTextField(labelWithAttributedString: {
         let line = NSMutableAttributedString(string: "harness-computer-use", attributes: [
             .font: NSFont.systemFont(ofSize: 13, weight: .semibold), .foregroundColor: NSColor.white])
@@ -277,8 +330,13 @@ func pill(on screen: NSScreen) -> NSPanel {
     stop.wantsLayer = true
     stop.layer?.backgroundColor = NSColor.white.withAlphaComponent(0.14).cgColor
     stop.layer?.cornerRadius = 12
-    let (height, pad, dot, gap) = (38.0, 16.0, 8.0, 10.0)
-    let width = pad + dot + gap + text.frame.width + 14 + stop.frame.width + 7
+    stopButton = stop
+    let hint = key ? NSTextField(labelWithAttributedString: NSAttributedString(string: STOP_KEY_SYMBOLS, attributes: [
+        .font: NSFont.systemFont(ofSize: 12), .foregroundColor: NSColor.white.withAlphaComponent(0.45)])) : nil
+    hint?.sizeToFit()
+    let (height, pad, dot, gap, hintGap) = (38.0, 16.0, 8.0, 10.0, 8.0)
+    let hintWidth = hint.map { $0.frame.width + hintGap } ?? 0
+    let width = pad + dot + gap + text.frame.width + 14 + hintWidth + stop.frame.width + 7
     let panel = PillPanel(contentRect: NSRect(x: screen.frame.minX + (screen.frame.width - width) / 2,
                                               y: screen.visibleFrame.maxY - PILL_MARGIN - height, width: width, height: height),
                           styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
@@ -317,6 +375,10 @@ func pill(on screen: NSScreen) -> NSPanel {
     view.addSubview(text)
     stop.setFrameOrigin(NSPoint(x: width - 7 - stop.frame.width, y: (height - stop.frame.height) / 2))
     view.addSubview(stop)
+    if let hint {
+        hint.setFrameOrigin(NSPoint(x: stop.frame.minX - hintGap - hint.frame.width, y: (height - hint.frame.height) / 2))
+        view.addSubview(hint)
+    }
     panel.contentView = view
     return panel
 }
@@ -324,6 +386,12 @@ func pill(on screen: NSScreen) -> NSPanel {
 let app = NSApplication.shared
 app.setActivationPolicy(.accessory)
 if NSScreen.screens.isEmpty { fail("there is no screen to show on") }
+// The stop key before the windows show: a press is taken from as soon as Stop can be.
+let keyRefused = claimStopKey()
+if let keyRefused {
+    print("no stop key: \(keyRefused)")
+    fflush(stdout)
+}
 
 // One glow window per screen, above everything but the cursor, on every Space; the pill above
 // the glow on the main screen.
@@ -342,7 +410,7 @@ for screen in NSScreen.screens {
     breathe(glow.layer, from: 1, to: 0.55, seconds: 2.2)
     window.contentView = glow
     windows.append(window)
-    if screen == NSScreen.main { windows.append(pill(on: screen)) }
+    if screen == NSScreen.main { windows.append(pill(on: screen, key: keyRefused == nil)) }
 }
 windows.forEach { $0.orderFrontRegardless() }
 

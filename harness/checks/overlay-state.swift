@@ -3,9 +3,10 @@
 //
 //   overlay-state <pid>
 //
-// Prints {"windows", "button"}: the titles of the overlay's windows on screen, as the window
-// server lists them, and the label of the pill's button, as Accessibility gives it. The
-// label is null if the overlay shows no button, or doesn't answer within ANSWER_SECONDS: a
+// Prints {"windows", "button", "texts"}: the titles of the overlay's windows on screen, as the
+// window server lists them, the label of the pill's button and the pill's texts, such as its
+// stop key, as Accessibility gives them. The label is null, and the texts are empty, if the
+// overlay shows no button, or doesn't answer within ANSWER_SECONDS: a
 // program answers Accessibility on its main thread, so one whose main thread is held up
 // gives none.
 
@@ -30,6 +31,12 @@ func button(in element: AXUIElement, depth: Int) -> AXUIElement? {
     return (attribute(element, kAXChildrenAttribute) as? [AXUIElement] ?? []).lazy.compactMap { button(in: $0, depth: depth - 1) }.first
 }
 
+func texts(in element: AXUIElement, depth: Int) -> [String] {
+    if attribute(element, kAXRoleAttribute) as? String == kAXStaticTextRole { return [attribute(element, kAXValueAttribute) as? String ?? ""] }
+    guard depth > 0 else { return [] }
+    return (attribute(element, kAXChildrenAttribute) as? [AXUIElement] ?? []).flatMap { texts(in: $0, depth: depth - 1) }
+}
+
 let arguments = CommandLine.arguments
 guard arguments.count == 2, let pid = pid_t(arguments[1]), pid > 0 else { fail("usage: overlay-state <pid>") }
 guard AXIsProcessTrusted() else { fail("Reading the pill's button needs Accessibility for the terminal app") }
@@ -38,5 +45,5 @@ let titles = list.filter { $0[kCGWindowOwnerPID as String] as? Int == Int(pid) }
 let overlay = AXUIElementCreateApplication(pid)
 AXUIElementSetMessagingTimeout(overlay, ANSWER_SECONDS)
 let label = button(in: overlay, depth: 6).flatMap { attribute($0, kAXDescriptionAttribute) as? String }
-let shown: [String: Any] = ["windows": titles, "button": label ?? NSNull()]
+let shown: [String: Any] = ["windows": titles, "button": label ?? NSNull(), "texts": texts(in: overlay, depth: 6)]
 print(String(data: try! JSONSerialization.data(withJSONObject: shown), encoding: .utf8)!)

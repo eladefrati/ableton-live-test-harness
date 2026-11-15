@@ -278,12 +278,13 @@ function runName(script = runScript()) {
 
 // Asks the person at this Mac whether the run may click; true only for Allow. Don't Allow is
 // the cancel button, which osascript reports as error -128. `border` is whether the border
-// was built: with none, the person is told so before they answer (ADR-0012). Exported for the
+// was built: with none, the person is told so before they answer (ADR-0012). `key` is the
+// border's stop key in words, or null if it couldn't be read (ADR-0017). Exported for the
 // tests.
-async function askToClick(script, border) {
+async function askToClick(script, border, key) {
   const text = `harness-computer-use wants to click in Live on this Mac${script ? ` for ${script}` : ""}. `
-    + (border ? "It moves the pointer until the run ends, while a purple glow shows around the screen."
-      : "It moves the pointer until the run ends. Nothing on screen will show that it may take the pointer, and there will be no Stop.");
+    + (border ? `It moves the pointer until the run ends, while a purple glow shows around the screen.${key ? ` Stop on its pill, or ${key}, takes the mouse back.` : ""}`
+      : "It moves the pointer until the run ends. Nothing on screen will show that it may take the pointer, and there will be no Stop and no stop key.");
   const dialog = [
     "on run argv",
     "  activate",
@@ -305,6 +306,18 @@ async function askToClick(script, border) {
 // process ends, then a notification. It watches this process itself, so it goes also when the
 // run is killed.
 const OVERLAY_SOURCE = path.join(__dirname, "computer-use-overlay.swift");
+
+// The border's stop key in words (ADR-0017), as its program gives it (`--stop-key`), which
+// holds the key in one place; null if the program can't say, and the dialog then doesn't
+// name a key. Exported for the tests.
+async function stopKeyOf(binary) {
+  try {
+    const { words } = JSON.parse(await tools.run(binary, ["--stop-key"]));
+    return typeof words === "string" && words ? words : null;
+  } catch {
+    return null;
+  }
+}
 
 // What a run that Stop on its pill stopped says, and its helper.
 const STOPPED_FROM_PILL = "harness-computer-use was stopped from its pill: this run clicks no more";
@@ -402,7 +415,8 @@ async function buildComputerUse() {
 // Starts the overlay and resolves once it says its windows are on screen. Rejects with the
 // reason the overlay gives if it ends before that, and ends it and rejects if it says nothing
 // for `shownMs`. One that goes later, however it ends, while the run goes on and wasn't
-// stopped, is warned of: the person has lost the pill and its Stop. Nothing of the overlay
+// stopped, is warned of: the person has lost the pill and its Stop. So is one that says,
+// before it shows, that it couldn't claim its stop key (ADR-0017). Nothing of the overlay
 // keeps this process running.
 async function showComputerUse(binary, { shownMs = OVERLAY_SHOWN_MS } = {}) {
   const run = runName();
@@ -430,6 +444,8 @@ async function showComputerUse(binary, { shownMs = OVERLAY_SHOWN_MS } = {}) {
     overlay.stderr.destroy();
     overlay.unref();
   }
+  const keyRefused = /^no stop key: (.*)$/m.exec(said);
+  if (keyRefused) console.error(`warn harness-computer-use couldn't claim its stop key (${keyRefused[1]}). Stop on its pill still stops the run`);
   // Not after Stop, when the run clicks no more.
   const gone = (code, signal) => {
     if (!stopped()) console.error(`warn harness-computer-use's border has gone (${signal ?? `status ${code}`}). The run clicks without it`);
@@ -446,7 +462,7 @@ const hostname = () => os.hostname().replace(/\.local$/, "");
 const machine = {
   hostname,
   clickHost: () => readClickHost(),
-  ask: (border) => askToClick(runName(), border),
+  ask: async (overlay) => askToClick(runName(), overlay !== null, overlay && await stopKeyOf(overlay)),
   buildComputerUse,
   showComputerUse,
   stopped,
@@ -521,7 +537,7 @@ async function permit(system) {
     const host = system.hostname();
     if (host !== system.clickHost()) {
       const overlay = await system.buildComputerUse();
-      if (!(await system.ask(overlay !== null))) throw new DeviceUiError(`Clicks in Live on ${host} weren't allowed (ADR-0006). Not clicked`);
+      if (!(await system.ask(overlay))) throw new DeviceUiError(`Clicks in Live on ${host} weren't allowed (ADR-0006). Not clicked`);
       if (overlay) await system.showComputerUse(overlay).catch((error) => warnNoBorder(error.message));
     }
     allowed.add(system);
@@ -940,5 +956,5 @@ async function openPluginWindow(live, { track, device, size, controls = {} }, sy
 module.exports = {
   DeviceUiError, openDeviceUi, openPluginWindow, captureWindow, liveWindows, liveMainWindow, readControls, readPanelWidth, pointControls, controlPoint,
   findTitle, infoTitle, readClickHost, hostname, runName, runScript, MEASURED_DEVICES, POINTER_CALLS, MACHINE_CALLS,
-  stopped, clickToken, buildComputerUse, showComputerUse, askToClick,
+  stopped, clickToken, buildComputerUse, showComputerUse, askToClick, stopKeyOf,
 };
