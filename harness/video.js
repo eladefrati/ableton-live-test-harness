@@ -48,6 +48,7 @@ const machine = {
   mainWindow: () => liveMainWindow(),
   windows: () => liveWindows(),
   binary: () => tools.helperBinary(HELPER_SOURCE),
+  frontmost: () => mac.frontmostApp(),
   spawn,
   say: (text) => console.error(text),
 };
@@ -97,11 +98,16 @@ async function recordVideo(file, { window, screen = false, seconds = MAX_SECONDS
   // Built first: a first build can take most of a minute, long enough for the display to
   // sleep again, and a recording started with it asleep makes no file.
   const binary = await system.binary();
-  // wakeDisplay's own message speaks of bringing Live to the front, which a recording doesn't
-  // do; it stays as the cause.
-  await system.wake().catch((error) => {
-    throw new VideoError("The display couldn't be woken for the recording. Waking it needs Automation for System Events "
-      + "for the terminal app: System Settings > Privacy & Security > Automation", { cause: error });
+  // Waking waits for System Events to name the frontmost app, and gives up the same way whether
+  // the display stayed asleep or System Events refused the terminal app: asked again, it says
+  // which.
+  await system.wake().catch(async (error) => {
+    const refused = await system.frontmost().then(() => null, (e) => (/-1743|Not authorized to send Apple events/.test(e.message) ? e : null));
+    if (refused) {
+      throw new VideoError(`The display couldn't be woken for the recording: System Events refused the terminal app (${refused.message}). `
+        + "Allow it under System Settings > Privacy & Security > Automation", { cause: error });
+    }
+    throw new VideoError(`The display couldn't be woken for the recording: ${error.message}`, { cause: error });
   });
   let target;
   if (screen) {

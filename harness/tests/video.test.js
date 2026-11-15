@@ -49,6 +49,7 @@ function fakeSystem(helper, { release = "25.6.0", windows = [{ id: 7, title: "Se
     mainWindow: async () => { calls.push("mainWindow"); return { id: 7 }; },
     windows: async () => { calls.push("windows"); return windows; },
     binary: async () => { calls.push("binary"); return helper.file; },
+    frontmost: async () => "com.example.app",
     spawn: (...args) => spawn(...args),
   };
 }
@@ -151,12 +152,22 @@ test("the helper is built before the display is woken, and the window looked up 
   await video.stop();
 });
 
-test("a display that can't be woken is refused with a reason that fits a recording, naming the permission it needs", async (t) => {
+test("a display that can't be woken is refused, saying why", async (t) => {
   const helper = fakeHelper(t, RECORDS_UNTIL_SIGINT);
   const system = fakeSystem(helper);
   system.wake = async () => { throw new Error("No app is frontmost 3000 ms after declaring user activity; Live can't be brought to the front"); };
   await assert.rejects(recordVideo(out(helper), {}, system), (e) => e instanceof VideoError
-    && /couldn't be woken for the recording/.test(e.message) && /Automation for System Events/.test(e.message) && !/brought to the front/.test(e.message));
+    && /^The display couldn't be woken for the recording: No app is frontmost 3000 ms/.test(e.message) && !/Automation/.test(e.message));
+});
+
+test("a display that can't be woken because System Events refuses the terminal app names the permission it needs", async (t) => {
+  const helper = fakeHelper(t, RECORDS_UNTIL_SIGINT);
+  const system = fakeSystem(helper);
+  system.wake = async () => { throw new Error("No app is frontmost 3000 ms after declaring user activity; Live can't be brought to the front"); };
+  system.frontmost = async () => { throw new Error("execution error: Not authorized to send Apple events to System Events. (-1743)"); };
+  await assert.rejects(recordVideo(out(helper), {}, system), (e) => e instanceof VideoError
+    && /couldn't be woken for the recording/.test(e.message) && /Not authorized to send Apple events to System Events/.test(e.message)
+    && /Privacy & Security > Automation/.test(e.message));
 });
 
 test("a recording given a length ends by itself: done() resolves with the file's length and size", async (t) => {
