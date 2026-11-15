@@ -7,8 +7,10 @@
 //
 // The modifiers are control, option, shift and command. With --hold it holds them down for
 // <ms> before the key, as a person's fingers take a moment to reach it. With --until-gone it
-// presses the key every 10 ms until <file> is gone, for up to UNTIL_SECONDS, for a press that must come
-// as soon as the overlay has claimed the key, and exits 1 if the file is still there.
+// holds the modifiers down and presses the key every 20 ms until <file> is gone, for up to
+// UNTIL_SECONDS, for a press that must come as soon as the overlay has claimed the key, and
+// exits 1 if the file is still there. Only the key repeats: the whole chord every 10 ms, 800
+// events a second, held up the overlay's start by more than 3 s (live-notes.md).
 // Exits 1, posting nothing, if the terminal app may not post events (Accessibility).
 
 import ApplicationServices
@@ -53,32 +55,42 @@ func post(_ key: CGKeyCode, down: Bool, flags: CGEventFlags, modifier: Bool) {
     event.flags = flags
     event.post(tap: .cghidEventTap)
 }
-func press() {
+// The modifiers held as they are pressed in turn, all of them once all are down.
+let allHeld = modifiers.reduce(CGEventFlags()) { $0.union($1.flag) }
+func holdModifiers() {
     var held = CGEventFlags()
     for modifier in modifiers {
         held.insert(modifier.flag)
         post(modifier.code, down: true, flags: held, modifier: true)
     }
-    usleep(hold)
-    post(code, down: true, flags: held, modifier: false)
-    post(code, down: false, flags: held, modifier: false)
+}
+func releaseModifiers() {
+    var held = allHeld
     for modifier in modifiers.reversed() {
         held.remove(modifier.flag)
         post(modifier.code, down: false, flags: held, modifier: true)
     }
 }
+func tapKey() {
+    post(code, down: true, flags: allHeld, modifier: false)
+    post(code, down: false, flags: allHeld, modifier: false)
+}
 
+holdModifiers()
 if let until {
     let deadline = Date().addingTimeInterval(UNTIL_SECONDS)
     while FileManager.default.fileExists(atPath: until) {
         if Date() > deadline {
+            releaseModifiers()
             usleep(SETTLE_MICROSECONDS)
             fail("\(until) was still there \(Int(UNTIL_SECONDS)) s after the key was first pressed")
         }
-        press()
-        usleep(10_000)
+        tapKey()
+        usleep(20_000)
     }
 } else {
-    press()
+    usleep(hold)
+    tapKey()
 }
+releaseModifiers()
 usleep(SETTLE_MICROSECONDS)
