@@ -199,7 +199,7 @@ setInterval(() => {}, 1000);
 const { spawn } = require("node:child_process");
 const { runVideoCommand } = require(${JSON.stringify(path.join(__dirname, "..", "video.js"))});
 const system = { startedMs: 5000, release: () => "25.6.0", wake: async () => {}, mainWindow: async () => ({ id: 7 }),
-  windows: async () => [], binary: async () => ${JSON.stringify(helper.file)}, spawn };
+  windows: async () => [], binary: async () => ${JSON.stringify(helper.file)}, spawn, say: () => {} };
 runVideoCommand({ file: ${JSON.stringify(at("video.mov"))}, screen: true, command: [process.execPath, ${JSON.stringify(at("command.js"))}] }, system)
   .then((result) => { process.exitCode = result.status; });
 `);
@@ -213,6 +213,26 @@ runVideoCommand({ file: ${JSON.stringify(at("video.mov"))}, screen: true, comman
   const command = JSON.parse(fs.readFileSync(at("command.json"), "utf8"));
   assert.equal(command.count, 1, "the command got one SIGINT");
   assert.ok(Number(fs.readFileSync(at("stopped"), "utf8")) >= command.at, "the recording was stopped after the command ended");
+});
+
+test("the video command says on stderr when it has started recording, and where to", async (t) => {
+  const helper = fakeHelper(t, RECORDS_UNTIL_SIGINT);
+  const system = fakeSystem(helper);
+  let saidBeforeCommand;
+  const marker = path.join(helper.folder, "said");
+  system.say = (text) => { system.said.push(text); fs.writeFileSync(marker, text); };
+  await runVideoCommand({ file: out(helper), screen: true,
+    command: [process.execPath, "-e", `process.exit(require("node:fs").existsSync(${JSON.stringify(marker)}) ? 0 : 9)`] }, system)
+    .then((result) => { saidBeforeCommand = result.status === 0; });
+  assert.equal(system.said[0], `recording ${out(helper)}`);
+  assert.ok(saidBeforeCommand, "said before the command started");
+  const timed = fakeHelper(t, `
+console.log("recording");
+setTimeout(() => { console.log(JSON.stringify({ seconds: 0.2, bytes: 10 })); process.exit(0); }, 200);
+`);
+  const timedSystem = fakeSystem(timed);
+  await runVideoCommand({ file: out(timed), seconds: 0.2, screen: true }, timedSystem);
+  assert.deepEqual(timedSystem.said, [`recording ${out(timed)}`]);
 });
 
 test("a recording around a command that fails as it stops still returns the command's status, and says why it failed", async (t) => {

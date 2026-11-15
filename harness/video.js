@@ -166,13 +166,16 @@ async function recordVideo(file, { window, screen = false, seconds = MAX_SECONDS
   };
 }
 
-// `cli.js video`: records until `command` ends, if one is given (its exit status is returned
-// as `status`), or until the length given, Ctrl-C or SIGTERM. The command runs in a process
+// `cli.js video`: says "recording <file>" on stderr once it records, then records until
+// `command` ends, if one is given (its exit status is returned as `status`), or until the
+// length given, Ctrl-C or SIGTERM. The command runs in a process
 // group of its own, with no input: each Ctrl-C, SIGTERM or SIGHUP the run gets reaches it
 // once, from here, and the recording goes on until it has ended. A recording that fails as it
 // stops is reported as `error`, with the command's status still returned.
 async function runVideoCommand({ file, seconds, window, screen, command = [] }, system = machine) {
   const video = await recordVideo(file, { seconds, window, screen }, system);
+  // Until this line, what happens isn't in the video.
+  system.say(`recording ${video.file}`);
   if (command.length === 0) {
     const stop = () => video.stop().catch(() => {});
     process.once("SIGINT", stop);
