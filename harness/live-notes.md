@@ -503,6 +503,27 @@ unexpected.
   pressing the stop key holds its modifiers first, so a click in flight then can reach Live
   as a Control-Option-Command click. The Escape that closes a menu after Stop now waits until
   no modifier is held, for 2 s at most, and isn't typed if one still is (ADR-0017).
+  `checks/pointer-guards.js` measured it again with a click, a drag and Shift alone: every
+  event, the hover's two moves included, carried the modifiers held, and the keyboard's
+  state, read by the target window as each event arrived, still read them held; with
+  nothing held, none either way (one run, the same day).
+- Trap: a posted mouse event with its modifiers cleared lets go of the keys a person holds,
+  for every app. With the helper clearing the modifier flags on every mouse event, keeping
+  only the non-coalesced flag, its events carried none while Control, Option and Command, or
+  Shift alone, were held (posted as key events), but the keyboard's state
+  (`CGEventSource.flagsState(.combinedSessionState)`, read by the target window as each event
+  arrived) read none held from the hover's first move to the button-up, in a click and a
+  drag. The same came of events made from a private event source (`.privateState`), and of
+  events made from the HID system state and posted at the session tap instead of the HID
+  tap (`checks/pointer-guards.js`, one run each, remote Mac, macOS 26, 2026-11-15). So the
+  helper builds its events from the keyboard's state as they are, carrying what is held.
+  Not tried: whether a real keyboard's next event reads the keys held again.
+- Which modifiers change a drag on one of Live's own knobs: Auto Filter's Dry/Wet, dragged
+  10 points up from 0.5 by `device-ui.js` with a modifier held (posted as key events by
+  `checks/press-key.swift`), the helper's events carrying it. Nothing held turned 10 steps
+  (0.5 to 0.5794), Shift 1 step (0.5079), Command 10 steps, and Control and Option none
+  (0.5 both); no menu was left on screen after (one run each, remote Mac, Live 12.4.25b1,
+  macOS 26, 2026-11-15).
 - Trap: a posted key event (`CGEvent` from the HID system state, at the HID tap) that carries
   modifiers as its flags leaves them held, for every app and every later posted event, until
   their release is posted. After `press-key` pressed F13 that way with Control, Option and
