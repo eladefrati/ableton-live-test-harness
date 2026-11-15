@@ -199,28 +199,36 @@ Node 18 or later. See [ADR-0001](../docs/adr/0001-fork-abletonosc.md) for the de
   280 MB for a window and 450 MB for the screen; more movement costs more. It builds the
   helper first, then wakes the display, and keeps it on while it records: a display that
   sleeps leaves the video on its last picture. The recording stops after `seconds` (10
-  minutes if not given), on `stop()`, or when the run's process ends, however it ends, and
-  the file is whole each time: a run that fails or is killed still leaves the video up to
-  then, and need not wait for it. The helper runs in a process group of its own, so Ctrl-C
-  on the run doesn't reach it: the run stops it. A plug-in's own window shows only while
+  minutes if not given), on `stop()`, when the run's process ends, however it ends, or when
+  nothing reads the run's stderr any more, as when the ssh session of a run on the remote
+  ends (the run itself goes on), and the file is whole each time: a run that fails or is
+  killed still leaves the video up to then, and need not wait for it. The helper runs in a
+  session of its own, a process group with no terminal, so Ctrl-C on the run doesn't reach
+  it: the run stops it. A plug-in's own window shows only while
   Live is in front (ADR-0008), so recording it needs Live in front throughout.
   `videoFrame(file, seconds, png)` saves the frame the video shows at that time and resolves
   with `{file, at, w, h, seconds}`, the last the video's length: how an agent, which can't
-  watch a video, sees what it shows. With no `png` it is `<video's name>-<seconds>s.png` in
-  the captures folder. Both need macOS 15 or later, refused below with that reason; the
+  watch a video, sees what it shows. With no `png` it goes to the captures folder, named as
+  other captures are: the time, then `<video's name>-<seconds>s.png`. Both need macOS 15 or later, refused below with that reason; the
   helper (`video.swift`) is built with `swiftc` on first use, as the click helper is. A
   recording also needs what "What Live needs" lists for it.
-- `captures.js`: where a still, a video or a frame given no path goes: the captures folder,
-  `ableton-harness-captures` in the system temp folder, apart from the harness's temp folder
-  that `relaunch.js` and `quit.js` empty, named by the local time and what it shows. A capture
-  is proof to show once, not part of a project, so no project keeps a folder or a
-  `.gitignore` line for one. macOS doesn't clear unused files from that temp folder within
-  days: on macOS 26, whose clean-up (`dirhelper`) is set to 3 days, files more than 3 days
-  old by both their times were still there after its daily runs. So each new capture's path
-  deletes the captures there older than 7 days. A video being recorded there is marked (`.<name>.recording`, with
-  the recorder's process id) and left alone. A path the caller gives is used as given, and
-  nothing deletes it. `node harness/captures.js finished` lists the folder's finished
-  captures, for `remote.sh`.
+- `captures.js`: where a capture given no path goes, from `cli.js`'s `capture`,
+  `plugin-window`, `video` and `video-frame` and from `recordVideo` and `videoFrame`: the
+  captures folder, `ableton-harness-captures` in the system temp folder, apart from the
+  harness's temp folder that `relaunch.js` and `quit.js` empty, named by the local time and
+  what it shows. `captureWindow` and `ui.capture` take a path; code that wants one of theirs
+  in the folder saves it with `saveCapture(name, ext, write)`. A capture is proof to show
+  once, not part of a project, so no project keeps a folder or a `.gitignore` line for one.
+  macOS doesn't clear unused files from that temp folder within days: on macOS 26, whose
+  clean-up (`dirhelper`) is set to 3 days, files more than 3 days old by both their times
+  were still there after its daily runs. So each capture saved there deletes, once it is
+  saved, the captures there older than 7 days: one left there lasts until a capture is saved
+  more than 7 days after it. A capture is written in the folder's hidden `.unfinished`
+  folder and moved out once it is finished, a video by its helper, so a file in the captures
+  folder itself is whole (a folder, as `screencapture` refuses a file name that starts with a
+  dot). A path the caller gives outside the folder is used as given, and nothing deletes it;
+  one inside it follows the folder's rules. `node harness/captures.js finished` lists the
+  folder's finished captures, for `remote.sh`.
 - `doctor.js`: read-only check that Live is ready to be driven; run it first. What it
   checks and what to do about each line: the
   [`verify-ableton` skill](../skills/verify-ableton/SKILL.md).
@@ -290,12 +298,15 @@ Node 18 or later. See [ADR-0001](../docs/adr/0001-fork-abletonosc.md) for the de
   `recording <file>` on stderr once it records, and nothing before that line is in the video;
   then it records until the command after `--` ends, the `--seconds` given, Ctrl-C or SIGTERM,
   10 minutes at most without `--seconds`, and prints `{file, seconds, bytes}`, with `early`
-  when it ended before it was stopped. With a command, the command runs in a process group of
-  its own with no input: each Ctrl-C, SIGTERM or SIGHUP `video` gets reaches it once, the
-  recording goes on until it has ended, and `video` exits with the command's status, adding it
-  as `status`; a recording that fails as it stops is reported as `error`, the status kept. It
-  needs no OSC, so it runs around a check, which is the way to record one: `node
-  harness/cli.js video -- node tests/live/<check>.js`. `video-frame` saves the frame a video
+  when it ended before it was stopped. With a command, the command runs in a session of its
+  own with no input: each Ctrl-C, SIGTERM, SIGHUP or SIGQUIT `video` gets reaches the
+  command's whole process group once, as a terminal's would, the recording goes on until the
+  command has ended, and `video` exits with the command's status, adding it as `status`; a
+  recording that fails as it stops is reported as `error`, the status kept. When `video`
+  ends, however it ends short of SIGKILL, what is left of the command's group gets SIGTERM.
+  It needs no OSC, so it runs around a check, which is the way to record one; from a
+  project's repo, `node ~/dev/ableton-live-test-harness/harness/cli.js video -- node
+  tests/live/<check>.js`. `video-frame` saves the frame a video
   shows at a time, in seconds (`videoFrame`). `capture`, `plugin-window`, `video` and
   `video-frame` given no file save to the captures folder (`captures.js`), and each prints the
   file's path.
@@ -424,23 +435,26 @@ Node 18 or later. See [ADR-0001](../docs/adr/0001-fork-abletonosc.md) for the de
   on the click host, with Live open; it brings Live to the front, deletes its track at the
   end, and takes about 80 s.
 - `checks/video-record.js [--out <folder>]`: checks `video.js` and its helper in Live. With
-  Live playing, so its window changes, it records Live's main window and the main display
-  for 4 s; a video around a command that runs 3 s and exits 3 (the status must come back);
-  one around a command given Ctrl-C after 2 s, as a terminal gives it, to the run's whole
-  process group, which takes 1 s to clean up and exits 5 (the command must get one SIGINT,
-  the status must come back, and the video must hold the clean-up); one that `cli.js video`
-  stops on SIGTERM after 3 s (it must exit 0 and finish the file); one of a window that
+  Live playing, so its window changes, it records Live's main window, and the main display
+  with Live in front, for 4 s; a video around a command that runs 3 s and exits 3 (the
+  status must come back); one around a command given Ctrl-C after 2 s, as a terminal gives
+  it, to the run's whole process group, which takes 1 s to clean up and exits 5 (the command
+  must get one SIGINT, the status must come back, the video must hold the clean-up, and a
+  `cli.js video` still running 15 s after fails the case); one that `cli.js video` stops on
+  SIGTERM after 3 s (it must exit 0 and finish the file); one whose run's stderr closes after
+  2 s, as an ssh session's does when it ends (the recording must end then); one of a window that
   closes after 2 s (a panel of its own, `checks/pointer-target.swift`: the result must say it
   ended early); and one whose run is killed after 3 s (its helper must end within 15 s, the
   file whole and 3 s long). Each video must be within 0.6 s of its length (the one around
   the command within 1.2 s over it, the Ctrl-C one at least 2.4 s), a window's frames the
   window's size at the display's scale, and each must have a frame at each time checked,
-  saved beside it; each frame of a video that moved must differ from the one before, so a
-  video that froze, as one does while the display sleeps, fails. It also runs `cli.js video`,
-  `capture` and `video-frame` with no file: each must save to the captures folder and say
+  saved beside it; the frames of a video that moved, at each second and 0.25 s before its
+  end, must each differ from the one before, so a video that froze, as one does while the
+  display sleeps, fails. It also runs `cli.js video`, `capture` and `video-frame` with no
+  file: each must save to the captures folder, moved out of its unfinished folder, and say
   where; it deletes what they saved. The frames are for looking at: with `--out` the videos
   and frames are kept in that folder, otherwise deleted. Leaves the transport stopped; takes
-  about 55 s.
+  about 70 s.
 
 Project checks live in each project's repo, in `tests/live/`, and use this folder as a
 library by path. Checks of a MIDI device run on `device-checks.js`; checks of audio or a
@@ -504,9 +518,10 @@ remote with no path come back too, from its captures folder to this Mac's (`capt
 only finished ones, not a video still being recorded, and none whose name this Mac's folder
 has already, which stays on the remote and is said so; `remote.sh` names each one it brings
 back, at its path here. A path given on the remote stays there. Ctrl-C or SIGTERM on
-`remote.sh` ends it and its ssh, and nothing reaches the remote: the run there goes on to its
-end, and a recording there ends with its command, its `--seconds` or the 10-minute cap. Its
-logs and captures stay there and come back after the next run. There is no lock; the slot rule below is what keeps two runs apart.
+`remote.sh` ends it and its ssh, and no signal reaches the remote: the run there goes on to
+its end. A recording there stops when the ssh session ends, as nothing reads the run's
+stderr any more (`video.js`), and its file is finished. The run's logs and captures stay
+there and come back after the next run. There is no lock; the slot rule below is what keeps two runs apart.
 
 The remote only runs checks. Its copies are mirrors, replaced on every run, `.git` included:
 never edit or commit in them, since the next run discards the work. Changes are made and
@@ -541,8 +556,8 @@ must stay off there: waking doesn't reliably dismiss it.
   permission above.
 - For `video.js` and `cli.js video`: macOS 15 or later, Screen Recording for the terminal app,
   and Automation for System Events, which wakes the display first, as for `capture`; for
-  `video-frame`, macOS 15 or later only. A recording that can't wake the display says which
-  permission it needs.
+  `video-frame`, macOS 15 or later only. A recording that can't wake the display says why,
+  and names the Automation permission when System Events refused the terminal app.
 - For a plug-in's own window (`openPluginWindow`, `cli.js plugin-window`): Accessibility for
   the terminal app too, and a Live that names its device view over Accessibility, as Live
   12.4 does (seen in 12.4.25b1; earlier versions not tried). Without it the window isn't

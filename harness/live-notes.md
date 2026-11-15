@@ -515,7 +515,17 @@ unexpected.
   helper keeps the display from sleeping while it records, though only from idle sleep: a
   display put to sleep on purpose (`pmset displaysleepnow`) during a recording of the helper's
   still slept, and the video froze from then on, which `checks/video-record.js` catches by
-  comparing frames (remote Mac, macOS 26.7, Live 12.4.25b1, 2026-11-14).
+  comparing frames (remote Mac, macOS 26.7, Live 12.4.25b1, 2026-11-14). The forced sleep
+  took effect late: sent 2.7 s or 3.3 s into a 4 s recording of Live's window, it left no
+  two frames alike up to 0.25 s before the end, in 2 of 2.
+- An ssh session that ends, its local ssh killed as Ctrl-C on `remote.sh` kills it, sends
+  the command it ran no signal: the command runs on, and only the other end of its stdout
+  and stderr is gone. With the helper watching the run's stderr, a `cli.js video --seconds
+  60` whose ssh was killed about 11 s in stopped then, leaving a whole 9.95 s video (remote
+  Mac, macOS 26.7, 2026-11-14).
+- `screencapture` refuses a file name that starts with a dot ("cannot write file to intended
+  destination") and still exits 0; a file in a hidden folder it writes (remote Mac, macOS
+  26.7, 2026-11-14).
 - `ui.capture` crops its capture of Live's window with the helper's `crop`, as a capture of
   a plug-in's editor does, no longer with `sips`. The helper's crop gave its PNG no
   resolution, which reads as 72 dpi, where the capture has 144 and a crop by `sips` kept

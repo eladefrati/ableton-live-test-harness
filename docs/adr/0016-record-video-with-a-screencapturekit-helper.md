@@ -28,10 +28,12 @@ and it marks every run log as made with uncommitted changes.
 1. **A Swift helper records with ScreenCaptureKit** (`harness/video.swift`, built with `swiftc`
    like the harness's other helpers) and writes the file through `SCRecordingOutput`: H.264 in
    a `.mov`, at most 30 frames a second, the pointer included. It says when the file has
-   started, and stops on SIGINT, SIGTERM or SIGHUP, after a length of time, or when the process
-   that started it ends, finishing the file each time. It runs in a process group of its own,
-   so Ctrl-C on a run reaches the run, which stops it: a recording around a command ends after
-   the command, not at Ctrl-C.
+   started, and stops on SIGINT, SIGTERM or SIGHUP, after a length of time, when the process
+   that started it ends, or when nothing reads that process's stderr any more, as when the ssh
+   session of a run on the remote ends, finishing the file each time. It runs in a session of
+   its own, so Ctrl-C on a run reaches the run, which stops it: a recording around a command
+   ends after the command, not at Ctrl-C. The command runs in a session of its own too, and
+   each signal the run gets reaches the command's whole process group once.
 2. **Live's main window by default,** or another of Live's windows by its id, recorded alone as
    `screencapture -l` captures it: behind other windows, without harness-computer-use's border
    and pill. **The whole main display on request,** for what the window leaves out: the menus,
@@ -46,11 +48,13 @@ and it marks every run log as made with uncommitted changes.
 6. **Captures given no path go to a folder of the harness's own in the system temp folder,**
    `ableton-harness-captures` (`harness/captures.js`), apart from the harness's temp folder,
    which a relaunch empties; this applies to stills too. A path the caller gives is used as
-   given, and nothing deletes it. macOS doesn't clear unused files from the temp folder within
-   days (on macOS 26 its clean-up is set to 3 days, and files older than that by both their
-   times were still there after its daily runs), so each new capture's path deletes the
-   captures there older than 7 days. `remote.sh` brings the remote's finished captures back
-   to this Mac's folder, overwriting nothing: a video still being recorded is marked and left.
+   given, and nothing deletes it, unless it is in that folder. macOS doesn't clear unused
+   files from the temp folder within days (on macOS 26 its clean-up is set to 3 days, and
+   files older than that by both their times were still there after its daily runs), so each
+   capture saved there deletes, once it is saved, the captures there older than 7 days. A
+   capture is written in a hidden folder there and moved out once it is finished, a video by
+   its helper, so `remote.sh` brings back the remote's finished captures to this Mac's
+   folder, overwriting nothing, and leaves one still being written.
 
 ## Considered
 
@@ -66,6 +70,13 @@ and it marks every run log as made with uncommitted changes.
 - **Captures in a project's `tests/live/captures/`,** brought back by `remote.sh` like logs.
   Every project would need the folder kept out of git, and an untracked capture marked each
   run log as made with uncommitted changes.
+- **A mark beside a video being recorded, naming its recorder's process,** for `remote.sh`
+  to leave it. A process id reused by another process kept a finished video marked; a hidden
+  folder needs no process id.
+- **`remote.sh` stopping the remote's recordings itself on Ctrl-C or SIGTERM,** from a shell
+  trap. zsh ran the trap only once its ssh had ended, which SIGTERM sent to `remote.sh` alone
+  doesn't do, and moving the run's logs and captures then took them from a check still
+  writing them. The recorder watching the run's stderr needs neither.
 
 ## Consequences
 
@@ -74,8 +85,9 @@ and it marks every run log as made with uncommitted changes.
   on an Intel Mac, 0.46 and 0.75 on an Apple-silicon one; a recording run to the 10-minute
   cap reaches about 280 MB for a window and 450 MB for the screen there. More movement costs
   more.
-- A capture left in the captures folder is deleted after 7 days; one to keep is moved out of
-  it, or made at a path of the person's from the start.
+- A capture left in the captures folder is deleted once a capture is saved there more than 7
+  days after it; one to keep is moved out of it, or made at a path of the person's from the
+  start.
 - A plug-in's own window shows only while Live is in front (ADR-0008), so recording it needs
   Live in front throughout.
 - Developer tools are needed on the Mac that records, as for the click helper.

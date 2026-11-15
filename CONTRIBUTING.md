@@ -24,7 +24,12 @@ those two refuse. Before a commit that changes `harness/video.swift`, `harness/v
 `harness/macos.js`, which find the window a recording takes and wake the display for it, also
 run `node harness/checks/video-record.js` with Live open: the unit tests run `video.js` on a
 stand-in for its helper, and the helper only where it refuses its arguments or a video it
-can't read, so only this check records.
+can't read, so only this check records. Before a commit that changes `harness/remote.sh`,
+the unit tests run it against two local folders (`harness/tests/remote.test.js`, with
+stand-ins for `ssh` and `rsync`); also run it once against the remote with a command that
+leaves a capture there, `harness/remote.sh ableton-live-test-harness node harness/cli.js
+capture` with the remote's Live open, and check that it brings the capture back and names
+it: only that run uses ssh and the remote's shell.
 A commit that changes how Live behaves
 under the harness, or what the harness refuses, adds it to `harness/live-notes.md` in the same commit: the next reader reads that file, not
 code comments or commit messages.
