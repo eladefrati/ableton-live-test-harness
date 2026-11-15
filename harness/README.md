@@ -419,11 +419,13 @@ Node 18 or later. See [ADR-0001](../docs/adr/0001-fork-abletonosc.md) for the de
   must not get it while the overlay is up, and must once the overlay has said its last
   words, while it still waits for its notification, and once it was killed (SIGKILL). With two overlays up, each over a run of its own, the
   second's claim on the key must be refused: its pill shows no key and its Stop still
-  stops its run, and one press of the key stops only the first run. A click the helper
-  posts while the key's modifiers are held, before the key (`press-key --hold`, with F13
-  in place of Space), carries them, as `checks/pointer-target.swift` reports each event's
-  modifiers: a measurement of the cost ADR-0017 accepts, after which the modifiers are let
-  go of whatever happened (`press-key --release`). After every case that presses the key,
+  stops its run, and one press of the key stops only the first run. A click and a drag the
+  helper posts while the key's modifiers are held, before the key (`press-key --hold`, with
+  F13 in place of Space), and a click while Shift alone is, carry them on their button
+  events, while the keyboard's state still reads them held as each event arrives, as
+  `checks/pointer-target.swift` reports both: a measurement of the cost ADR-0017 accepts,
+  after which the modifiers are let go of whatever happened (`press-key --release`). A click
+  with nothing held carries none. After every case that presses the key,
   and once more at the end, no modifier key may be left held. First of
   all the overlay is started with the process id 0, and with -1, for its run: it must
   refuse, saying nothing and exiting 1 with its usage. After every case it is started over a run

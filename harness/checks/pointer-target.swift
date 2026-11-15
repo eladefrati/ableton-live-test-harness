@@ -9,9 +9,10 @@
 // Prints {"window", "x", "y", "w", "h"} once the panel is on screen and no notification's
 // banner covers the screen, which the helper would wait out, then one line per mouse
 // event a window of its receives: {"type": "move" | "down" | "drag" | "up", "window", "x", "y",
-// "dx", "dy", "flags", "at"}, the event's position in points from the screen's top left, its
-// delta fields, the modifier keys it carries (shift, control, option, command) and when it
-// was received, in ms. With
+// "dx", "dy", "flags", "held", "at"}, the event's position in points from the screen's top
+// left, its delta fields, the modifier keys it carries (shift, control, option, command), those
+// the keyboard's state reads as held as it is received, which an app may read instead of the
+// event's, and when it was received, in ms. With
 // --cover it shows a second window over the panel when the pointer first moves in it. With
 // --return it moves the pointer back to where the button went down at every drag event, as a
 // knob of one of Live's devices does after an event with a vertical part. When the button goes
@@ -50,6 +51,7 @@ func now() -> Double { Date().timeIntervalSince1970 * 1000 }
 // The modifier keys an event may carry, by name.
 let MODIFIER_NAMES: [(flag: CGEventFlags, name: String)] = [
     (.maskShift, "shift"), (.maskControl, "control"), (.maskAlternate, "option"), (.maskCommand, "command")]
+func names(_ flags: CGEventFlags) -> [String] { MODIFIER_NAMES.filter { flags.contains($0.flag) }.map { $0.name } }
 
 final class Pad: NSView {
     var onFirstMove: (() -> Void)?
@@ -84,7 +86,7 @@ final class Pad: NSView {
         guard let posted = event.cgEvent else { return }
         printJSON(["type": type, "window": window?.windowNumber ?? -1, "x": posted.location.x, "y": posted.location.y,
                    "dx": posted.getIntegerValueField(.mouseEventDeltaX), "dy": posted.getIntegerValueField(.mouseEventDeltaY),
-                   "flags": MODIFIER_NAMES.filter { posted.flags.contains($0.flag) }.map { $0.name }, "at": now()])
+                   "flags": names(posted.flags), "held": names(CGEventSource.flagsState(.combinedSessionState)), "at": now()])
     }
 }
 

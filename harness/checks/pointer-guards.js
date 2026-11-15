@@ -1073,41 +1073,52 @@ async function keyTargetFailures(binaries, { killed = false } = {}) {
 // A key no app answers, pressed in place of the stop key's own where only its modifiers count.
 const F13 = 105;
 // How long a person may hold the stop key's modifiers before reaching its key, and how far
-// into that the helper's click starts.
+// into that the helper's gesture starts.
 const HOLD_MS = 1000;
-const CLICK_INTO_HOLD_MS = 200;
+const GESTURE_INTO_HOLD_MS = 200;
 
-// A click the helper posts while a person holds the stop key's modifiers, before their key
-// (ADR-0017): the helper builds its events from the keyboard's state as it is, so its click's
-// events carry the modifiers held then (`carries`). This measures a cost ADR-0017 accepts,
-// not what the harness wants: a helper that cleared its events' modifiers would change it.
-// No overlay runs, and F13 is pressed in place of the key, which would otherwise go to the
-// app in front. Whatever happens, the modifiers are let go of at the end.
-async function heldModifiersFailures(binaries, carries) {
+// A gesture the helper posts (`command`, a click or a drag at the target) while a person holds
+// the modifier keys `held`, as one holds the stop key's before its key (ADR-0017): the helper
+// builds its events from the keyboard's state, so its button events carry the modifiers held
+// then, and the keyboard's state must still read them held as each event arrives. This
+// measures a cost ADR-0017 accepts: an event posted with its modifiers cleared lets go of the
+// person's keys for every app (live-notes.md). A hover's moves carried them in one run and not
+// in another, so they are left out. With nothing held, nothing is pressed: the control, whose
+// events carry none. No overlay runs, and F13 is pressed in place of the key, which would
+// otherwise go to the app in front. Whatever happens, the modifiers are let go of at the end.
+async function heldModifiersFailures(binaries, held, command) {
   fs.mkdirSync(FOLDER, { recursive: true });
   fs.writeFileSync(TOKEN, "");
   const run = startRun(binaries.helper);
   const target = await showTarget(binaries.target, RECT);
   const [x, y] = [target.x + target.w / 2, target.y + target.h / 2];
+  const same = (names, wanted) => [...names].sort().join() === [...wanted].sort().join();
   let printed = [];
   try {
-    const held = tools.run(binaries.key, [F13, ...binaries.stopKey.modifiers, "--hold", HOLD_MS]).then(() => "", (error) => error.message);
-    await sleep(CLICK_INTO_HOLD_MS);
-    const ended = await run.helper(click(target.window, x, y));
-    const unpressed = await held;
+    const pressed = held.length
+      ? tools.run(binaries.key, [F13, ...held, "--hold", HOLD_MS]).then(() => "", (error) => error.message)
+      : Promise.resolve("");
+    if (held.length) await sleep(GESTURE_INTO_HOLD_MS);
+    const ended = await run.helper(command(target.window, x, y));
+    const unpressed = await pressed;
     await sleep(EVENT_WAIT_MS);
     printed = await target.end();
-    const buttons = printed.filter((event) => event.type === "down" || event.type === "up");
-    const carried = buttons.map((event) => `${event.type} [${event.flags.join(", ")}]`).join(", ");
+    const events = printed.filter((event) => "type" in event);
+    const buttonEvents = events.filter((event) => event.type !== "move");
+    const buttons = buttonEvents.map((event) => event.type).join(", ");
+    const wantedButtons = command === drag ? "down, drag, up" : "down, up";
+    const listed = (key, list = events) => list.map((event) => `${event.type} [${event[key].join(", ")}]`).join(", ");
     return [
       unpressed && `the modifiers couldn't be held: ${unpressed}`,
       ended.status !== 0 && `the helper exited ${ended.status}${ended.stderr && `, with "${ended.stderr}"`}`,
-      buttons.length !== 2 && `the target received ${JSON.stringify(buttons)}, not one down and one up`,
-      !buttons.every((event) => [...event.flags].sort().join() === [...carries].sort().join()) && `the click's events carried ${carried}, not [${carries.join(", ")}]`,
+      buttons !== wantedButtons && `the target received the button events ${buttons || "none"}, not ${wantedButtons}`,
+      !events.some((event) => event.type === "move") && "the target received no move of the hover",
+      !buttonEvents.every((event) => same(event.flags, held)) && `the button events carried ${listed("flags", buttonEvents)}, not [${held.join(", ")}]`,
+      !events.every((event) => same(event.held, held)) && `the keyboard read held, as each event arrived, ${listed("held")}, not [${held.join(", ")}]`,
     ].filter(Boolean);
   } finally {
     if (!printed.length) await target.end();
-    await tools.run(binaries.key, [F13, ...binaries.stopKey.modifiers, "--release"]).catch(() => {});
+    if (held.length) await tools.run(binaries.key, [F13, ...held, "--release"]).catch(() => {});
     await run.end();
     unlockToken();
   }
@@ -1333,7 +1344,15 @@ async function main() {
     await withKey("the stop key with another app in front: the pill shows the key, the key stops the run, the app doesn't get it while the "
       + "overlay is up, and gets it once the overlay has gone", keyTargetFailures(binaries));
     await withKey("the stop key with another app in front once the overlay has been killed (SIGKILL): the app gets it", keyTargetFailures(binaries, { killed: true }));
-    await withKey("a click the helper posts while a person holds the stop key's modifiers carries them", heldModifiersFailures(binaries, binaries.stopKey.modifiers));
+    const modifiers = binaries.stopKey.modifiers;
+    for (const [name, held, command] of [
+      ["a click the helper posts while a person holds the stop key's modifiers", modifiers, click],
+      ["a drag the helper posts while a person holds the stop key's modifiers", modifiers, drag],
+      ["a click the helper posts while a person holds Shift", ["shift"], click],
+    ]) {
+      await withKey(`${name} carries them on its button events, and the keyboard still reads them held`, heldModifiersFailures(binaries, held, command));
+    }
+    report("a click the helper posts with no modifier key held carries none on its button events, and the keyboard reads none held", await heldModifiersFailures(binaries, [], click));
     await withKey("two overlays: the second's claim on the stop key is refused, its pill shows no key and its Stop still works, and one press of "
       + "the key stops only the first run", twoOverlaysFailures(binaries));
     report("no modifier key is held at the end of the check", await leftHeld(binaries));
