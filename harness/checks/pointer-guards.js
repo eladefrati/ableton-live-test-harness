@@ -1034,6 +1034,46 @@ async function keyTargetFailures(binaries, { killed = false } = {}) {
   }
 }
 
+// A key no app answers, pressed in place of the stop key's own where only its modifiers count.
+const F13 = 105;
+// How long a person may hold the stop key's modifiers before reaching its key, and how far
+// into that the helper's click starts.
+const HOLD_MS = 1000;
+const CLICK_INTO_HOLD_MS = 200;
+
+// A click the helper posts while a person holds the stop key's modifiers, before their key
+// (ADR-0017): the helper builds its events from the keyboard's state as it is, so its click's
+// events carry the modifiers held then (`carries`). No overlay runs, and F13 is pressed in
+// place of the key, which would otherwise go to the app in front.
+async function heldModifiersFailures(binaries, carries) {
+  fs.mkdirSync(FOLDER, { recursive: true });
+  fs.writeFileSync(TOKEN, "");
+  const run = startRun(binaries.helper);
+  const target = await showTarget(binaries.target, RECT);
+  const [x, y] = [target.x + target.w / 2, target.y + target.h / 2];
+  let printed = [];
+  try {
+    const held = tools.run(binaries.key, [F13, ...binaries.stopKey.modifiers, "--hold", HOLD_MS]).then(() => "", (error) => error.message);
+    await sleep(CLICK_INTO_HOLD_MS);
+    const ended = await run.helper(click(target.window, x, y));
+    const unpressed = await held;
+    await sleep(EVENT_WAIT_MS);
+    printed = await target.end();
+    const buttons = printed.filter((event) => event.type === "down" || event.type === "up");
+    const carried = buttons.map((event) => `${event.type} [${event.flags.join(", ")}]`).join(", ");
+    return [
+      unpressed && `the modifiers couldn't be held: ${unpressed}`,
+      ended.status !== 0 && `the helper exited ${ended.status}${ended.stderr && `, with "${ended.stderr}"`}`,
+      buttons.length !== 2 && `the target received ${JSON.stringify(buttons)}, not one down and one up`,
+      !buttons.every((event) => event.flags.join() === carries.join()) && `the click's events carried ${carried}, not [${carries.join(", ")}]`,
+    ].filter(Boolean);
+  } finally {
+    if (!printed.length) await target.end();
+    await run.end();
+    unlockToken();
+  }
+}
+
 // Two runs, each with its overlay and its own token: the first overlay holds the stop key, so
 // the second's exclusive claim is refused (ADR-0017). The second must say so before it shows,
 // show no key on its pill and still stop its run from its pill's Stop; one press of the key
@@ -1246,6 +1286,7 @@ async function main() {
     report("the stop key with another app in front: the pill shows the key, the key stops the run, the app doesn't get it while the "
       + "overlay is up, and gets it once the overlay has gone", await keyTargetFailures(binaries));
     report("the stop key with another app in front once the overlay has been killed (SIGKILL): the app gets it", await keyTargetFailures(binaries, { killed: true }));
+    report("a click the helper posts while a person holds the stop key's modifiers carries them", await heldModifiersFailures(binaries, binaries.stopKey.modifiers));
     report("two overlays: the second's claim on the stop key is refused, its pill shows no key and its Stop still works, and one press of "
       + "the key stops only the first run", await twoOverlaysFailures(binaries));
   } finally {

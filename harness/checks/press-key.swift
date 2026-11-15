@@ -3,10 +3,11 @@
 // would come in. It presses harness-computer-use's stop key (computer-use-overlay.swift,
 // ADR-0017), given as the overlay's --stop-key gives it.
 //
-//   press-key <code> <modifier>... [--until-gone <file>]
+//   press-key <code> <modifier>... [--until-gone <file>] [--hold <ms>]
 //
-// The modifiers are control, option, shift and command. With --until-gone it presses the
-// key every 10 ms until <file> is gone, for up to UNTIL_SECONDS, for a press that must come
+// The modifiers are control, option, shift and command. With --hold it holds them down for
+// <ms> before the key, as a person's fingers take a moment to reach it. With --until-gone it
+// presses the key every 10 ms until <file> is gone, for up to UNTIL_SECONDS, for a press that must come
 // as soon as the overlay has claimed the key, and exits 1 if the file is still there.
 // Exits 1, posting nothing, if the terminal app may not post events (Accessibility).
 
@@ -26,12 +27,17 @@ let MODIFIER_KEYS: [String: (code: CGKeyCode, flag: CGEventFlags)] = [
     "control": (59, .maskControl), "option": (58, .maskAlternate), "shift": (56, .maskShift), "command": (55, .maskCommand)]
 
 var options = Array(CommandLine.arguments.dropFirst())
-var until: String?
-if let index = options.firstIndex(of: "--until-gone"), index + 1 < options.count {
-    until = options[index + 1]
-    options.removeSubrange(index...index + 1)
+func value(_ name: String) -> String? {
+    guard let index = options.firstIndex(of: name), index + 1 < options.count else { return nil }
+    defer { options.removeSubrange(index...index + 1) }
+    return options[index + 1]
 }
-let usage = "usage: press-key <code> <modifier>... [--until-gone <file>]"
+let until = value("--until-gone")
+let usage = "usage: press-key <code> <modifier>... [--until-gone <file>] [--hold <ms>]"
+let hold = value("--hold").map { text -> useconds_t in
+    guard let ms = useconds_t(text) else { fail(usage) }
+    return ms * 1000
+} ?? 0
 guard let first = options.first, let code = CGKeyCode(first) else { fail(usage) }
 let modifiers = options.dropFirst().map { name -> (code: CGKeyCode, flag: CGEventFlags) in
     guard let key = MODIFIER_KEYS[name] else { fail("press-key takes the modifiers \(MODIFIER_KEYS.keys.sorted().joined(separator: ", ")), not \(name)") }
@@ -53,6 +59,7 @@ func press() {
         held.insert(modifier.flag)
         post(modifier.code, down: true, flags: held, modifier: true)
     }
+    usleep(hold)
     post(code, down: true, flags: held, modifier: false)
     post(code, down: false, flags: held, modifier: false)
     for modifier in modifiers.reversed() {

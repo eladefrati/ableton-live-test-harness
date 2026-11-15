@@ -416,7 +416,10 @@ Node 18 or later. See [ADR-0001](../docs/adr/0001-fork-abletonosc.md) for the de
   must not get it while the overlay is up, and must once the overlay has gone, also when the
   overlay was killed (SIGKILL). With two overlays up, each over a run of its own, the
   second's claim on the key must be refused: its pill shows no key and its Stop still
-  stops its run, and one press of the key stops only the first run. First of
+  stops its run, and one press of the key stops only the first run. A click the helper
+  posts while the key's modifiers are held, before the key (`press-key --hold`, with F13
+  in place of Space), must carry them, as `checks/pointer-target.swift` reports each event's
+  modifiers. First of
   all the overlay is started with the process id 0, and with -1, for its run: it must
   refuse, saying nothing and exiting 1 with its usage. After every case it is started over a run
   that has ended and that nothing has waited for, which still answers signal 0: it must say

@@ -9,8 +9,9 @@
 // Prints {"window", "x", "y", "w", "h"} once the panel is on screen and no notification's
 // banner covers the screen, which the helper would wait out, then one line per mouse
 // event a window of its receives: {"type": "move" | "down" | "drag" | "up", "window", "x", "y",
-// "dx", "dy", "at"}, the event's position in points from the screen's top left, its delta
-// fields, and when it was received, in ms. With
+// "dx", "dy", "flags", "at"}, the event's position in points from the screen's top left, its
+// delta fields, the modifier keys it carries (shift, control, option, command) and when it
+// was received, in ms. With
 // --cover it shows a second window over the panel when the pointer first moves in it. With
 // --return it moves the pointer back to where the button went down at every drag event, as a
 // knob of one of Live's devices does after an event with a vertical part. When the button goes
@@ -46,6 +47,10 @@ func printJSON(_ value: [String: Any]) {
 // The time, in ms, on the clock pointer-guards.js reads too.
 func now() -> Double { Date().timeIntervalSince1970 * 1000 }
 
+// The modifier keys an event may carry, by name.
+let MODIFIER_NAMES: [(flag: CGEventFlags, name: String)] = [
+    (.maskShift, "shift"), (.maskControl, "control"), (.maskAlternate, "option"), (.maskCommand, "command")]
+
 final class Pad: NSView {
     var onFirstMove: (() -> Void)?
     var onMove: ((CGEvent) -> Void)?
@@ -79,7 +84,7 @@ final class Pad: NSView {
         guard let posted = event.cgEvent else { return }
         printJSON(["type": type, "window": window?.windowNumber ?? -1, "x": posted.location.x, "y": posted.location.y,
                    "dx": posted.getIntegerValueField(.mouseEventDeltaX), "dy": posted.getIntegerValueField(.mouseEventDeltaY),
-                   "at": now()])
+                   "flags": MODIFIER_NAMES.filter { posted.flags.contains($0.flag) }.map { $0.name }, "at": now()])
     }
 }
 
