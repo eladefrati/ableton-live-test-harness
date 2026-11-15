@@ -466,7 +466,8 @@ test("a frame the helper can't save rejects with its reason", async (t) => {
   const helper = fakeHelper(t, `console.error("video.mov is 2.00 s long, so it has no frame at 3 s"); process.exit(1);`);
   const video = path.join(helper.folder, "video.mov");
   fs.writeFileSync(video, "");
-  await assert.rejects(videoFrame(video, 3, path.join(helper.folder, "a.png"), fakeSystem(helper)), (e) => e instanceof VideoError && /no frame at 3 s/.test(e.message));
+  await assert.rejects(videoFrame(video, 3, path.join(helper.folder, "a.png"), fakeSystem(helper)),
+    (e) => e instanceof VideoError && e.message === "video.mov is 2.00 s long, so it has no frame at 3 s");
 });
 
 const hasDeveloperTools = (() => {

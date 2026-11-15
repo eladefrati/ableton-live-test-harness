@@ -25,6 +25,7 @@ test("run gives the command the environment it is given, in place of this proces
 test("run rejects with the command and its stderr", async () => {
   await assert.rejects(run("/bin/sh", ["-c", "echo why >&2; exit 3"]), (error) => {
     assert.equal(error.message, "/bin/sh -c echo why >&2; exit 3 failed: why");
+    assert.equal(error.stderr, "why\n");
     assert.equal(error.cause.code, 3);
     return true;
   });

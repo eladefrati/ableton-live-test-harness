@@ -265,7 +265,7 @@ async function videoFrame(file, at, png, system = machine) {
     const args = ["frame", path.resolve(file), String(at), to];
     const said = await system.run(binary, args).catch((error) => {
       // The helper's reason, without the command line run() puts before it.
-      throw new VideoError(error.message.replace(`${[binary, ...args].join(" ")} failed: `, ""), { cause: error });
+      throw new VideoError(error.stderr?.trim() || error.message, { cause: error });
     });
     return JSON.parse(said);
   };
