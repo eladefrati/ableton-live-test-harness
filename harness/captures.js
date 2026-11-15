@@ -140,8 +140,9 @@ async function saveCapture(file, options, write) {
 
 // Deletes what is in `root` older than KEEP_DAYS by its modification time, and what is in its
 // unfinished folder: a capture being written there has a recent one (a video's is the time of
-// its last frame, and none records past 10 minutes), so one that old is one whose writer was
-// killed. Best effort: what can't be read or deleted is left.
+// its last frame, written as it records), so one that old is one whose writer was killed, or a
+// recording asked to last longer than KEEP_DAYS. Best effort: what can't be read or deleted is
+// left.
 function pruneCaptures(root = CAPTURES, now = new Date()) {
   const before = now.getTime() - KEEP_DAYS * 24 * 60 * 60 * 1000;
   const prune = (folder, keep = []) => {

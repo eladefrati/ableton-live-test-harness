@@ -199,10 +199,14 @@ Node 18 or later. See [ADR-0001](../docs/adr/0001-fork-abletonosc.md) for the de
   280 MB for a window and 450 MB for the screen; more movement costs more. It builds the
   helper first, then wakes the display, and keeps it on while it records: a display that
   sleeps leaves the video on its last picture. The recording stops after `seconds` (10
-  minutes if not given), on `stop()`, when the run's process ends, however it ends, or when
-  nothing reads the run's stderr any more, as when the ssh session of a run on the remote
-  ends (the run itself goes on), and the file is whole each time: a run that fails or is
-  killed still leaves the video up to then, and need not wait for it. The helper runs in a
+  minutes if not given), on `stop()`, when the run's process ends, however it ends, or, when
+  the run's stderr is a pipe or a socket, once nothing reads it any more, as when the ssh
+  session of a run on the remote ends (the run itself goes on; the result doesn't say why it
+  stopped). A run whose stderr goes to a process still reading it, a check that started the
+  run, say, records on. The file is whole each time: a run that fails or is killed still
+  leaves the video up to then, and need not wait for it. A helper killed itself leaves its
+  file whole too, but one it was writing in the captures folder stays under its hidden name
+  there, in `.unfinished`, until the folder's prune deletes it (`captures.js`). The helper runs in a
   session of its own, a process group with no terminal, so Ctrl-C on the run doesn't reach
   it: the run stops it. A plug-in's own window shows only while
   Live is in front (ADR-0008), so recording it needs Live in front throughout.
@@ -224,7 +228,8 @@ Node 18 or later. See [ADR-0001](../docs/adr/0001-fork-abletonosc.md) for the de
   clean-up (`dirhelper`) is set to 3 days, files more than 3 days old by both their times
   were still there after its daily runs. So each capture saved there deletes, once it is
   saved, the captures there older than 7 days: one left there lasts until a capture is saved
-  more than 7 days after it. A capture is written in the folder's hidden `.unfinished`
+  more than 7 days after it. Two captures of one thing named in one millisecond get `-2`,
+  `-3` after the name, and none given no path replaces a file. A capture is written in the folder's hidden `.unfinished`
   folder and moved out once it is finished, a video by its helper, so a file in the captures
   folder itself is whole (a folder, as `screencapture` refuses a file name that starts with a
   dot). A path the caller gives outside the folder is used as given, and nothing deletes it;
@@ -303,8 +308,9 @@ Node 18 or later. See [ADR-0001](../docs/adr/0001-fork-abletonosc.md) for the de
   own with no input: each Ctrl-C, SIGTERM, SIGHUP or SIGQUIT `video` gets reaches the
   command's whole process group once, as a terminal's would, the recording goes on until the
   command has ended, and `video` exits with the command's status, adding it as `status`; a
-  recording that fails as it stops is reported as `error`, the status kept. When `video`
-  ends, however it ends short of SIGKILL, what is left of the command's group gets SIGTERM.
+  recording that fails as it stops is reported as `error`, the status kept. What the command
+  leaves running in its group gets SIGTERM as the command ends, or as `video` ends first,
+  unless a signal `video` doesn't handle ends it (SIGKILL, SIGUSR2, an abort).
   It needs no OSC, so it runs around a check, which is the way to record one; from a
   project's repo, `node ~/dev/ableton-live-test-harness/harness/cli.js video -- node
   tests/live/<check>.js`. `video-frame` saves the frame a video
@@ -442,7 +448,7 @@ Node 18 or later. See [ADR-0001](../docs/adr/0001-fork-abletonosc.md) for the de
   it, to the run's whole process group, which takes 1 s to clean up and exits 5 (the command
   must get one SIGINT, the status must come back, the video must hold the clean-up, and a
   `cli.js video` still running 15 s after fails the case); one that `cli.js video` stops on
-  SIGTERM after 3 s (it must exit 0 and finish the file); one whose run's stderr closes after
+  SIGTERM after 3 s (it must exit 0 within 30 s and finish the file); one whose run's stderr closes after
   2 s, as an ssh session's does when it ends (the recording must end then); one of a window that
   closes after 2 s (a panel of its own, `checks/pointer-target.swift`: the result must say it
   ended early); and one whose run is killed after 3 s (its helper must end within 15 s, the
@@ -518,11 +524,13 @@ and logs it can't move come back after the next run. Stills, videos and frames t
 remote with no path come back too, from its captures folder to this Mac's (`captures.js`):
 only finished ones, not a video still being recorded, and none whose name this Mac's folder
 has already, which stays on the remote and is said so; `remote.sh` names each one it brings
-back, at its path here. A path given on the remote stays there. Ctrl-C or SIGTERM on
-`remote.sh` ends it and its ssh, and no signal reaches the remote: the run there goes on to
-its end. A recording there stops when the ssh session ends, as nothing reads the run's
-stderr any more (`video.js`), and its file is finished. The run's logs and captures stay
-there and come back after the next run. There is no lock; the slot rule below is what keeps two runs apart.
+back, at its path here. A path given on the remote stays there. Ctrl-C on `remote.sh` ends
+it and its ssh, as the terminal signals both, and no signal reaches the remote: the run there
+goes on to its end. A SIGTERM sent to `remote.sh` alone ends only `remote.sh`: its ssh, and
+so the session, goes on to the run's end. A recording there whose run's stderr is the
+session's stops when the session ends, as nothing reads that stderr any more (`video.js`),
+and its file is finished; one whose run's stderr goes to another process there records on.
+The run's logs and captures stay there and come back after the next run. There is no lock; the slot rule below is what keeps two runs apart.
 
 The remote only runs checks. Its copies are mirrors, replaced on every run, `.git` included:
 never edit or commit in them, since the next run discards the work. Changes are made and

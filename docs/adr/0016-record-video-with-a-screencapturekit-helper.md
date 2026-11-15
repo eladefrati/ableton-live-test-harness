@@ -29,11 +29,12 @@ and it marks every run log as made with uncommitted changes.
    like the harness's other helpers) and writes the file through `SCRecordingOutput`: H.264 in
    a `.mov`, at most 30 frames a second, the pointer included. It says when the file has
    started, and stops on SIGINT, SIGTERM or SIGHUP, after a length of time, when the process
-   that started it ends, or when nothing reads that process's stderr any more, as when the ssh
-   session of a run on the remote ends, finishing the file each time. It runs in a session of
-   its own, so Ctrl-C on a run reaches the run, which stops it: a recording around a command
-   ends after the command, not at Ctrl-C. The command runs in a session of its own too, and
-   each signal the run gets reaches the command's whole process group once.
+   that started it ends, or, when that process's stderr is a pipe or a socket, when nothing
+   reads it any more, as when the ssh session of a run on the remote ends, finishing the file
+   each time. It runs in a session of its own, so Ctrl-C on a run reaches the run, which stops
+   it: a recording around a command ends after the command, not at Ctrl-C. The command runs in
+   a session of its own too, each signal the run gets reaches the command's whole process
+   group once, and what the command leaves in its group is ended as the command ends.
 2. **Live's main window by default,** or another of Live's windows by its id, recorded alone as
    `screencapture -l` captures it: behind other windows, without harness-computer-use's border
    and pill. **The whole main display on request,** for what the window leaves out: the menus,
@@ -88,6 +89,8 @@ and it marks every run log as made with uncommitted changes.
 - A capture left in the captures folder is deleted once a capture is saved there more than 7
   days after it; one to keep is moved out of it, or made at a path of the person's from the
   start.
+- A helper killed itself, rather than its run, leaves a whole video, but one it was writing
+  in the captures folder stays under its hidden name there until the prune deletes it.
 - A plug-in's own window shows only while Live is in front (ADR-0008), so recording it needs
   Live in front throughout.
 - Developer tools are needed on the Mac that records, as for the click helper.

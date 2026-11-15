@@ -11,8 +11,8 @@
 // with "early", the reason, when the stream ended before it was stopped (its window closed).
 // It stops after <seconds>, on SIGINT, SIGTERM or SIGHUP, when the process that started it
 // ends, or when nothing reads the run's output any more (fd 3, below), and finishes the file
-// each time. A file it was writing when it was killed is whole up
-// to then: SCRecordingOutput writes it as it goes (a recorder killed 5 s in left 5 s). While
+// each time. A file it was writing when it was killed is whole up to then, at <out.mov>, not
+// renamed: SCRecordingOutput writes it as it goes (a recorder killed 5 s in left 5 s). While
 // it records the display is kept on: a display that sleeps leaves the video on its last
 // picture.
 //

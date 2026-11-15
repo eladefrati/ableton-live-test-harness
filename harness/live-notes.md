@@ -526,6 +526,15 @@ unexpected.
 - `screencapture` refuses a file name that starts with a dot ("cannot write file to intended
   destination") and still exits 0; a file in a hidden folder it writes (remote Mac, macOS
   26.7, 2026-11-14).
+- openrsync with `--remove-source-files`, failing on one listed file it couldn't read, copied
+  the other file it was given but didn't delete its source, and exited non-zero; `remote.sh`
+  names what it copied, and a later run finds that name already here (remote Mac, macOS 26.7,
+  2026-11-15).
+- macOS checks a new program the first time it runs: a new shell script took 0.60 to 0.67 s
+  from its start to its first line, in 9 of 9, and a link to one that had already run 0.01 to
+  0.02 s, in 8 of 8 (remote Mac, macOS 26.7, 2026-11-15). The unit tests run their stand-ins
+  through Node or make them once a file; `device-ui.test.js` runs its one before any test
+  times a stand-in.
 - `ui.capture` crops its capture of Live's window with the helper's `crop`, as a capture of
   a plug-in's editor does, no longer with `sips`. The helper's crop gave its PNG no
   resolution, which reads as 72 dpi, where the capture has 144 and a crop by `sips` kept
