@@ -147,6 +147,9 @@ func stopOnSignalsAndParent(_ stop: @escaping () -> Void) {
 }
 
 func record(_ file: URL, target: [String], seconds: Double) async {
+    // Process 1 from the start: the run ended before this got going, and nothing would stop
+    // the recording before its length.
+    if PARENT == 1 { fail("The run that started the recording had already ended") }
     var assertion = IOPMAssertionID(0)
     IOPMAssertionCreateWithName(kIOPMAssertionTypePreventUserIdleDisplaySleep as CFString,
                                 IOPMAssertionLevel(kIOPMAssertionLevelOn), "Recording a video of Live" as CFString, &assertion)
@@ -212,6 +215,9 @@ let USAGE = "usage: video record <out.mov> window <id> | screen <seconds>\n     
 let arguments = CommandLine.arguments
 // ScreenCaptureKit needs a connection to the window server, which this makes.
 _ = NSApplication.shared
+// The run may be gone, with its end of the pipes: a write to them must not end this before
+// the file is finished.
+signal(SIGPIPE, SIG_IGN)
 
 Task {
     switch arguments.count > 1 ? arguments[1] : "" {
