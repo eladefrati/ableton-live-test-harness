@@ -47,6 +47,7 @@ const machine = {
   windows: () => liveWindows(),
   binary: () => tools.helperBinary(HELPER_SOURCE),
   spawn,
+  say: (text) => console.error(text),
 };
 
 // Refuses a Mac before macOS 15, where the helper doesn't build.
@@ -168,7 +169,8 @@ async function recordVideo(file, { window, screen = false, seconds = MAX_SECONDS
 // `cli.js video`: records until `command` ends, if one is given (its exit status is returned
 // as `status`), or until the length given, Ctrl-C or SIGTERM. The command runs in a process
 // group of its own, with no input: each Ctrl-C, SIGTERM or SIGHUP the run gets reaches it
-// once, from here, and the recording goes on until it has ended.
+// once, from here, and the recording goes on until it has ended. A recording that fails as it
+// stops is reported as `error`, with the command's status still returned.
 async function runVideoCommand({ file, seconds, window, screen, command = [] }, system = machine) {
   const video = await recordVideo(file, { seconds, window, screen }, system);
   if (command.length === 0) {
@@ -195,7 +197,14 @@ async function runVideoCommand({ file, seconds, window, screen, command = [] }, 
       });
       child.on("close", (code, signal) => resolve(code ?? 128 + os.constants.signals[signal]));
     });
-    return { ...(await video.stop()), status };
+    // The command's status is the run's result: a recording that fails as it stops (its
+    // window closed, say) doesn't replace it.
+    try {
+      return { ...(await video.stop()), status };
+    } catch (error) {
+      system.say(error.message);
+      return { file: video.file, status, error: error.message };
+    }
   } finally {
     signals.forEach((signal) => process.off(signal, pass));
   }

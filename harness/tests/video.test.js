@@ -37,8 +37,11 @@ setInterval(() => {}, 1000);
 
 function fakeSystem(helper, { release = "25.6.0", windows = [{ id: 7, title: "Set", layer: 0 }], startedMs = 5000 } = {}) {
   const calls = [];
+  const said = [];
   return {
     calls,
+    said,
+    say: (text) => said.push(text),
     startedMs,
     release: () => release,
     wake: async () => { calls.push("wake"); },
@@ -210,6 +213,18 @@ runVideoCommand({ file: ${JSON.stringify(at("video.mov"))}, screen: true, comman
   const command = JSON.parse(fs.readFileSync(at("command.json"), "utf8"));
   assert.equal(command.count, 1, "the command got one SIGINT");
   assert.ok(Number(fs.readFileSync(at("stopped"), "utf8")) >= command.at, "the recording was stopped after the command ended");
+});
+
+test("a recording around a command that fails as it stops still returns the command's status, and says why it failed", async (t) => {
+  const helper = fakeHelper(t, `
+process.on("SIGINT", () => { console.error("The recording failed: the window closed"); process.exit(1); });
+console.log("recording");
+setInterval(() => {}, 1000);
+`);
+  const system = fakeSystem(helper);
+  const result = await runVideoCommand({ file: out(helper), screen: true, command: [process.execPath, "-e", "process.exit(3)"] }, system);
+  assert.deepEqual(result, { file: out(helper), status: 3, error: "The recording failed: the window closed" });
+  assert.ok(system.said.some((line) => /The recording failed: the window closed/.test(line)), system.said.join("\n"));
 });
 
 test("the video-frame command reads a video, a time in seconds and a PNG", () => {
