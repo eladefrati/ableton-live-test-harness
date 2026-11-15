@@ -4,7 +4,7 @@
 // Checks video.js and its helper in Live (ADR-0016): with Live playing, so its window
 // changes, it records Live's main window and the main display for a length of time, a video
 // around a command, one around a command given Ctrl-C, one that cli.js video stops on
-// SIGTERM, one of a window that closes (a panel of its own, pointer-target.swift), and one
+// SIGTERM, one whose run's stderr closes, as an ssh session's does, one of a window that closes (a panel of its own, pointer-target.swift), and one
 // whose run is killed, and saves frames of each; and the captures cli.js makes given no file,
 // which it deletes. Every video must be playable, as long as
 // asked within a tolerance, and have a frame at each time checked, and two frames of one that
@@ -177,6 +177,27 @@ const CASES = [
       const result = JSON.parse(out.trim().split("\n").pop());
       if (!near(result.seconds, 3)) throw new Error(`The video is ${result.seconds} s long`);
       return `${result.seconds.toFixed(2)} s; ${await frames(file, [1, 2.5])}`;
+    },
+  },
+  {
+    name: "cli.js video whose run's stderr closes 2 s in, as an ssh session's does when it ends",
+    async run(folder) {
+      const file = path.join(folder, "closed-stderr.mov");
+      fs.rmSync(file, { force: true });
+      const { child, ended } = await node([CLI, "video", file, "--seconds", "30"], "recording ");
+      try {
+        await sleep(2000);
+        child.stderr.destroy();
+        const { code, out } = await Promise.race([ended, sleep(10000).then(() => {
+          throw new Error("The recording went on 10 s after its run's stderr closed");
+        })]);
+        if (code !== 0) throw new Error(`cli.js ended with status ${code}`);
+        const result = JSON.parse(out.trim().split("\n").pop());
+        if (!near(result.seconds, 2)) throw new Error(`The video is ${result.seconds} s long`);
+        return `${result.seconds.toFixed(2)} s; ${await frames(file, [1, 1.5])}`;
+      } finally {
+        if (child.exitCode === null && child.signalCode === null) child.kill("SIGINT");
+      }
     },
   },
   {

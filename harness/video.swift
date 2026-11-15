@@ -8,8 +8,9 @@
 // recorded alone, behind other windows too; the display with everything on it. It prints
 // "recording" once the file has started, and on stopping one JSON line: {"seconds", "bytes"},
 // with "early", the reason, when the stream ended before it was stopped (its window closed).
-// It stops after <seconds>, on SIGINT, SIGTERM or SIGHUP, or when the process that started it
-// ends, and finishes the file each time. A file it was writing when it was killed is whole up
+// It stops after <seconds>, on SIGINT, SIGTERM or SIGHUP, when the process that started it
+// ends, or when nothing reads the run's output any more (fd 3, below), and finishes the file
+// each time. A file it was writing when it was killed is whole up
 // to then: SCRecordingOutput writes it as it goes (a recorder killed 5 s in left 5 s). While
 // it records the display is kept on: a display that sleeps leaves the video on its last
 // picture.
@@ -154,6 +155,29 @@ func stopOnSignalsAndParent(_ stop: @escaping () -> Void) {
     keep.append(source)
     // It may have ended before the source was made.
     if getppid() != PARENT { DispatchQueue.main.async(execute: stop) }
+    stopWhenRunOutputCloses(stop)
+}
+
+// fd 3, when given, is the run's own stderr. Over ssh it is a pipe or socket to sshd, and an ssh
+// session that ends (Ctrl-C on remote.sh) closes its other end and sends no signal: the run
+// goes on, so its recording stops here. A terminal or a file is left alone.
+func stopWhenRunOutputCloses(_ stop: @escaping () -> Void) {
+    var info = stat()
+    guard fstat(3, &info) == 0, (info.st_mode & S_IFMT) == S_IFIFO || (info.st_mode & S_IFMT) == S_IFSOCK else { return }
+    let queue = kqueue()
+    // Edge-triggered: it reports once that it can be written, then only on a change, such as
+    // its reader going (EV_EOF).
+    var watch = kevent(ident: 3, filter: Int16(EVFILT_WRITE), flags: UInt16(EV_ADD | EV_CLEAR), fflags: 0, data: 0, udata: nil)
+    guard queue >= 0, kevent(queue, &watch, 1, nil, 0, nil) == 0 else { return }
+    Thread.detachNewThread {
+        var event = kevent()
+        while kevent(queue, nil, 0, &event, 1, nil) >= 0 {
+            if event.flags & UInt16(EV_EOF) != 0 {
+                DispatchQueue.main.async(execute: stop)
+                return
+            }
+        }
+    }
 }
 
 func record(_ file: URL, target: [String], seconds: Double) async {

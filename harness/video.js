@@ -118,8 +118,9 @@ async function recordVideo(file, { window, screen = false, seconds = MAX_SECONDS
   // In the captures folder, a mark says the file is being written, until the helper has ended.
   const marked = path.dirname(file) === path.resolve(system.captures);
   // A process group of its own: Ctrl-C in a terminal signals the run's whole group, and the
-  // recording must end when the run says, after a command it wraps has ended.
-  const child = system.spawn(binary, ["record", file, ...target, String(seconds)], { stdio: ["ignore", "pipe", "pipe"], detached: true });
+  // recording must end when the run says, after a command it wraps has ended. The run's stderr
+  // goes as fd 3, which the helper watches: over ssh, a session that ends closes it.
+  const child = system.spawn(binary, ["record", file, ...target, String(seconds)], { stdio: ["ignore", "pipe", "pipe", 2], detached: true });
   let [said, complained] = ["", ""];
   child.stdout.on("data", (data) => { said += data; });
   child.stderr.on("data", (data) => { complained += data; });
