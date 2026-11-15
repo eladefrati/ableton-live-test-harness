@@ -243,6 +243,95 @@ runVideoCommand({ file: ${JSON.stringify(at("video.mov"))}, screen: true, comman
   assert.ok(Number(fs.readFileSync(at("stopped"), "utf8")) >= command.at, "the recording was stopped after the command ended");
 });
 
+// Writes run.js beside `helper`: it records around `command` with runVideoCommand and exits with
+// the command's status, `then` (code) run once the recording has started.
+function videoRun(helper, command, then = "") {
+  const at = (name) => path.join(helper.folder, name);
+  fs.writeFileSync(at("run.js"), `
+const { spawn } = require("node:child_process");
+const { runVideoCommand } = require(${JSON.stringify(path.join(__dirname, "..", "video.js"))});
+const system = { startedMs: 5000, release: () => "25.6.0", wake: async () => {}, mainWindow: async () => ({ id: 7 }),
+  windows: async () => [], binary: async () => ${JSON.stringify(helper.file)}, spawn, say: () => {}, captures: ${JSON.stringify(at("captures"))} };
+runVideoCommand({ file: ${JSON.stringify(at("video.mov"))}, screen: true, command: ${JSON.stringify(command)} }, system)
+  .then((result) => { process.exitCode = result.status; });
+${then}
+`);
+  // A group of its own, as a terminal's foreground job is: Ctrl-C signals the whole group.
+  const run = spawn(process.execPath, [at("run.js")], { detached: true, stdio: "ignore" });
+  const ended = new Promise((resolve) => run.on("exit", (code, signal) => resolve(code ?? signal)));
+  return { run, ended };
+}
+
+async function until(test, ms = 5000) {
+  for (const end = Date.now() + ms; !test() && Date.now() < end;) await new Promise((r) => setTimeout(r, 50));
+  return test();
+}
+
+const running = (pid) => {
+  try { process.kill(pid, 0); return true; } catch (error) { return error.code === "EPERM"; }
+};
+
+// A command that notes its process, counts `signal`, and after the first takes 300 ms to clean
+// up, notes the count and exits 7.
+function countingCommand(helper, signal) {
+  const at = (name) => path.join(helper.folder, name);
+  fs.writeFileSync(at("command.js"), `
+const fs = require("node:fs");
+let count = 0;
+process.on(${JSON.stringify(signal)}, () => {
+  if (count++ === 0) setTimeout(() => { fs.writeFileSync(${JSON.stringify(at("command.json"))}, JSON.stringify({ count })); process.exit(7); }, 300);
+});
+fs.writeFileSync(${JSON.stringify(at("command.pid"))}, String(process.pid));
+setInterval(() => {}, 1000);
+`);
+  return at("command.js");
+}
+
+test("Ctrl-C on a recording around a shell reaches the shell's own command once", { timeout: 20000 }, async (t) => {
+  const helper = fakeHelper(t, RECORDS_UNTIL_SIGINT);
+  const command = countingCommand(helper, "SIGINT");
+  // A second command after it keeps the shell from replacing itself with the first.
+  const { run, ended } = videoRun(helper, ["/bin/sh", "-c", `"${process.execPath}" "${command}"; exit $?`]);
+  t.after(() => { try { process.kill(-run.pid, "SIGKILL"); } catch {} });
+  assert.ok(await until(() => fs.existsSync(path.join(helper.folder, "command.pid"))), "the command started");
+  process.kill(-run.pid, "SIGINT");
+  const code = await Promise.race([ended, new Promise((r) => setTimeout(() => r("still running 5 s after Ctrl-C"), 5000))]);
+  t.after(() => { try { process.kill(Number(fs.readFileSync(path.join(helper.folder, "command.pid"), "utf8")), "SIGKILL"); } catch {} });
+  assert.equal(code, 7, "the run exits with the shell's status, its command's");
+  assert.equal(JSON.parse(fs.readFileSync(path.join(helper.folder, "command.json"), "utf8")).count, 1, "the command got one SIGINT");
+});
+
+test("SIGQUIT on a recording around a command reaches the command", { timeout: 20000 }, async (t) => {
+  const helper = fakeHelper(t, RECORDS_UNTIL_SIGINT);
+  const { run, ended } = videoRun(helper, [process.execPath, countingCommand(helper, "SIGQUIT")]);
+  t.after(() => { try { process.kill(-run.pid, "SIGKILL"); } catch {} });
+  assert.ok(await until(() => fs.existsSync(path.join(helper.folder, "command.pid"))), "the command started");
+  t.after(() => { try { process.kill(Number(fs.readFileSync(path.join(helper.folder, "command.pid"), "utf8")), "SIGKILL"); } catch {} });
+  process.kill(-run.pid, "SIGQUIT");
+  assert.equal(await ended, 7, "the run exits with the command's status");
+  assert.equal(JSON.parse(fs.readFileSync(path.join(helper.folder, "command.json"), "utf8")).count, 1);
+});
+
+test("a run that dies while it records around a command takes the command's processes with it", { timeout: 20000 }, async (t) => {
+  const helper = fakeHelper(t, RECORDS_UNTIL_SIGINT);
+  // The shell's command ignores SIGINT, so only the end of the run can end it.
+  const command = path.join(helper.folder, "stubborn.js");
+  fs.writeFileSync(command, `process.on("SIGINT", () => {});
+require("node:fs").writeFileSync(${JSON.stringify(path.join(helper.folder, "command.pid"))}, String(process.pid));
+setInterval(() => {}, 1000);`);
+  const { run, ended } = videoRun(helper, ["/bin/sh", "-c", `"${process.execPath}" "${command}"; exit $?`],
+    `const fs = require("node:fs");
+const wait = setInterval(() => { if (fs.existsSync(${JSON.stringify(path.join(helper.folder, "command.pid"))})) { clearInterval(wait); throw new Error("the run fails"); } }, 50);`);
+  t.after(() => { try { process.kill(-run.pid, "SIGKILL"); } catch {} });
+  assert.equal(await ended, 1, "the run died of its error");
+  // The stand-in helper doesn't watch its run, as the helper does.
+  const stand = helper.pid();
+  t.after(() => { try { process.kill(stand, "SIGKILL"); } catch {} });
+  const pid = Number(fs.readFileSync(path.join(helper.folder, "command.pid"), "utf8"));
+  t.after(() => { try { process.kill(pid, "SIGKILL"); } catch {} });
+  assert.ok(await until(() => !running(pid), 3000), "the command's process ended with the run");
+});
+
 test("the video command says on stderr when it has started recording, and where to", async (t) => {
   const helper = fakeHelper(t, RECORDS_UNTIL_SIGINT);
   const system = fakeSystem(helper);

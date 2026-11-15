@@ -178,9 +178,11 @@ async function recordVideo(file, { window, screen = false, seconds = MAX_SECONDS
 // `cli.js video`: says "recording <file>" on stderr once it records, then records until
 // `command` ends, if one is given (its exit status is returned as `status`), or until the
 // length given, Ctrl-C or SIGTERM. The command runs in a process
-// group of its own, with no input: each Ctrl-C, SIGTERM or SIGHUP the run gets reaches it
-// once, from here, and the recording goes on until it has ended. A recording that fails as it
-// stops is reported as `error`, with the command's status still returned.
+// group of its own, with no input: each Ctrl-C, SIGTERM, SIGHUP or SIGQUIT the run gets reaches
+// that whole group once, from here, as a terminal's would, and the recording goes on until the
+// command has ended. However the run ends, short of SIGKILL, the command's group is sent
+// SIGTERM as it does. A recording that fails as it stops is reported as `error`, with the
+// command's status still returned.
 async function runVideoCommand({ file, seconds, window, screen, command = [] }, system = machine) {
   const video = await recordVideo(file, { seconds, window, screen }, system);
   // Until this line, what happens isn't in the video.
@@ -197,9 +199,16 @@ async function runVideoCommand({ file, seconds, window, screen, command = [] }, 
     }
   }
   let child;
-  const pass = (signal) => child?.kill(signal);
-  const signals = ["SIGINT", "SIGTERM", "SIGHUP"];
+  // The command leads its group: a shell or a runner it starts has processes of its own.
+  const pass = (signal) => {
+    try {
+      if (child?.pid) process.kill(-child.pid, signal);
+    } catch {}
+  };
+  const signals = ["SIGINT", "SIGTERM", "SIGHUP", "SIGQUIT"];
   signals.forEach((signal) => process.on(signal, pass));
+  const end = () => pass("SIGTERM");
+  process.on("exit", end);
   try {
     const status = await new Promise((resolve) => {
       child = spawn(command[0], command.slice(1), { stdio: ["ignore", "inherit", "inherit"], detached: true });
@@ -219,6 +228,9 @@ async function runVideoCommand({ file, seconds, window, screen, command = [] }, 
     }
   } finally {
     signals.forEach((signal) => process.off(signal, pass));
+    process.off("exit", end);
+    // What the command left running in its group.
+    end();
   }
 }
 
