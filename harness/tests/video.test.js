@@ -163,7 +163,7 @@ test("a display that can't be woken is refused, saying why", async (t) => {
   const system = fakeSystem(helper);
   system.wake = async () => { throw new Error("No app is frontmost 3000 ms after declaring user activity; Live can't be brought to the front"); };
   await assert.rejects(recordVideo(out(helper), {}, system), (e) => e instanceof VideoError
-    && /^The display couldn't be woken for the recording: No app is frontmost 3000 ms/.test(e.message) && !/Automation/.test(e.message));
+    && e.message === "The display couldn't be woken for the recording: No app is frontmost 3000 ms after declaring user activity");
 });
 
 test("a display that can't be woken because System Events refuses the terminal app names the permission it needs", async (t) => {

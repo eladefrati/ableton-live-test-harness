@@ -108,7 +108,10 @@ async function recordVideo(file, { window, screen = false, seconds = MAX_SECONDS
       throw new VideoError(`The display couldn't be woken for the recording: System Events refused the terminal app (${refused.message}). `
         + "Allow it under System Settings > Privacy & Security > Automation", { cause: error });
     }
-    throw new VideoError(`The display couldn't be woken for the recording: ${error.message}`, { cause: error });
+    // wakeDisplay's reason, without what it means for bringing Live to the front, which a
+    // recording doesn't do.
+    const reason = error.message.replace(/; Live can't be brought to the front$/, "");
+    throw new VideoError(`The display couldn't be woken for the recording: ${reason}`, { cause: error });
   });
   let target;
   if (screen) {
