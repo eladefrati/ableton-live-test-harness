@@ -1123,13 +1123,21 @@ test("buildComputerUse rejects when the helper can't be built", async () => {
 });
 
 // A stand-in for the overlay: a shell script of `lines`, run with the overlay's arguments,
-// that first writes its pid beside itself. Returns its path.
+// that first writes its pid beside itself. Returns its path. Each is a link to one program,
+// made and run once for the file, which runs the lines saved beside the link: macOS scans a
+// new program the first time it runs, which took about 0.6 s on the remote Mac, longer than
+// the 500 ms a border is given below, and a link to a program it has run started in 0.02 s.
 const STAND_INS = fs.mkdtempSync(path.join(os.tmpdir(), "device-ui-test-"));
 process.on("exit", () => fs.rmSync(STAND_INS, { recursive: true, force: true }));
+const STAND_IN = path.join(STAND_INS, "overlay");
+fs.writeFileSync(STAND_IN, ["#!/bin/sh", 'echo $$ > "$0.pid"', '. "$0.sh"', ""].join("\n"), { mode: 0o755 });
+fs.writeFileSync(`${STAND_IN}.sh`, "");
+require("node:child_process").execFileSync(STAND_IN);
 let standIns = 0;
 function standIn(...lines) {
   const file = path.join(STAND_INS, `overlay-${standIns++}`);
-  fs.writeFileSync(file, ["#!/bin/sh", 'echo $$ > "$0.pid"', ...lines, ""].join("\n"), { mode: 0o755 });
+  fs.symlinkSync(STAND_IN, file);
+  fs.writeFileSync(`${file}.sh`, [...lines, ""].join("\n"));
   return file;
 }
 // Stays until the run it was given, its first argument, has gone, as the overlay does.
@@ -1141,7 +1149,10 @@ async function until(done) {
     if (Date.now() > deadline) throw new Error("Not within 3 s");
   }
 }
+// Whether the stand-in at `file` has ended. One that never started fails the test as that: it
+// shows nothing of how a stand-in is ended.
 const gone = (file) => {
+  if (!fs.existsSync(`${file}.pid`)) throw new Error(`The stand-in ${path.basename(file)} never started`);
   const pid = Number(fs.readFileSync(`${file}.pid`, "utf8"));
   try { process.kill(pid, 0); return false; } catch { return true; }
 };
