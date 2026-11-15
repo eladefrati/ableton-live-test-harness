@@ -1195,9 +1195,9 @@ test("showComputerUse resolves once the border says it has shown, having given i
 });
 
 test("a border that couldn't claim its stop key is warned of", async () => {
-  const border = standIn('echo "no stop key: RegisterEventHotKey returned -9878"', "echo shown", STAYS);
+  const border = standIn('echo "no stop key: another program holds Control-Option-Command-Space"', "echo shown", STAYS);
   const warnings = await warningsOf(() => showComputerUse(border));
-  assert.deepEqual(warnings, ["warn harness-computer-use couldn't claim its stop key (RegisterEventHotKey returned -9878). Stop on its pill still stops the run"]);
+  assert.deepEqual(warnings, ["warn harness-computer-use couldn't claim its stop key (another program holds Control-Option-Command-Space). Stop on its pill still stops the run"]);
 });
 
 test("the click token exists before a border is started", async () => {
