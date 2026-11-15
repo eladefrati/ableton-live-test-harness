@@ -56,8 +56,14 @@ final class Recorder: NSObject, SCStreamDelegate, SCStreamOutput, SCRecordingOut
     var stream: SCStream?
     var output: SCRecordingOutput?
     var stopping = false
-    // Why the stream ended before it was stopped, if it did.
-    var early: String?
+    // Why the stream ended before it was stopped, if it did: set on ScreenCaptureKit's queue
+    // and read on another, so under a lock.
+    private let lock = NSLock()
+    private var endedEarly: String?
+    var early: String? {
+        get { lock.withLock { endedEarly } }
+        set { lock.withLock { endedEarly = newValue } }
+    }
 
     init(file: URL, seconds: Double, finished: URL?) {
         self.file = file
@@ -109,8 +115,9 @@ final class Recorder: NSObject, SCStreamDelegate, SCStreamOutput, SCRecordingOut
     // says why it ended early.
     func stream(_ stream: SCStream, didStopWithError error: Error) {
         complain("The recording stopped: \(error.localizedDescription)")
+        // Here, before anything that finishes the file, which reads it.
+        early = error.localizedDescription
         DispatchQueue.main.async {
-            self.early = error.localizedDescription
             if !self.stopping { self.awaitFinish() }
         }
     }
@@ -133,7 +140,6 @@ final class Recorder: NSObject, SCStreamDelegate, SCStreamOutput, SCRecordingOut
     func recordingOutputDidFinishRecording(_ output: SCRecordingOutput) {
         let file = self.file
         let finished = self.finished
-        let early = self.early
         Task {
             let bytes = (try? FileManager.default.attributesOfItem(atPath: file.path)[.size] as? Int) ?? 0
             guard let duration = try? await AVURLAsset(url: file).load(.duration) else {
@@ -147,7 +153,8 @@ final class Recorder: NSObject, SCStreamDelegate, SCStreamOutput, SCRecordingOut
                 }
             }
             var result: [String: Any] = ["seconds": duration.seconds, "bytes": bytes]
-            if let early { result["early"] = early }
+            // Read once the file has been read, the latest it can be.
+            if let early = self.early { result["early"] = early }
             printJSON(result)
             exit(0)
         }
