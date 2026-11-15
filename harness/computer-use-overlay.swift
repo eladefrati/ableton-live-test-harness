@@ -172,10 +172,12 @@ let STOPPING_TITLE = NSAttributedString(string: "Stopping", attributes: [
 let ROUND_SECONDS = 1.1
 
 // The pill's button once Stop is pressed (ADR-0015): it reads Stopping, and a light goes
-// round its edge until the overlay ends. The light is drawn in a view of its own over the
+// round its edge until the overlay ends. The stop key's hint beside it goes: the key does
+// nothing more. The light is drawn in a view of its own over the
 // button, whose layer is AppKit's to draw in: a bright head and a fainter, longer tail, two
 // dashes of the button's outline that start with their leading ends together.
 @MainActor func showStopping(_ button: NSButton) {
+    button.superview?.subviews.first { ($0 as? NSTextField)?.stringValue == STOP_KEY_SYMBOLS }?.isHidden = true
     button.image = nil
     button.attributedTitle = STOPPING_TITLE
     button.setAccessibilityLabel("Stopping")

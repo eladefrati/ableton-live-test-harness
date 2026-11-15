@@ -5,10 +5,10 @@
 //
 // Prints {"windows", "button", "texts"}: the titles of the overlay's windows on screen, as the
 // window server lists them, the label of the pill's button and the pill's texts, such as its
-// stop key, as Accessibility gives them. The label is null, and the texts are empty, if the
-// overlay shows no button, or doesn't answer within ANSWER_SECONDS: a
-// program answers Accessibility on its main thread, so one whose main thread is held up
-// gives none.
+// stop key, as Accessibility gives them. The label is null if the overlay shows no button,
+// and the texts are empty if it shows none; both are so if it doesn't answer within
+// ANSWER_SECONDS: a program answers Accessibility on its main thread, so one whose main
+// thread is held up gives none.
 
 import ApplicationServices
 import Foundation

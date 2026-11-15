@@ -111,12 +111,7 @@ Node 18 or later. See [ADR-0001](../docs/adr/0001-fork-abletonosc.md) for the de
   pill stays, its button reading Stopping, until the run's process has ended: the
   notification that the mouse is free comes then. A run still going 10 s after Stop is left
   running: the pill goes, and the notification says that the run was stopped and is still
-  running (ADR-0015). The stop key, Control-Option-Command-Space (⌃⌥⌘Space, which the pill
-  shows before its Stop and the dialog names), presses Stop on the pill through the
-  button's own action and needs no pointer: while the border's program runs, no app gets
-  that key, Live included (ADR-0017). The key is claimed exclusively: a border that couldn't
-  claim it, as when another program or another run's border holds it, shows no key, and
-  the run says so on stderr in a line starting `warn harness-computer-use` and clicks on. If only the press's release was
+  running (ADR-0015). If only the press's release was
   left, the click or the drag has happened: `error.done` is `true` on that press's error, and
   set on no other, so a check that must undo what a click did reads it in its cleanup. Stop
   removes the run's click token, a file the run and its click helper must be able to read
@@ -128,7 +123,13 @@ Node 18 or later. See [ADR-0001](../docs/adr/0001-fork-abletonosc.md) for the de
   either, so a capture of a plug-in's window throws too. If Stop can't remove the token, it
   signals the run instead (SIGUSR2): the run stops the same way, whatever its token says,
   and the border stays until the run has ended. A run still there 10 s after the signal is
-  killed, and cleans nothing up: a check has that long to clean up and end. A run
+  killed, and cleans nothing up: a check has that long to clean up and end. The stop key,
+  Control-Option-Command-Space (⌃⌥⌘Space, which the pill shows before its Stop and the
+  dialog names), presses Stop on the pill through the button's action and needs no
+  pointer: while the border's program runs, no app gets that key, Live included
+  (ADR-0017). The key is claimed exclusively: a border that couldn't claim it, as when
+  another program or another run's border holds it, shows no key, and the run says so on
+  stderr in a line starting `warn harness-computer-use` and clicks on. A run
   whose border can't show, or goes, however it ends, while the run goes
   on and wasn't stopped, says so on stderr in a line starting `warn harness-computer-use`, and clicks without
   it; when the border couldn't be built, the dialog says, in place of the glow, that nothing
@@ -382,7 +383,8 @@ Node 18 or later. See [ADR-0001](../docs/adr/0001-fork-abletonosc.md) for the de
   check posts a notification, whose banner must show. Stop is also pressed on the pill
   itself, through Accessibility (`checks/press-stop.swift`): the overlay removes the token,
   takes the border down and keeps the pill up, its button reading Stopping, while the run
-  goes on (`checks/overlay-state.swift` reads the overlay's windows and that button), and
+  goes on (`checks/overlay-state.swift` reads the overlay's windows, that button and the
+  pill's texts), and
   says Stopped only once the run has ended, which the check's run does when the check ends
   it; over a run that goes on, the pill goes 10 s after Stop, not sooner, the overlay says
   that the run was stopped and is still running, and the run is left running; when the
