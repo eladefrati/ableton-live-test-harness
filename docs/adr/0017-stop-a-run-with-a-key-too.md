@@ -78,13 +78,13 @@ Probed on the remote Mac (macOS 26), with a stand-in app in front and keys poste
   opened too. Spotlight's key is one of macOS's own shortcuts, not a hot key a program
   registers, and the exclusive option isn't expected to keep it out; that wasn't tried.
 - A claimed plain Escape (key code 53) caught an Escape posted with no modifiers.
+- With Live in front, the key stopped a run as Stop on the pill does, and once the border's
+  program had gone it didn't start Live's transport (live-notes.md).
 
 Not proven:
 
 - A press on a real keyboard. Posted events take the same path through the window server,
   but only posted ones were tried.
-- Live in front. Hot keys are taken before an event goes to any app, so the stand-in's result
-  should hold for Live, but that wasn't tried.
 - That System Events, as the harness types Escape, posts it as the probe did, and so would be
   caught by a claimed Escape.
 - macOS's default shortcuts: only the remote Mac's settings were read, where nothing else
