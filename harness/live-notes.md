@@ -467,6 +467,13 @@ unexpected.
   plain Escape caught an Escape posted with no modifiers; the harness types its Escape, to
   close a menu, through System Events, which wasn't tried (remote Mac, macOS 26,
   2026-11-15). Not tried: a real keyboard, and Live in front.
+- A click the helper posts while modifier keys are held carries them: with Control, Option
+  and Command held (posted as key events) for 1 s and the helper's click started 200 ms in,
+  its button-down and button-up both carried all three in 2 of 2, and its hover's two moves
+  in 1 of 2, carrying none in the other; with nothing held, none, in 2 of 2 (remote Mac, macOS 26, 2026-11-15). A person
+  pressing the stop key holds its modifiers first, so a click in flight then can reach Live
+  as a Control-Option-Command click. The Escape that closes a menu after Stop now waits until
+  no modifier is held, for 2 s at most, then is typed anyway with a warning.
 - With no window server, as for a process with no desktop session, a program gets no session
   (`CGSessionCopyCurrentDictionary()` is nil), no screens, and windows that say they are
   visible and never show, all with no error; `display dialog` fails there with -1713, "No

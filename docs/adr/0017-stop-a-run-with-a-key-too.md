@@ -97,3 +97,12 @@ Also:
   ⌘⇧G carry modifiers. Text should be typed with at most the modifiers a character needs on
   the keyboard layout, which never include Control; that wasn't tried.
 - A run with no border has no key either: the key belongs to the border's program.
+- A person reaches the key with its modifiers held first, and the run's clicks carry
+  whatever modifiers are held as they are posted: on the remote Mac a click the helper
+  posted 200 ms into a 1 s hold of Control, Option and Command carried all three, on its
+  button-down and button-up, where one with nothing held carried none. So a click already
+  in flight when the key is pressed can reach Live as a Control-Option-Command click, which
+  Live may take as another gesture, a Control-click opening a context menu. The helper
+  builds its events as before; that cost stands. The Escape that closes a menu after Stop
+  (ADR-0014), which the person may still be holding the modifiers for, waits until none is
+  held, for 2 s at most, and is then typed anyway, with a warning.

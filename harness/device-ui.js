@@ -66,6 +66,9 @@ const ROW_TOLERANCE = 4; // points
 const INFO_VIEW_SETTLE_MS = 350;
 // How often a press looks for Stop while it waits on a read of Live's window.
 const STOP_POLL_MS = 100;
+// How long the Escape that closes a menu after Stop waits for the stop key's modifiers to be
+// let go of: about twice as long as a person holds them before reaching the key.
+const MODIFIERS_WAIT_MS = 2000;
 // A device's frame around its panel, in points at 100% zoom: left of and above the panel's
 // corner (the title bar), right of the panel, and the whole height (measured on the remote
 // Mac, 2026-11-11).
@@ -517,6 +520,7 @@ const machine = {
   // front, and doesn't bring it there.
   escape: (refuse) => mac.typeInLive("key code 53", { refuse }),
   escapeIfInFront: () => mac.typeIfLiveInFront("key code 53"),
+  waitForNoModifiers: (ms) => mac.waitForNoModifiers(ms),
   giveBack: (id) => mac.giveBackFront(id),
   // Crops a capture of the window, `width` points wide, to [x, y, w, h] in points from its
   // top left, which must lie inside it. The helper crops, at the capture's resolution.
@@ -615,6 +619,10 @@ function guarded(system) {
         if (!system.stopped()) throw error;
       }
     }
+    // The person may still hold the stop key's modifiers (ADR-0017), and an Escape typed
+    // meanwhile carries them, which may leave the menu open: it waits for them, a while.
+    const free = await system.waitForNoModifiers(MODIFIERS_WAIT_MS).catch(() => false);
+    if (!free) console.error(`warn harness-computer-use typed Escape to close the menu with a modifier key still held ${MODIFIERS_WAIT_MS} ms after Stop: the menu may stay open`);
     await system.escapeIfInFront();
   };
   for (const call of POINTER_CALLS) {

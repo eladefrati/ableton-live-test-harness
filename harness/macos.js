@@ -104,6 +104,27 @@ async function typeInLive(body, { refuse } = {}) {
   await osascript(inLive(body));
 }
 
+// Waits until no modifier key (Shift, Control, Option, Command) is held, for up to
+// `timeoutMs`, and resolves with whether none is. The keys are read as the window server has
+// them, held on a keyboard or posted, with no permission needed.
+const NO_MODIFIERS = `ObjC.import("AppKit");
+function run(argv) {
+  const end = Date.now() + Number(argv[0]);
+  for (;;) {
+    if (($.NSEvent.modifierFlags & 0x1E0000) === 0) return "free";
+    if (Date.now() >= end) return "held";
+    delay(0.05);
+  }
+}`;
+function waitForNoModifiers(timeoutMs) {
+  return new Promise((resolve, reject) => {
+    execFile("osascript", ["-l", "JavaScript", "-e", NO_MODIFIERS, String(timeoutMs)], (error, stdout, stderr) => {
+      if (error) reject(new MacError((stderr || error.message).trim()));
+      else resolve(stdout.trim() === "free");
+    });
+  });
+}
+
 // Sends keystrokes to Live only if it is frontmost, and doesn't bring it there. One script
 // looks and types, so that no other app comes to the front between the two.
 const typeIfLiveInFront = (body) => osascript(`tell application "System Events" to if frontmost of process "Live" then ${body}`);
@@ -422,5 +443,5 @@ module.exports = {
   MacError, osascript, activate, wakeDisplay, keepDisplayOn, isFrontmost, menuItems, clickMenu, isChecked, undoName,
   setToggle, setKeyMapMode, setMidiMapMode, liveApp, saveSet, saveSetAs, openInBackground, openSet,
   openSetAndWait, windowTitle, sameFile, SAVE_CHANGES, TEMP_FILES, STOP_AUDIO, HARNESS_TEMP, inHarnessTemp, tempFolder,
-  emptyHarnessTemp, livePids, liveStartTime, frontmostApp, giveBackFront, typeInLive, typeIfLiveInFront,
+  emptyHarnessTemp, livePids, liveStartTime, frontmostApp, giveBackFront, typeInLive, typeIfLiveInFront, waitForNoModifiers,
 };

@@ -437,7 +437,7 @@ test("a press and a drag that Stop caught with only the release left reject with
 // The machine's calls that never move the pointer or press its button, so need no permit.
 const OTHER_CALLS = [
   "hostname", "clickHost", "ask", "buildComputerUse", "showComputerUse", "stopped", "wake", "focus", "window", "windows", "capture", "read",
-  "pluginWindow", "editor", "frontmost", "escape", "escapeIfInFront", "giveBack", "captureRect",
+  "pluginWindow", "editor", "frontmost", "escape", "escapeIfInFront", "waitForNoModifiers", "giveBack", "captureRect",
 ];
 
 test("every call of the machine is either one that takes the pointer, which passes permit, or listed as one that never does", () => {
@@ -881,6 +881,7 @@ function menuMachine(rows, { opens = true } = {}) {
     click: async (id, x, y) => { system.calls.push(["click", id, x, y]); if (id === 7 && opens) open = true; },
     escape: async () => { system.calls.push("escape"); },
     escapeIfInFront: async () => { system.calls.push("escapeIfInFront"); },
+    waitForNoModifiers: async (ms) => { system.calls.push(["waitForNoModifiers", ms]); return true; },
   });
   const read = system.read;
   system.read = async (id) => (id === 9 ? { width: 176, lines: rows } : read(id));
@@ -1013,6 +1014,22 @@ test("Stop while choose reads the menu leaves its closing to the one call that t
   assert.equal(clicks(system).length, 1);
   assert.equal(system.calls.at(-1), "escapeIfInFront");
   assert.equal(system.calls.includes("escape"), false);
+});
+
+test("after Stop, the Escape that closes choose's menu waits until no modifier key is held, 2 s at most, and is typed then even if one still is, with a warning", async () => {
+  for (const free of [true, false]) {
+    const system = menuMachine(MENU_ROWS);
+    system.waitForNoModifiers = async (ms) => { system.calls.push(["waitForNoModifiers", ms]); return free; };
+    const stop = stoppable(system);
+    const read = system.read;
+    system.read = async (id) => { if (id === 9) stop(); return read(id); };
+    const warnings = await warningsOf(async () => {
+      await assert.rejects((await openMenu(system)).choose("Menu", "Wander"), /stopped from its pill/);
+    });
+    assert.deepEqual(system.calls.slice(-2), [["waitForNoModifiers", 2000], "escapeIfInFront"]);
+    assert.deepEqual(warnings, free ? []
+      : ["warn harness-computer-use typed Escape to close the menu with a modifier key still held 2000 ms after Stop: the menu may stay open"]);
+  }
 });
 
 test("Stop that comes while Live is brought forward for the Escape that closes choose's menu leaves the closing to that one call", async () => {
