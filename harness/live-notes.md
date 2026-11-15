@@ -466,7 +466,28 @@ unexpected.
   claims the key, so that a program that holds it already makes the claim fail. A claimed
   plain Escape caught an Escape posted with no modifiers; the harness types its Escape, to
   close a menu, through System Events, which wasn't tried (remote Mac, macOS 26,
-  2026-11-15). Not tried: a real keyboard, and Live in front.
+  2026-11-15). Not tried: a real keyboard.
+- The overlay's exclusive claim on the stop key: with one overlay up, a second's claim was
+  refused (`eventHotKeyExistsErr`), its pill showed no key and its Stop still stopped its
+  run, and one press of the key stopped only the first run. An overlay killed with SIGKILL
+  gave the key up: the app in front got the next press (`checks/pointer-guards.js`, 62 of
+  62, remote Mac, macOS 26, 2026-11-15).
+- The stop key in Live, posted as key events with Live in front while a press's click waited
+  under a notification's cover: the token went 228 and 251 ms after the presser was
+  started, its own start included, the glow 280 and 282 ms after, the run ended by itself
+  768 and 778 ms after, its track deleted and the control's value unchanged, and the pill
+  went 1.21 and 1.25 s after; no mouse event of the run's came after the key. Once the
+  overlay had gone, the key pressed with Live in front didn't start Live's transport, in 2
+  of 2 (remote Mac, Live 12.4.25b1, macOS 26, 2026-11-15).
+- Posting the whole stop key chord every 10 ms, about 800 events a second, held up the
+  overlay's start: it said "stopping" 3.5 s after it was started, once, and nothing within
+  4 s, once, where it otherwise said "shown" after 1.03 to 1.15 s. Holding the modifiers and
+  tapping only the key every 20 ms, it said "stopping" after 0.76 and 0.79 s and "shown"
+  after 1.23 and 1.30 s, the key taken before its windows showed (remote Mac, 2026-11-15).
+- The wait for no modifier key held, before the Escape after Stop, read the modifiers posted
+  as key events: with them held 1 s from 0.1 s before the wait began it said none was held
+  1.06 s in; held 2.5 s with a limit of 0.5 s it said one was, 0.69 s in; with none held,
+  0.22 s in, its script's start included (remote Mac, 2026-11-15).
 - A click the helper posts while modifier keys are held carries them: with Control, Option
   and Command held (posted as key events) for 1 s and the helper's click started 200 ms in,
   its button-down and button-up both carried all three in 2 of 2, and its hover's two moves
