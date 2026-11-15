@@ -5,16 +5,16 @@
 // changes, it records Live's main window and the main display for a length of time, a video
 // around a command, one around a command given Ctrl-C, one that cli.js video stops on
 // SIGTERM, one of a window that closes (a panel of its own, pointer-target.swift), and one
-// whose run is killed, and
-// saves frames of each. Every video must be playable, as long as asked within a tolerance,
-// and have a frame at each time checked; the frames are left to look at with --out. Leaves
-// the transport stopped.
+// whose run is killed, and saves frames of each. Every video must be playable, as long as
+// asked within a tolerance, and have a frame at each time checked, and two frames of one that
+// moved must differ; the frames are left to look at with --out. Leaves the transport stopped.
 //
 //   node harness/checks/video-record.js [--out <folder>]
 //
 // Without --out the videos and frames go to a temp folder, deleted at the end. Takes about
-// 40 s.
+// 55 s.
 
+const crypto = require("node:crypto");
 const fs = require("node:fs");
 const path = require("node:path");
 const { spawn } = require("node:child_process");
@@ -48,20 +48,28 @@ async function retry(fn, ms) {
   }
 }
 
-// Saves the frames at `times` and says what they are.
-async function frames(file, times) {
+// Saves the frames at `times` and says what they are. Live plays while the check records, and
+// its position changes many times a second, so each frame differs from the one before: two
+// the same are a video that froze between them, as one does while the display sleeps.
+// `still` is for a video of something that doesn't move.
+async function frames(file, times, { still = false } = {}) {
   const saved = [];
+  let before;
   for (const at of times) {
     const frame = await videoFrame(file, at, file.replace(/\.mov$/, `-${at}s.png`));
+    const hash = crypto.createHash("sha256").update(fs.readFileSync(frame.file)).digest("hex");
+    if (!still && before && hash === before.hash) throw new Error(`The frames at ${before.at} and ${at} s are the same: the video froze`);
+    before = { at, hash };
     saved.push(`${path.basename(frame.file)} ${frame.w}x${frame.h}`);
   }
   return saved.join(", ");
 }
 
-// Runs Node with `args`, its output collected; resolves, once it has said `line` (at once
-// without one), with the process and `ended`, which resolves with its exit and output.
-function node(args, line) {
-  const child = spawn(process.execPath, args, { stdio: ["ignore", "pipe", "pipe"] });
+// Runs Node with `args`, its output collected; resolves, once it has said `line` on stdout or
+// stderr (at once without one), with the process and `ended`, which resolves with its exit
+// and output. `detached` gives it a process group of its own, as a terminal's job has.
+function node(args, line, { detached = false } = {}) {
+  const child = spawn(process.execPath, args, { stdio: ["ignore", "pipe", "pipe"], detached });
   let [out, err] = ["", ""];
   const ended = new Promise((resolve) => child.on("close", (code, signal) => resolve({ code, signal, out, err })));
   return new Promise((resolve, reject) => {
@@ -69,7 +77,10 @@ function node(args, line) {
       out += data;
       if (line && out.includes(line)) resolve({ child, ended });
     });
-    child.stderr.on("data", (data) => { err += data; });
+    child.stderr.on("data", (data) => {
+      err += data;
+      if (line && err.includes(line)) resolve({ child, ended });
+    });
     if (!line) resolve({ child, ended });
     ended.then(({ code, signal }) => reject(new Error(`It ended before it said "${line}" (${signal ?? `status ${code}`}): ${err.trim()}`)));
   });
@@ -81,6 +92,7 @@ const CASES = [
     async run(folder) {
       const window = await liveMainWindow();
       const file = path.join(folder, "window.mov");
+      fs.rmSync(file, { force: true });
       const result = await (await recordVideo(file, { seconds: 4 })).done();
       if (!near(result.seconds, 4)) throw new Error(`The video is ${result.seconds} s long`);
       const frame = await videoFrame(file, 1, path.join(folder, "window-1s.png"));
@@ -88,22 +100,24 @@ const CASES = [
       if (Math.abs(frame.w / frame.h - window.w / window.h) > 0.01 || frame.w % window.w !== 0) {
         throw new Error(`A frame is ${frame.w}x${frame.h} pixels, the window ${window.w}x${window.h} points`);
       }
-      return `${result.seconds.toFixed(2)} s, ${result.bytes} bytes; ${await frames(file, [1, 3])}`;
+      return `${result.seconds.toFixed(2)} s, ${result.bytes} bytes; ${await frames(file, [1, 2, 3])}`;
     },
   },
   {
     name: "the main display, for 4 s",
     async run(folder) {
       const file = path.join(folder, "screen.mov");
+      fs.rmSync(file, { force: true });
       const result = await (await recordVideo(file, { screen: true, seconds: 4 })).done();
       if (!near(result.seconds, 4)) throw new Error(`The video is ${result.seconds} s long`);
-      return `${result.seconds.toFixed(2)} s, ${result.bytes} bytes; ${await frames(file, [1, 3])}`;
+      return `${result.seconds.toFixed(2)} s, ${result.bytes} bytes; ${await frames(file, [1, 2, 3])}`;
     },
   },
   {
     name: "around a command that runs 3 s and exits 3",
     async run(folder) {
       const file = path.join(folder, "command.mov");
+      fs.rmSync(file, { force: true });
       const result = await runVideoCommand({ file, command: [process.execPath, "-e", "setTimeout(() => process.exit(3), 3000)"] });
       if (result.status !== 3) throw new Error(`The command's status came back as ${result.status}`);
       // The recording starts before the command and stops after it.
@@ -122,17 +136,14 @@ const CASES = [
         require("node:fs").writeFileSync(${JSON.stringify(counted)}, JSON.stringify(n)); process.exit(5); }, 1000); });
         setInterval(() => {}, 1000);`;
       // A group of its own, as a terminal's foreground job: Ctrl-C signals the whole group.
-      const child = spawn(process.execPath, [CLI, "video", file, "--", process.execPath, "-e", command], { detached: true, stdio: ["ignore", "pipe", "pipe"] });
-      let [out, err] = ["", ""];
-      child.stdout.on("data", (data) => { out += data; });
-      child.stderr.on("data", (data) => { err += data; });
-      const ended = new Promise((resolve) => child.on("close", (code) => resolve(code)));
+      const { child, ended } = await node([CLI, "video", file, "--", process.execPath, "-e", command], "recording ", { detached: true });
+      let out;
       try {
-        await retry(async () => { if (!fs.existsSync(file)) throw new Error(`No ${file} after 10 s`); }, 10000);
         await sleep(2000);
         process.kill(-child.pid, "SIGINT");
-        const code = await ended;
-        if (code !== 5) throw new Error(`cli.js ended with status ${code}, not the command's 5: ${err.trim()}`);
+        const run = await ended;
+        out = run.out;
+        if (run.code !== 5) throw new Error(`cli.js ended with ${run.signal ?? `status ${run.code}`}, not the command's 5: ${run.err.trim()}`);
       } finally {
         try { process.kill(-child.pid, "SIGKILL"); } catch {}
       }
@@ -148,12 +159,18 @@ const CASES = [
     name: "cli.js video stopped by SIGTERM after 3 s",
     async run(folder) {
       const file = path.join(folder, "sigterm.mov");
-      const { child, ended } = await node([CLI, "video", file]);
-      // The file appears when the helper starts writing it.
-      await retry(async () => { if (!fs.existsSync(file)) throw new Error(`No ${file} after 10 s`); }, 10000);
-      await sleep(3000);
-      child.kill("SIGTERM");
-      const { code, signal, out, err } = await ended;
+      fs.rmSync(file, { force: true });
+      const { child, ended } = await node([CLI, "video", file], "recording ");
+      let run;
+      try {
+        await sleep(3000);
+        child.kill("SIGTERM");
+        run = await ended;
+      } finally {
+        // cli.js and its recording, if anything above failed before they ended.
+        if (child.exitCode === null && child.signalCode === null) child.kill("SIGINT");
+      }
+      const { code, signal, out, err } = run;
       if (code !== 0) throw new Error(`cli.js ended with ${signal ?? `status ${code}`}: ${err.trim()}`);
       const result = JSON.parse(out.trim().split("\n").pop());
       if (!near(result.seconds, 3)) throw new Error(`The video is ${result.seconds} s long`);
@@ -189,7 +206,7 @@ const CASES = [
         const result = JSON.parse(out.trim().split("\n").pop());
         if (!result.early) throw new Error(`The result doesn't say the recording ended early: ${JSON.stringify(result)}`);
         if (!near(result.seconds, 2)) throw new Error(`The video is ${result.seconds} s long`);
-        return `${result.seconds.toFixed(2)} s, early: ${result.early}; ${await frames(file, [1])}`;
+        return `${result.seconds.toFixed(2)} s, early: ${result.early}; ${await frames(file, [1], { still: true })}`;
       } finally {
         target.kill("SIGTERM");
       }
@@ -199,6 +216,7 @@ const CASES = [
     name: "a run killed 3 s into its recording",
     async run(folder) {
       const file = path.join(folder, "killed.mov");
+      fs.rmSync(file, { force: true });
       const { child, ended } = await node(["-e", `require(${JSON.stringify(VIDEO)}).recordVideo(${JSON.stringify(file)})
         .then((video) => { console.log("recording " + video.pid); setInterval(() => {}, 1000); })`], "recording ");
       await sleep(3000);
@@ -217,7 +235,10 @@ const CASES = [
         process.kill(helper, "SIGINT");
         throw error;
       });
-      return frames(file, [1, 2.5]);
+      // Killed 3 s after it said it recorded: the video holds those 3 s.
+      const { seconds } = await videoFrame(file, 1, path.join(folder, "killed-1s.png"));
+      if (!near(seconds, 3)) throw new Error(`The video is ${seconds} s long`);
+      return `${seconds.toFixed(2)} s; ${await frames(file, [1, 2.5])}`;
     },
   },
 ];
