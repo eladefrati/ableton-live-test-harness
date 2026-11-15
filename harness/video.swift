@@ -1,10 +1,11 @@
 // Records a video of one of Live's windows, or of the main display, with ScreenCaptureKit, and
 // saves a frame of a video as a PNG (ADR-0016). macOS 15 or later (SCRecordingOutput).
 //
-//   video record <out.mov> window <id> | screen <seconds>
+//   video record <out.mov> window <id> | screen <seconds> [then <finished.mov>]
 //   video frame <in.mov> <seconds> <out.png>
 //
-// record writes H.264 in a .mov, at most 30 frames a second, the pointer included. A window is
+// record writes H.264 in a .mov, renamed to <finished.mov> once it is finished if that is given
+// (the captures folder writes in a hidden folder until then), at most 30 frames a second, the pointer included. A window is
 // recorded alone, behind other windows too; the display with everything on it. It prints
 // "recording" once the file has started, and on stopping one JSON line: {"seconds", "bytes"},
 // with "early", the reason, when the stream ended before it was stopped (its window closed).
@@ -44,15 +45,18 @@ func printJSON(_ value: Any) {
 final class Recorder: NSObject, SCStreamDelegate, SCStreamOutput, SCRecordingOutputDelegate {
     let file: URL
     let seconds: Double
+    // What the file is renamed to once it is finished, if anything.
+    let finished: URL?
     var stream: SCStream?
     var output: SCRecordingOutput?
     var stopping = false
     // Why the stream ended before it was stopped, if it did.
     var early: String?
 
-    init(file: URL, seconds: Double) {
+    init(file: URL, seconds: Double, finished: URL?) {
         self.file = file
         self.seconds = seconds
+        self.finished = finished
     }
 
     func start(filter: SCContentFilter, width: Int, height: Int) throws {
@@ -122,11 +126,19 @@ final class Recorder: NSObject, SCStreamDelegate, SCStreamOutput, SCRecordingOut
     // The length is read from the file: recordedDuration came in whole seconds.
     func recordingOutputDidFinishRecording(_ output: SCRecordingOutput) {
         let file = self.file
+        let finished = self.finished
         let early = self.early
         Task {
             let bytes = (try? FileManager.default.attributesOfItem(atPath: file.path)[.size] as? Int) ?? 0
             guard let duration = try? await AVURLAsset(url: file).load(.duration) else {
                 fail("The recording finished, but \(file.path) can't be read as a video")
+            }
+            if let finished {
+                do {
+                    try FileManager.default.moveItem(at: file, to: finished)
+                } catch {
+                    fail("The recording finished, but \(file.path) couldn't be renamed \(finished.path): \(error.localizedDescription)")
+                }
             }
             var result: [String: Any] = ["seconds": duration.seconds, "bytes": bytes]
             if let early { result["early"] = early }
@@ -180,7 +192,7 @@ func stopWhenRunOutputCloses(_ stop: @escaping () -> Void) {
     }
 }
 
-func record(_ file: URL, target: [String], seconds: Double) async {
+func record(_ file: URL, target: [String], seconds: Double, then finished: URL?) async {
     // Process 1 from the start: the run ended before this got going, and nothing would stop
     // the recording before its length.
     if PARENT == 1 { fail("The run that started the recording had already ended") }
@@ -207,7 +219,7 @@ func record(_ file: URL, target: [String], seconds: Double) async {
     let width = Int((filter.contentRect.width * scale).rounded())
     let height = Int((filter.contentRect.height * scale).rounded())
     await MainActor.run {
-        let made = Recorder(file: file, seconds: seconds)
+        let made = Recorder(file: file, seconds: seconds, finished: finished)
         recorder = made
         do {
             try made.start(filter: filter, width: width, height: height)
@@ -245,7 +257,7 @@ func frame(_ video: URL, at seconds: Double, to png: URL) async {
     }
 }
 
-let USAGE = "usage: video record <out.mov> window <id> | screen <seconds>\n       video frame <in.mov> <seconds> <out.png>"
+let USAGE = "usage: video record <out.mov> window <id> | screen <seconds> [then <finished.mov>]\n       video frame <in.mov> <seconds> <out.png>"
 let arguments = CommandLine.arguments
 // ScreenCaptureKit needs a connection to the window server, which this makes.
 _ = NSApplication.shared
@@ -256,11 +268,18 @@ signal(SIGPIPE, SIG_IGN)
 Task {
     switch arguments.count > 1 ? arguments[1] : "" {
     case "record":
-        let target = Array(arguments.dropFirst(3).dropLast())
-        guard arguments.count >= 5, let seconds = Double(arguments.last!), seconds > 0,
+        // <out.mov>, the target, <seconds>, and then <finished.mov> if given.
+        var words = Array(arguments.dropFirst(2))
+        var finished: URL?
+        if words.count >= 2, words[words.count - 2] == "then" {
+            finished = URL(fileURLWithPath: words[words.count - 1])
+            words.removeLast(2)
+        }
+        let target = Array(words.dropFirst().dropLast())
+        guard words.count >= 3, let seconds = Double(words.last!), seconds > 0,
               target == ["screen"] || (target.count == 2 && target[0] == "window" && UInt32(target[1]) != nil)
         else { fail(USAGE) }
-        await record(URL(fileURLWithPath: arguments[2]), target: target, seconds: seconds)
+        await record(URL(fileURLWithPath: words[0]), target: target, seconds: seconds, then: finished)
     case "frame":
         guard arguments.count == 5, let seconds = Double(arguments[3]), seconds >= 0 else { fail(USAGE) }
         await frame(URL(fileURLWithPath: arguments[2]), at: seconds, to: URL(fileURLWithPath: arguments[4]))

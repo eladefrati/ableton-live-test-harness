@@ -105,28 +105,29 @@ test("by default Live's main window is recorded for up to 10 minutes, by a helpe
   assert.ok(fs.existsSync(path.dirname(file)), "the file's folder is made");
 });
 
-test("with no file, a video goes to the captures folder under the time and what it shows, marked as recording until it ends", async (t) => {
+test("with no file, a video goes to the captures folder under the time and what it shows, written under a hidden name the helper renames it from when finished", async (t) => {
   const helper = fakeHelper(t, RECORDS_UNTIL_SIGINT);
   const system = fakeSystem(helper);
   const video = await recordVideo(undefined, {}, system);
+  t.after(() => video.stop().catch(() => {}));
   assert.equal(path.dirname(video.file), system.captures);
   assert.match(path.basename(video.file), /^\d{4}-\d\d-\d\dT\d\d-\d\d-\d\d-\d{3}-live-window\.mov$/);
-  assert.equal(helper.args()[1], video.file);
-  const mark = path.join(system.captures, `.${path.basename(video.file)}.recording`);
-  assert.equal(fs.readFileSync(mark, "utf8"), String(video.pid));
+  assert.deepEqual(helper.args(), ["record", path.join(system.captures, ".unfinished", path.basename(video.file)), "window", "7", "600", "then", video.file]);
   await video.stop();
-  assert.ok(!fs.existsSync(mark), "the mark goes when the recording has ended");
   const screen = await recordVideo(undefined, { screen: true }, system);
   assert.match(path.basename(screen.file), /-live-screen\.mov$/);
   await screen.stop();
 });
 
-test("a video at a path of the caller's leaves no mark there", async (t) => {
+test("a video at a path of the caller's is written there under that name, unless the path is in the captures folder", async (t) => {
   const helper = fakeHelper(t, RECORDS_UNTIL_SIGINT);
+  const system = fakeSystem(helper);
   const file = out(helper);
-  const video = await recordVideo(file, {}, fakeSystem(helper));
-  assert.deepEqual(fs.readdirSync(path.dirname(file)).filter((name) => name.startsWith(".")), []);
-  await video.stop();
+  await (await recordVideo(file, {}, system)).stop();
+  assert.deepEqual(helper.args(), ["record", file, "window", "7", "600"]);
+  const there = path.join(system.captures, "mine.mov");
+  await (await recordVideo(there, {}, system)).stop();
+  assert.deepEqual(helper.args(), ["record", path.join(system.captures, ".unfinished", "mine.mov"), "window", "7", "600", "then", there]);
 });
 
 test("a window given by id must be one of Live's on screen", async (t) => {
@@ -407,6 +408,7 @@ test("with no PNG, a frame goes to the captures folder, named by the time as oth
   const frame = await videoFrame(video, 1.5, undefined, system);
   assert.equal(path.dirname(frame.file), system.captures);
   assert.match(path.basename(frame.file), /^\d{4}-\d\d-\d\dT\d\d-\d\d-\d\d-\d{3}-clip-1\.5s\.png$/);
+  assert.equal(helper.args()[3], path.join(system.captures, ".unfinished", path.basename(frame.file)), "written under a hidden name");
   assert.ok(fs.existsSync(frame.file));
 });
 

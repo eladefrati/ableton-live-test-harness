@@ -9,9 +9,11 @@
 // each capture saved here deletes, once it is saved, the captures older than KEEP_DAYS. A path
 // the caller gives outside this folder is used as given, and nothing here deletes it.
 //
-// A video being recorded here has a hidden mark beside it, `.<name>.recording`, holding its
-// recorder's process id: remote.sh brings back only finished captures, and pruning leaves a
-// recording alone.
+// A capture is written here under a hidden name, `.unfinished/<name>`, and moved to its own
+// once it is finished: a file in the folder itself is whole, and remote.sh may bring it back.
+// A video's helper moves it, so a run that ends while it records still leaves a finished video.
+// A hidden folder rather than a hidden file name: screencapture refuses to write a file whose
+// name starts with a dot, saying so but exiting 0 (macOS 26).
 //
 //   node harness/captures.js finished    the folder, then the name of each finished capture in
 //                                        it, one a line (for remote.sh)
@@ -22,7 +24,7 @@ const path = require("node:path");
 
 const CAPTURES = path.join(os.tmpdir(), "ableton-harness-captures");
 const KEEP_DAYS = 7;
-const MARK = /^\.(.+)\.recording$/;
+const UNFINISHED = ".unfinished";
 
 const two = (n, width = 2) => String(n).padStart(width, "0");
 // The local time, to the millisecond, in a form a file name can hold.
@@ -35,73 +37,59 @@ function capturePath(name, ext, { root = CAPTURES, now = new Date() } = {}) {
   return path.join(root, `${stamp(now)}-${name}${ext}`);
 }
 
-// Saves a capture in the folder, as capturePath names it: `write` (its path) makes it. Then,
-// and not before, so a capture made from another one there can read it, deletes the folder's
-// old captures. Resolves with the capture's path.
+// The hidden name `file` is written under until it is finished; its folder is made.
+function unfinished(file) {
+  const folder = path.join(path.dirname(file), UNFINISHED);
+  fs.mkdirSync(folder, { recursive: true });
+  return path.join(folder, path.basename(file));
+}
+
+// Saves a capture in the folder, as capturePath names it: `write` makes it at the hidden name
+// it is given, which then becomes the capture's own; a capture that fails leaves nothing.
+// Then, and not before, so a capture made from another one there can read it, deletes the
+// folder's old captures. Resolves with the capture's path.
 async function saveCapture(name, ext, write, { root = CAPTURES, now = new Date() } = {}) {
   const file = capturePath(name, ext, { root, now });
-  await write(file);
-  pruneCaptures(root, now);
+  const writing = unfinished(file);
+  try {
+    await write(writing);
+    fs.renameSync(writing, file);
+  } finally {
+    fs.rmSync(writing, { force: true });
+  }
+  pruneCaptures(root);
   return file;
 }
 
-const markOf = (file) => path.join(path.dirname(file), `.${path.basename(file)}.recording`);
-
-// Marks `file` as being recorded by the process `pid`; unmarkRecording takes the mark away.
-function markRecording(file, pid) {
-  fs.writeFileSync(markOf(file), String(pid));
-}
-function unmarkRecording(file) {
-  fs.rmSync(markOf(file), { force: true });
-}
-
-function running(pid) {
-  try {
-    process.kill(pid, 0);
-    return true;
-  } catch (error) {
-    return error.code === "EPERM";
-  }
-}
-
-// Whether `file` is being recorded: its mark names a process that still runs.
-function recording(file) {
-  try {
-    return running(Number(fs.readFileSync(markOf(file), "utf8")));
-  } catch {
-    return false;
-  }
-}
-
-// Deletes what is in `root` older than KEEP_DAYS by its modification time, except a video still
-// being recorded, and the marks of recordings that have ended. Best effort: what can't be read
-// or deleted is left.
+// Deletes what is in `root` older than KEEP_DAYS by its modification time, and what is in its
+// unfinished folder: a capture being written there has a recent one (a video's is the time of
+// its last frame, and none records past 10 minutes), so one that old is one whose writer was
+// killed. Best effort: what can't be read or deleted is left.
 function pruneCaptures(root = CAPTURES, now = new Date()) {
   const before = now.getTime() - KEEP_DAYS * 24 * 60 * 60 * 1000;
-  let names = [];
-  try {
-    names = fs.readdirSync(root);
-  } catch {}
-  for (const name of names) {
-    const file = path.join(root, name);
+  const prune = (folder, keep = []) => {
+    let names = [];
     try {
-      const mark = name.match(MARK);
-      if (mark) {
-        if (!recording(path.join(root, mark[1]))) fs.rmSync(file, { force: true });
-      } else if (fs.lstatSync(file).mtimeMs < before && !recording(file)) {
-        fs.rmSync(file, { recursive: true, force: true });
-      }
+      names = fs.readdirSync(folder);
     } catch {}
-  }
+    for (const name of names.filter((n) => !keep.includes(n))) {
+      const file = path.join(folder, name);
+      try {
+        if (fs.lstatSync(file).mtimeMs < before) fs.rmSync(file, { recursive: true, force: true });
+      } catch {}
+    }
+  };
+  prune(root, [UNFINISHED]);
+  prune(path.join(root, UNFINISHED));
 }
 
-// The names of the files in `root` that are finished: not hidden, and not being recorded.
+// The names of the finished files in `root`: those not under a hidden name.
 function finishedCaptures(root = CAPTURES) {
   let entries = [];
   try {
     entries = fs.readdirSync(root, { withFileTypes: true });
   } catch {}
-  return entries.filter((e) => e.isFile() && !e.name.startsWith(".") && !recording(path.join(root, e.name))).map((e) => e.name);
+  return entries.filter((e) => e.isFile() && !e.name.startsWith(".")).map((e) => e.name);
 }
 
 if (require.main === module) {
@@ -113,4 +101,4 @@ if (require.main === module) {
   }
 }
 
-module.exports = { CAPTURES, KEEP_DAYS, capturePath, saveCapture, pruneCaptures, markRecording, unmarkRecording, recording, finishedCaptures };
+module.exports = { CAPTURES, KEEP_DAYS, capturePath, saveCapture, unfinished, pruneCaptures, finishedCaptures };

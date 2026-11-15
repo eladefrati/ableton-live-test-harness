@@ -117,23 +117,24 @@ async function recordVideo(file, { window, screen = false, seconds = MAX_SECONDS
   file = named ? captures.capturePath(screen ? "live-screen" : "live-window", ".mov", { root: system.captures }) : path.resolve(file);
   fs.mkdirSync(path.dirname(file), { recursive: true });
   fs.rmSync(file, { force: true });
-  // In the captures folder, a mark says the file is being written, until the helper has ended.
-  const marked = path.dirname(file) === path.resolve(system.captures);
+  // In the captures folder it is written under a hidden name, which the helper renames to `file`
+  // once it is finished, however the recording ends (captures.js).
+  const hide = path.dirname(file) === path.resolve(system.captures);
+  const writing = hide ? captures.unfinished(file) : file;
   // A process group of its own: Ctrl-C in a terminal signals the run's whole group, and the
   // recording must end when the run says, after a command it wraps has ended. The run's stderr
   // goes as fd 3, which the helper watches: over ssh, a session that ends closes it.
-  const child = system.spawn(binary, ["record", file, ...target, String(seconds)], { stdio: ["ignore", "pipe", "pipe", 2], detached: true });
+  const child = system.spawn(binary, ["record", writing, ...target, String(seconds), ...(hide ? ["then", file] : [])],
+    { stdio: ["ignore", "pipe", "pipe", 2], detached: true });
   let [said, complained] = ["", ""];
   child.stdout.on("data", (data) => { said += data; });
   child.stderr.on("data", (data) => { complained += data; });
   const reason = () => complained.trim().split("\n").pop();
-  if (marked && child.pid) captures.markRecording(file, child.pid);
 
   // Settles when the helper has ended: with its last line, the file's length and size.
   const ended = new Promise((resolve, reject) => {
     child.on("error", (error) => reject(new VideoError(`The video helper couldn't run: ${error.message}`)));
     child.on("close", (code, signal) => {
-      if (marked) captures.unmarkRecording(file);
       if (named) captures.pruneCaptures(system.captures);
       const last = said.trim().split("\n").pop();
       if (code === 0 && last.startsWith("{")) resolve({ file, ...JSON.parse(last) });

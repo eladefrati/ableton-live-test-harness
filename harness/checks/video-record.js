@@ -219,6 +219,9 @@ const CASES = [
         made.push(JSON.parse(frame.out).file);
         const elsewhere = made.filter((file) => path.dirname(file) !== CAPTURES || !fs.existsSync(file));
         if (elsewhere.length) throw new Error(`Not in ${CAPTURES}: ${elsewhere.join(", ")}`);
+        // Each was written under a hidden name, and given its own once finished.
+        const unfinished = made.filter((file) => fs.existsSync(path.join(CAPTURES, ".unfinished", path.basename(file))));
+        if (unfinished.length) throw new Error(`Still under a hidden name: ${unfinished.join(", ")}`);
         if (!err.includes(`recording ${video}`)) throw new Error(`cli.js video didn't say where it records: ${err.trim()}`);
         return made.map((file) => path.basename(file)).join(", ");
       } finally {
