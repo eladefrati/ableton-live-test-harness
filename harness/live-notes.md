@@ -507,8 +507,8 @@ unexpected.
   event, the hover's two moves included, carried the modifiers held, and the keyboard's
   state, read by the target window as each event arrived, still read them held; with
   nothing held, none either way (one run, the same day).
-- Trap: a posted mouse event with its modifiers cleared lets go of modifiers held by posted
-  key events, for every app. With the helper clearing the modifier flags on every mouse event, keeping
+- Trap: a posted mouse event with its modifiers cleared lets go of the modifiers held, for
+  every app, keys held on a real keyboard included. With the helper clearing the modifier flags on every mouse event, keeping
   only the non-coalesced flag, its events carried none while Control, Option and Command, or
   Shift alone, were held (posted as key events), but the keyboard's state
   (`CGEventSource.flagsState(.combinedSessionState)`, read by the target window as each event
@@ -517,9 +517,14 @@ unexpected.
   events made from the HID system state and posted at the session tap instead of the HID
   tap (`checks/pointer-guards.js`, one run each, remote Mac, macOS 26, 2026-11-15). So the
   helper builds its events from the keyboard's state as they are, carrying what is held.
-  That table holds the state posted events put in place, from every source in the session,
-  so whether such an event also lets go of keys held on a real keyboard, and whether the
-  keyboard's next event reads them held again, wasn't tried.
+  With Shift and Option held on a real keyboard, one mouse move made from the HID system
+  state, its modifiers cleared and posted at the HID tap, at the pointer's position: before
+  it the HID system table, the combined session table and AppKit
+  (`NSEvent.modifierFlags`) all read shift and option, and the event as made carried them;
+  100 ms and 1 s after it all three read none, the keys still held. So the HID table itself
+  reads the keys let go, and stays so for at least 1 s while they are held (once, on another
+  Mac, 2026-11-15). The private source and the session tap were measured only with
+  modifiers held by posted key events.
 - Which modifiers change a drag on one of Live's own knobs: Auto Filter's Dry/Wet, dragged
   10 points up from 0.5 by `device-ui.js` with a modifier held (posted as key events by
   `checks/press-key.swift`), the helper's events carrying it. Nothing held turned 10 steps
