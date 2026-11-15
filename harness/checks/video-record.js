@@ -3,7 +3,8 @@
 
 // Checks video.js and its helper in Live (ADR-0016): with Live playing, so its window
 // changes, it records Live's main window and the main display for a length of time, a video
-// around a command, one that cli.js video stops on SIGTERM, and one whose run is killed, and
+// around a command, one around a command given Ctrl-C, one that cli.js video stops on
+// SIGTERM, and one whose run is killed, and
 // saves frames of each. Every video must be playable, as long as asked within a tolerance,
 // and have a frame at each time checked; the frames are left to look at with --out. Leaves
 // the transport stopped.
@@ -104,6 +105,39 @@ const CASES = [
       // The recording starts before the command and stops after it.
       if (result.seconds < 3 || result.seconds > 3 + 2 * TOLERANCE_S) throw new Error(`The video is ${result.seconds} s long`);
       return `${result.seconds.toFixed(2)} s; ${await frames(file, [1, 2.5])}`;
+    },
+  },
+  {
+    name: "Ctrl-C 2 s into a recording around a command that takes 1 s to clean up and exits 5",
+    async run(folder) {
+      const file = path.join(folder, "ctrl-c.mov");
+      const counted = path.join(folder, "ctrl-c-signals.json");
+      fs.rmSync(file, { force: true });
+      fs.rmSync(counted, { force: true });
+      const command = `let n = 0; process.on("SIGINT", () => { if (n++ === 0) setTimeout(() => {
+        require("node:fs").writeFileSync(${JSON.stringify(counted)}, JSON.stringify(n)); process.exit(5); }, 1000); });
+        setInterval(() => {}, 1000);`;
+      // A group of its own, as a terminal's foreground job: Ctrl-C signals the whole group.
+      const child = spawn(process.execPath, [CLI, "video", file, "--", process.execPath, "-e", command], { detached: true, stdio: ["ignore", "pipe", "pipe"] });
+      let [out, err] = ["", ""];
+      child.stdout.on("data", (data) => { out += data; });
+      child.stderr.on("data", (data) => { err += data; });
+      const ended = new Promise((resolve) => child.on("close", (code) => resolve(code)));
+      try {
+        await retry(async () => { if (!fs.existsSync(file)) throw new Error(`No ${file} after 10 s`); }, 10000);
+        await sleep(2000);
+        process.kill(-child.pid, "SIGINT");
+        const code = await ended;
+        if (code !== 5) throw new Error(`cli.js ended with status ${code}, not the command's 5: ${err.trim()}`);
+      } finally {
+        try { process.kill(-child.pid, "SIGKILL"); } catch {}
+      }
+      const signals = JSON.parse(fs.readFileSync(counted, "utf8"));
+      if (signals !== 1) throw new Error(`The command got ${signals} SIGINTs`);
+      const result = JSON.parse(out.trim().split("\n").pop());
+      // 2 s before Ctrl-C and 1 s of the command's clean-up, which the video must include.
+      if (result.seconds < 3 - TOLERANCE_S) throw new Error(`The video is ${result.seconds} s long: it ended before the command`);
+      return `${result.seconds.toFixed(2)} s, the command got 1 SIGINT; ${await frames(file, [1, 2.5])}`;
     },
   },
   {

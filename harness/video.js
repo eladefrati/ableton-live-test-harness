@@ -110,7 +110,9 @@ async function recordVideo(file, { window, screen = false, seconds = MAX_SECONDS
   file = path.resolve(file);
   fs.mkdirSync(path.dirname(file), { recursive: true });
   fs.rmSync(file, { force: true });
-  const child = system.spawn(binary, ["record", file, ...target, String(seconds)], { stdio: ["ignore", "pipe", "pipe"] });
+  // A process group of its own: Ctrl-C in a terminal signals the run's whole group, and the
+  // recording must end when the run says, after a command it wraps has ended.
+  const child = system.spawn(binary, ["record", file, ...target, String(seconds)], { stdio: ["ignore", "pipe", "pipe"], detached: true });
   let [said, complained] = ["", ""];
   child.stdout.on("data", (data) => { said += data; });
   child.stderr.on("data", (data) => { complained += data; });
@@ -164,7 +166,9 @@ async function recordVideo(file, { window, screen = false, seconds = MAX_SECONDS
 }
 
 // `cli.js video`: records until `command` ends, if one is given (its exit status is returned
-// as `status`), or until the length given, Ctrl-C or SIGTERM.
+// as `status`), or until the length given, Ctrl-C or SIGTERM. The command runs in a process
+// group of its own, with no input: each Ctrl-C, SIGTERM or SIGHUP the run gets reaches it
+// once, from here, and the recording goes on until it has ended.
 async function runVideoCommand({ file, seconds, window, screen, command = [] }, system = machine) {
   const video = await recordVideo(file, { seconds, window, screen }, system);
   if (command.length === 0) {
@@ -178,14 +182,13 @@ async function runVideoCommand({ file, seconds, window, screen, command = [] }, 
       process.off("SIGTERM", stop);
     }
   }
-  // Ctrl-C or SIGTERM goes on to the command, and the recording stops once it has ended.
   let child;
   const pass = (signal) => child?.kill(signal);
-  process.on("SIGINT", pass);
-  process.on("SIGTERM", pass);
+  const signals = ["SIGINT", "SIGTERM", "SIGHUP"];
+  signals.forEach((signal) => process.on(signal, pass));
   try {
     const status = await new Promise((resolve) => {
-      child = spawn(command[0], command.slice(1), { stdio: "inherit" });
+      child = spawn(command[0], command.slice(1), { stdio: ["ignore", "inherit", "inherit"], detached: true });
       child.on("error", (error) => {
         console.error(`${command[0]} couldn't run: ${error.message}`);
         resolve(127);
@@ -194,8 +197,7 @@ async function runVideoCommand({ file, seconds, window, screen, command = [] }, 
     });
     return { ...(await video.stop()), status };
   } finally {
-    process.off("SIGINT", pass);
-    process.off("SIGTERM", pass);
+    signals.forEach((signal) => process.off(signal, pass));
   }
 }
 

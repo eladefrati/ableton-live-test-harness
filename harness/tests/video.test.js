@@ -169,6 +169,49 @@ test("a recording around a command lasts until the command ends, and returns its
   assert.deepEqual(result, { file: out(helper), seconds: 1.5, bytes: 1000, status: 3 });
 });
 
+test("Ctrl-C on a recording around a command reaches the command once, and the recording ends after the command", { timeout: 20000 }, async (t) => {
+  // The helper notes when it was told to stop; the command counts the SIGINTs it gets, takes
+  // 500 ms to clean up after the first, notes when it ended, and exits 7.
+  const helper = fakeHelper(t, `
+const fs = require("node:fs");
+process.on("SIGINT", () => {
+  fs.writeFileSync(require("node:path").join(__dirname, "stopped"), String(Date.now()));
+  console.log(JSON.stringify({ seconds: 1, bytes: 1 }));
+  process.exit(0);
+});
+console.log("recording");
+setInterval(() => {}, 1000);
+`);
+  const at = (name) => path.join(helper.folder, name);
+  fs.writeFileSync(at("command.js"), `
+const fs = require("node:fs");
+let count = 0;
+process.on("SIGINT", () => {
+  if (count++ === 0) setTimeout(() => { fs.writeFileSync(${JSON.stringify(at("command.json"))}, JSON.stringify({ count, at: Date.now() })); process.exit(7); }, 500);
+});
+fs.writeFileSync(${JSON.stringify(at("command-started"))}, "");
+setInterval(() => {}, 1000);
+`);
+  fs.writeFileSync(at("run.js"), `
+const { spawn } = require("node:child_process");
+const { runVideoCommand } = require(${JSON.stringify(path.join(__dirname, "..", "video.js"))});
+const system = { startedMs: 5000, release: () => "25.6.0", wake: async () => {}, mainWindow: async () => ({ id: 7 }),
+  windows: async () => [], binary: async () => ${JSON.stringify(helper.file)}, spawn };
+runVideoCommand({ file: ${JSON.stringify(at("video.mov"))}, screen: true, command: [process.execPath, ${JSON.stringify(at("command.js"))}] }, system)
+  .then((result) => { process.exitCode = result.status; });
+`);
+  // A group of its own, as a terminal's foreground job is: Ctrl-C signals the whole group.
+  const run = spawn(process.execPath, [at("run.js")], { detached: true, stdio: "ignore" });
+  const ended = new Promise((resolve) => run.on("exit", (code) => resolve(code)));
+  t.after(() => { try { process.kill(-run.pid, "SIGKILL"); } catch {} });
+  for (const until = Date.now() + 5000; !fs.existsSync(at("command-started")) && Date.now() < until;) await new Promise((r) => setTimeout(r, 50));
+  process.kill(-run.pid, "SIGINT");
+  assert.equal(await ended, 7, "the run exits with the command's status");
+  const command = JSON.parse(fs.readFileSync(at("command.json"), "utf8"));
+  assert.equal(command.count, 1, "the command got one SIGINT");
+  assert.ok(Number(fs.readFileSync(at("stopped"), "utf8")) >= command.at, "the recording was stopped after the command ended");
+});
+
 test("the video-frame command reads a video, a time in seconds and a PNG", () => {
   assert.deepEqual(parseFrameArgs(["a.mov", "1.5", "a.png"]), { file: "a.mov", at: 1.5, png: "a.png" });
   for (const argv of [[], ["a.mov", "1"], ["a.mov", "x", "a.png"], ["a.mov", "-1", "a.png"], ["a.mov", "1", "a.jpg"], ["a.mp4", "1", "a.png"], ["a.mov", "1", "a.png", "b"]]) {
