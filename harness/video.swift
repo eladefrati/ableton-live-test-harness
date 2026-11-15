@@ -14,8 +14,8 @@
 // it records the display is kept on: a display that sleeps leaves the video on its last
 // picture.
 //
-// frame saves the frame shown at <seconds> and prints {"at", "w", "h"}: the time of that
-// frame, and its size in pixels.
+// frame saves the frame shown at <seconds> and prints {"at", "w", "h", "seconds"}: the time of
+// that frame, its size in pixels, and the video's length.
 //
 // Errors go to stderr, with exit status 1.
 
@@ -214,7 +214,7 @@ func frame(_ video: URL, at seconds: Double, to png: URL) async {
         guard let data = NSBitmapImageRep(cgImage: image).representation(using: .png, properties: [:])
         else { fail("Couldn't encode the frame at \(seconds) s as a PNG") }
         try data.write(to: png)
-        printJSON(["at": actual.seconds, "w": image.width, "h": image.height])
+        printJSON(["at": actual.seconds, "w": image.width, "h": image.height, "seconds": duration.seconds])
         exit(0)
     } catch {
         fail("Couldn't save the frame at \(seconds) s: \(error.localizedDescription)")

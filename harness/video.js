@@ -222,8 +222,8 @@ function parseFrameArgs(argv) {
 }
 
 // Saves the frame `file` shows at `at` seconds as the PNG `png` (its folder is made), and
-// resolves with { file: png, at, w, h }: the time of that frame, and its size in pixels. For
-// an agent to see what a video shows, as it can't watch one.
+// resolves with { file: png, at, w, h, seconds }: the time of that frame, its size in pixels,
+// and the video's length. For an agent to see what a video shows, as it can't watch one.
 async function videoFrame(file, at, png, system = machine) {
   requireMacOS15(system);
   if (!fs.existsSync(file)) throw new VideoError(`No video at ${file}`);
