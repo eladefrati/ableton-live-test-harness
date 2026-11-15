@@ -405,12 +405,12 @@ Node 18 or later. See [ADR-0001](../docs/adr/0001-fork-abletonosc.md) for the de
   the helper holds a button, so for these four the window suspends the helper at that
   event (SIGSTOP), and the check lets it go on (SIGCONT) once the token is gone. The stop
   key, posted as a keyboard's events (`checks/press-key.swift`, given the key the overlay's
-  `--stop-key` names), is pressed in place of Stop at a click's first move, with a click's
-  button down and with a drag's, and in the last resort over a run that ignores the
-  signal, where pressed again 5 s in it changes nothing; each must end as after Stop on
-  the pill. Pressed as soon as the overlay has claimed it, before its windows show, it must
-  be taken as an early Stop; and pressed with another app in front (`checks/key-target.swift`,
-  which prints the keys it gets), the pill must show it, it must stop the run, and the app
+  `--stop-key` names), is pressed in place of Stop in every case above that presses Stop on
+  the pill, and each must end as it does with Stop on the pill. Pressed as soon as the
+  overlay has claimed it, before its windows show, with an app in front that prints the
+  keys it gets (`checks/key-target.swift`), it must be taken as an early Stop, and none of
+  the presses may reach that app once the overlay has said it is stopping; and pressed with
+  that app in front, the pill must show it, it must stop the run, and the app
   must not get it while the overlay is up, and must once the overlay has gone, also when the
   overlay was killed (SIGKILL). With two overlays up, each over a run of its own, the
   second's claim on the key must be refused: its pill shows no key and its Stop still

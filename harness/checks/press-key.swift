@@ -8,9 +8,10 @@
 // The modifiers are control, option, shift and command. With --until-gone it presses the
 // key every 10 ms until <file> is gone, for up to UNTIL_SECONDS, for a press that must come
 // as soon as the overlay has claimed the key, and exits 1 if the file is still there.
+// Exits 1, posting nothing, if the terminal app may not post events (Accessibility).
 
+import ApplicationServices
 import Foundation
-import CoreGraphics
 
 func fail(_ message: String) -> Never {
     FileHandle.standardError.write(Data((message + "\n").utf8))
@@ -18,6 +19,8 @@ func fail(_ message: String) -> Never {
 }
 
 let UNTIL_SECONDS = 3.0
+// An event posted just before the process exits is lost, and with it a modifier's release.
+let SETTLE_MICROSECONDS: useconds_t = 100_000
 // Each modifier's key code and the flag it sets.
 let MODIFIER_KEYS: [String: (code: CGKeyCode, flag: CGEventFlags)] = [
     "control": (59, .maskControl), "option": (58, .maskAlternate), "shift": (56, .maskShift), "command": (55, .maskCommand)]
@@ -35,6 +38,8 @@ let modifiers = options.dropFirst().map { name -> (code: CGKeyCode, flag: CGEven
     return key
 }
 
+// Without Accessibility the events would be dropped with no error.
+guard AXIsProcessTrusted() else { fail("Pressing a key needs Accessibility for the terminal app") }
 let source = CGEventSource(stateID: .hidSystemState)
 func post(_ key: CGKeyCode, down: Bool, flags: CGEventFlags, modifier: Bool) {
     guard let event = CGEvent(keyboardEventSource: source, virtualKey: key, keyDown: down) else { fail("The key event couldn't be made") }
@@ -59,12 +64,14 @@ func press() {
 if let until {
     let deadline = Date().addingTimeInterval(UNTIL_SECONDS)
     while FileManager.default.fileExists(atPath: until) {
-        if Date() > deadline { fail("\(until) was still there \(Int(UNTIL_SECONDS)) s after the key was first pressed") }
+        if Date() > deadline {
+            usleep(SETTLE_MICROSECONDS)
+            fail("\(until) was still there \(Int(UNTIL_SECONDS)) s after the key was first pressed")
+        }
         press()
         usleep(10_000)
     }
 } else {
     press()
 }
-// An event posted just before the process exits is lost.
-usleep(100_000)
+usleep(SETTLE_MICROSECONDS)
