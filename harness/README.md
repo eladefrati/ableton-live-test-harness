@@ -437,7 +437,7 @@ Node 18 or later. See [ADR-0001](../docs/adr/0001-fork-abletonosc.md) for the de
   suspended with the button down, not before the token went: under that the case fails,
   as it hasn't shown that Stop came before the release. The cases that end under a
   notification's banner come after the others, each waiting for the banner of the case before to go,
-  and the check takes about 159 s. It takes the
+  and the check takes about 290 s. It takes the
   pointer, so it runs only on the click host and refuses on any other machine, posting
   nothing. A case that leaves the button held releases it and fails.
 - `checks/editor-guards.js`: checks what the helper's `click-editor` and `drag-editor`

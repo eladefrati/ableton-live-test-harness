@@ -10,8 +10,10 @@ module needs an import in `abletonosc/__init__.py`, an entry in `HANDLERS` and a
 Before a commit that changes anything other than Markdown files, run
 `node --test harness/tests/*.test.js` (Live not needed, but a logged-in session is) and, with Live open,
 `node harness/checks/record-roundtrip.js`. Before a commit that changes
-`harness/device-ui.swift` or `harness/computer-use-overlay.swift`, also run
-`node harness/checks/pointer-guards.js` on the click host (Live not needed): the unit tests
+`harness/device-ui.swift`, `harness/computer-use-overlay.swift`, `harness/checks/pointer-guards.js` or
+the programs only it runs (`checks/press-key.swift`, `checks/key-target.swift`,
+`checks/press-stop.swift`, `checks/overlay-state.swift`, `checks/run-orphaned.swift`),
+also run `node harness/checks/pointer-guards.js` on the click host (Live not needed): the unit tests
 run the helper's callers on fakes, and the helper only where it refuses a drag for its
 distance and where it crops a picture, so only this check sees what the helper posts, what
 else it refuses, and what Stop on the overlay's pill and its stop key do. Before a commit that changes

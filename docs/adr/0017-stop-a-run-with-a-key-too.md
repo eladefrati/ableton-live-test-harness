@@ -18,8 +18,8 @@ so reaching Stop means competing with the run for the pointer. A key needs no po
 
 1. **A key presses Stop.** While the border's program runs, Control-Option-Command-Space is
    Stop on its pill: the press is sent as the pill's button sends a click, through its action
-   to its target, so it does all that Stop does, in the same order. The token goes first; in Stop's last resort
-   the run is signalled first. Then the pill reads Stopping, with the same cap and last resort
+   to its target, so it does all that Stop does, in the same order. The token goes first; in
+   Stop's last resort the run is signalled first. Then the pill reads Stopping, with the same cap and last resort
    (ADR-0012, ADR-0015). Once Stop is pressed, by the key or on the pill, the key does nothing
    more, as a press on Stopping does nothing.
 2. **The border's program claims it, exclusively, with no permission.** It registers a
@@ -27,7 +27,9 @@ so reaching Stop means competing with the run for the pointer. A key needs no po
    windows show, and holds it until it ends, giving it up first as it does. The key then goes
    to it and to no app or other program: Live doesn't get it while a run shows its pill, and
    gets it again once the border's program has ended. A program that holds the key already
-   keeps it, and the claim fails.
+   keeps it, and the claim fails. A program that tries to register the key while a run shows
+   its pill fails, and one that registers it only once, as it starts, stays without it after
+   the run.
 3. **The key is a choice, not a constraint.** One constant in `computer-use-overlay.swift`
    holds its key code and modifiers. The words the dialog uses and the hint on the pill are
    made from that constant, and so is the key that `checks/pointer-guards.js` presses. It is
@@ -101,8 +103,9 @@ Also:
   whatever modifiers are held as they are posted: on the remote Mac a click the helper
   posted 200 ms into a 1 s hold of Control, Option and Command carried all three, on its
   button-down and button-up, where one with nothing held carried none. So a click already
-  in flight when the key is pressed can reach Live as a Control-Option-Command click, which
-  Live may take as another gesture, a Control-click opening a context menu. The helper
+  in flight when the key is pressed can reach Live as a Control-Option-Command click, and
+  its release will, whenever the key comes while the helper holds the button: Live may take
+  it as another gesture, a Control-click opening a context menu. The helper
   builds its events as before; that cost stands. The Escape that closes a menu after Stop
   (ADR-0014), which the person may still be holding the modifiers for, waits until none is
   held, for 2 s at most. If one still is, it isn't typed, and the run warns that the menu may
