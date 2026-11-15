@@ -146,7 +146,7 @@ Node 18 or later. See [ADR-0001](../docs/adr/0001-fork-abletonosc.md) for the de
   their 126 steps per point up, and a Max for Live number box in 2-point steps, with the
   distances to drag it by, `live-notes.md`),
   `ui.choose(name, item)` opens the menu a control opens (a chooser) and clicks the one row
-  that reads `item`, closing the menu with Escape if none or two do or anything else fails once the menu's control was clicked (ADR-0014; after Stop, once no modifier key is held, 2 s at most, since the stop key's may still be: ADR-0017), and `ui.text([x, y, w, h])`
+  that reads `item`, closing the menu with Escape if none or two do or anything else fails once the menu's control was clicked (ADR-0014; after Stop, once no modifier key is held, waiting 2 s at most and leaving the menu open with a warning if one still is, since the stop key's may be: ADR-0017), and `ui.text([x, y, w, h])`
   resolves with the lines shown in that part of the panel, in device units. A press looks
   for the panel again, brings Live to the front, and throws `DeviceUiError` without clicking
   unless the screen is unlocked, Live's main window is on top at the point and the Info View

@@ -92,14 +92,19 @@ test("keepDisplayOn lets go of the display when waking it fails", async () => {
 });
 
 // macos.js as it loads over a stand-in for osascript: `answer` is given every AppleScript it
-// would run and returns what the script prints; waking the display, a JavaScript, succeeds.
+// would run and returns what the script prints, and `jxa` the arguments after every
+// JavaScript, returning what it prints, "" by default, or undefined for one that never
+// answers.
 function macOver(answer, jxa = () => "") {
   const childProcess = require("node:child_process");
   const file = require.resolve("../macos.js");
   const [execFile, loaded] = [childProcess.execFile, require.cache[file]];
   childProcess.execFile = (command, args, done) => {
     assert.equal(command, "osascript");
-    setImmediate(() => done(null, args[0] === "-l" ? `${jxa(args.slice(4))}\n` : `${answer(args.at(-1))}\n`, ""));
+    // A script `jxa` gives no answer for never answers.
+    const said = args[0] === "-l" ? jxa(args.slice(4)) : answer(args.at(-1));
+    if (said !== undefined) setImmediate(() => done(null, `${said}\n`, ""));
+    return { kill: () => {} };
   };
   delete require.cache[file];
   try {
@@ -163,6 +168,14 @@ test("typeIfLiveInFront looks for Live in front and types in one script, and act
     await macOver(events.answer).typeIfLiveInFront("key code 53");
     assert.deepEqual(events.did, ['tell application "System Events" to if frontmost of process "Live" then key code 53']);
   }
+});
+
+test("waitForNoModifiers refuses a time that is no finite number of ms, and gives up on a script that doesn't answer 1 s after its time", async () => {
+  const mac = macOver(() => "", () => undefined);
+  for (const ms of [undefined, NaN, -1, Infinity]) await assert.rejects(mac.waitForNoModifiers(ms), /time to wait/);
+  const started = Date.now();
+  await assert.rejects(mac.waitForNoModifiers(50), /didn't answer/);
+  assert.ok(Date.now() - started < 3000);
 });
 
 test("waitForNoModifiers gives its script the time to wait, and resolves with whether no modifier key was held by then", async () => {

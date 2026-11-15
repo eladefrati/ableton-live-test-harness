@@ -106,7 +106,10 @@ async function typeInLive(body, { refuse } = {}) {
 
 // Waits until no modifier key (Shift, Control, Option, Command) is held, for up to
 // `timeoutMs`, and resolves with whether none is. The keys are read as the window server has
-// them, held on a keyboard or posted, with no permission needed.
+// them, held on a keyboard or posted, with no permission needed. The script that waits is
+// given up on, and the wait rejects, if it hasn't answered NO_MODIFIERS_SLACK_MS after its
+// time. The mask holds the four modifiers' flags (NSEvent.ModifierFlags: shift 1 << 17,
+// control 1 << 18, option 1 << 19, command 1 << 20).
 const NO_MODIFIERS = `ObjC.import("AppKit");
 function run(argv) {
   const end = Date.now() + Number(argv[0]);
@@ -116,12 +119,20 @@ function run(argv) {
     delay(0.05);
   }
 }`;
+const NO_MODIFIERS_SLACK_MS = 1000;
 function waitForNoModifiers(timeoutMs) {
+  if (!Number.isFinite(timeoutMs) || timeoutMs < 0) return Promise.reject(new MacError(`The time to wait for the modifier keys must be a number of ms, not ${timeoutMs}`));
   return new Promise((resolve, reject) => {
-    execFile("osascript", ["-l", "JavaScript", "-e", NO_MODIFIERS, String(timeoutMs)], (error, stdout, stderr) => {
+    let timer = null;
+    const child = execFile("osascript", ["-l", "JavaScript", "-e", NO_MODIFIERS, String(timeoutMs)], (error, stdout, stderr) => {
+      clearTimeout(timer);
       if (error) reject(new MacError((stderr || error.message).trim()));
       else resolve(stdout.trim() === "free");
     });
+    timer = setTimeout(() => {
+      child?.kill();
+      reject(new MacError(`The wait for the modifier keys didn't answer within ${timeoutMs + NO_MODIFIERS_SLACK_MS} ms`));
+    }, timeoutMs + NO_MODIFIERS_SLACK_MS);
   });
 }
 

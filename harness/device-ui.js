@@ -620,9 +620,20 @@ function guarded(system) {
       }
     }
     // The person may still hold the stop key's modifiers (ADR-0017), and an Escape typed
-    // meanwhile carries them, which may leave the menu open: it waits for them, a while.
-    const free = await system.waitForNoModifiers(MODIFIERS_WAIT_MS).catch(() => false);
-    if (!free) console.error(`warn harness-computer-use typed Escape to close the menu with a modifier key still held ${MODIFIERS_WAIT_MS} ms after Stop: the menu may stay open`);
+    // meanwhile would carry them: it waits for them, a while. If they are still held it isn't
+    // typed, since a modified Escape may be another shortcut (Option-Command-Escape is Force
+    // Quit). If they can't be read, it is typed, as before the stop key.
+    let free;
+    try {
+      free = await system.waitForNoModifiers(MODIFIERS_WAIT_MS);
+    } catch (error) {
+      console.error(`warn harness-computer-use couldn't read the modifier keys (${error.message.split("\n")[0]}). Escape typed to close the menu`);
+      free = true;
+    }
+    if (!free) {
+      console.error(`warn harness-computer-use didn't type Escape to close the menu: a modifier key was still held after ${MODIFIERS_WAIT_MS} ms. The menu may stay open`);
+      return;
+    }
     await system.escapeIfInFront();
   };
   for (const call of POINTER_CALLS) {

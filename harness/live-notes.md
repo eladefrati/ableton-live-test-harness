@@ -494,7 +494,7 @@ unexpected.
   in 1 of 2, carrying none in the other; with nothing held, none, in 2 of 2 (remote Mac, macOS 26, 2026-11-15). A person
   pressing the stop key holds its modifiers first, so a click in flight then can reach Live
   as a Control-Option-Command click. The Escape that closes a menu after Stop now waits until
-  no modifier is held, for 2 s at most, then is typed anyway with a warning.
+  no modifier is held, for 2 s at most, and isn't typed if one still is (ADR-0017).
 - With no window server, as for a process with no desktop session, a program gets no session
   (`CGSessionCopyCurrentDictionary()` is nil), no screens, and windows that say they are
   visible and never show, all with no error; `display dialog` fails there with -1713, "No

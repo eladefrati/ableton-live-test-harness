@@ -1016,19 +1016,25 @@ test("Stop while choose reads the menu leaves its closing to the one call that t
   assert.equal(system.calls.includes("escape"), false);
 });
 
-test("after Stop, the Escape that closes choose's menu waits until no modifier key is held, 2 s at most, and is typed then even if one still is, with a warning", async () => {
-  for (const free of [true, false]) {
+test("after Stop, the Escape that closes choose's menu waits until no modifier key is held, 2 s at most, is left out with a warning if one still is, and is typed with a warning if they can't be read", async () => {
+  const cases = [
+    { wait: async () => true, typed: true, warnings: [] },
+    { wait: async () => false, typed: false,
+      warnings: ["warn harness-computer-use didn't type Escape to close the menu: a modifier key was still held after 2000 ms. The menu may stay open"] },
+    { wait: async () => { throw new Error("osascript failed"); }, typed: true,
+      warnings: ["warn harness-computer-use couldn't read the modifier keys (osascript failed). Escape typed to close the menu"] },
+  ];
+  for (const { wait, typed, warnings: expected } of cases) {
     const system = menuMachine(MENU_ROWS);
-    system.waitForNoModifiers = async (ms) => { system.calls.push(["waitForNoModifiers", ms]); return free; };
+    system.waitForNoModifiers = async (ms) => { system.calls.push(["waitForNoModifiers", ms]); return wait(); };
     const stop = stoppable(system);
     const read = system.read;
     system.read = async (id) => { if (id === 9) stop(); return read(id); };
     const warnings = await warningsOf(async () => {
       await assert.rejects((await openMenu(system)).choose("Menu", "Wander"), /stopped from its pill/);
     });
-    assert.deepEqual(system.calls.slice(-2), [["waitForNoModifiers", 2000], "escapeIfInFront"]);
-    assert.deepEqual(warnings, free ? []
-      : ["warn harness-computer-use typed Escape to close the menu with a modifier key still held 2000 ms after Stop: the menu may stay open"]);
+    assert.deepEqual(system.calls.slice(typed ? -2 : -1), [["waitForNoModifiers", 2000], ...(typed ? ["escapeIfInFront"] : [])]);
+    assert.deepEqual(warnings, expected);
   }
 });
 

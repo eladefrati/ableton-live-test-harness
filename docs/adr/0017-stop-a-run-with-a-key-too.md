@@ -105,4 +105,6 @@ Also:
   Live may take as another gesture, a Control-click opening a context menu. The helper
   builds its events as before; that cost stands. The Escape that closes a menu after Stop
   (ADR-0014), which the person may still be holding the modifiers for, waits until none is
-  held, for 2 s at most, and is then typed anyway, with a warning.
+  held, for 2 s at most. If one still is, it isn't typed, and the run warns that the menu may
+  stay open: a modified Escape may be another shortcut, Option-Command-Escape being Force
+  Quit. If the modifiers can't be read, it is typed, with a warning.
