@@ -122,19 +122,20 @@ async function recordVideo(file, { window, screen = false, seconds = MAX_SECONDS
     if (!(await system.windows()).some((w) => w.id === window)) throw new VideoError(`Live has no window ${window} on screen`);
     target = ["window", String(window)];
   }
-  // One given no file prunes the captures folder once it has ended (captures.js).
-  const named = file === undefined;
-  file = named ? captures.capturePath(screen ? "live-screen" : "live-window", ".mov", { root: system.captures }) : path.resolve(file);
-  fs.mkdirSync(path.dirname(file), { recursive: true });
-  fs.rmSync(file, { force: true });
+  if (file !== undefined) {
+    file = path.resolve(file);
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+  }
   // In the captures folder it is written under a hidden name, which the helper renames to `file`
   // once it is finished, however the recording ends (captures.js).
-  const hide = path.dirname(file) === path.resolve(system.captures);
-  const writing = hide ? captures.unfinished(file) : file;
+  const capture = captures.startCapture(file, { name: screen ? "live-screen" : "live-window", ext: ".mov", root: system.captures });
+  file = capture.file;
+  fs.rmSync(file, { force: true });
+  const moves = capture.writing !== file;
   // A process group of its own: Ctrl-C in a terminal signals the run's whole group, and the
   // recording must end when the run says, after a command it wraps has ended. The run's stderr
   // goes as fd 3, which the helper watches: over ssh, a session that ends closes it.
-  const child = system.spawn(binary, ["record", writing, ...target, String(seconds), ...(hide ? ["then", file] : [])],
+  const child = system.spawn(binary, ["record", capture.writing, ...target, String(seconds), ...(moves ? ["then", file] : [])],
     { stdio: ["ignore", "pipe", "pipe", 2], detached: true });
   let [said, complained] = ["", ""];
   child.stdout.on("data", (data) => { said += data; });
@@ -145,10 +146,12 @@ async function recordVideo(file, { window, screen = false, seconds = MAX_SECONDS
   const ended = new Promise((resolve, reject) => {
     child.on("error", (error) => reject(new VideoError(`The video helper couldn't run: ${error.message}`)));
     child.on("close", (code, signal) => {
-      if (named) captures.pruneCaptures(system.captures);
       const last = said.trim().split("\n").pop();
-      if (code === 0 && last.startsWith("{")) resolve({ file, ...JSON.parse(last) });
-      else reject(new VideoError(reason() || `The video helper ended with ${signal ?? `status ${code}`}`));
+      if (code === 0 && last.startsWith("{")) {
+        // A video that fails is left where it was being written.
+        capture.finished();
+        resolve({ file, ...JSON.parse(last) });
+      } else reject(new VideoError(reason() || `The video helper ended with ${signal ?? `status ${code}`}`));
     });
   });
   // Nothing may be waiting for it yet.
@@ -272,15 +275,12 @@ async function videoFrame(file, at, png, system = machine) {
     });
     return JSON.parse(said);
   };
-  if (png === undefined) {
-    let frame;
-    const saved = await captures.saveCapture(`${path.basename(file, ".mov")}-${at}s`, ".png", async (to) => { frame = await save(to); },
-      { root: system.captures });
-    return { file: saved, ...frame };
+  if (png !== undefined) {
+    png = path.resolve(png);
+    fs.mkdirSync(path.dirname(png), { recursive: true });
   }
-  png = path.resolve(png);
-  fs.mkdirSync(path.dirname(png), { recursive: true });
-  return { file: png, ...(await save(png)) };
+  const saved = await captures.saveCapture(png, { name: `${path.basename(file, ".mov")}-${at}s`, ext: ".png", root: system.captures }, save);
+  return { file: saved.file, ...saved.value };
 }
 
 module.exports = { VideoError, parseVideoArgs, recordVideo, runVideoCommand, parseFrameArgs, videoFrame, MAX_SECONDS };

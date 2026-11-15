@@ -10,7 +10,8 @@
 // the caller gives outside this folder is used as given, and nothing here deletes it.
 //
 // A capture is written here under a hidden name, `.unfinished/<name>`, and moved to its own
-// once it is finished: a file in the folder itself is whole, and remote.sh may bring it back.
+// once it is finished, whether it was given no path or a path here (startCapture): a file in
+// the folder itself is whole, and remote.sh may bring it back.
 // A video's helper moves it, so a run that ends while it records still leaves a finished video.
 // A hidden folder rather than a hidden file name: screencapture refuses to write a file whose
 // name starts with a dot, saying so but exiting 0 (macOS 26).
@@ -37,28 +38,65 @@ function capturePath(name, ext, { root = CAPTURES, now = new Date() } = {}) {
   return path.join(root, `${stamp(now)}-${name}${ext}`);
 }
 
-// The hidden name `file` is written under until it is finished; its folder is made.
-function unfinished(file) {
-  const folder = path.join(path.dirname(file), UNFINISHED);
-  fs.mkdirSync(folder, { recursive: true });
-  return path.join(folder, path.basename(file));
+// The real path of `file`, or null if it isn't there.
+const real = (file) => {
+  try {
+    return fs.realpathSync(file);
+  } catch {
+    return null;
+  }
+};
+
+// Starts a capture: every still, frame and video the harness saves goes through here. Its
+// path is `file`, the caller's, or with none a new one in the folder (capturePath, by `name`
+// and `ext`). Returns { file, writing, finish(), finished(), abandon() }. `writing` is where
+// the capture is to be written: in the folder, however the path names it, its hidden name,
+// cleared of what a writer killed before left there; elsewhere `file` itself, as given.
+// finish() moves what was written to `file`, replacing one there; finished() is for a writer
+// that moves it itself, as a video's helper does; either then prunes the folder, if the
+// capture is in it. abandon() deletes what a failed writer left under a hidden name.
+function startCapture(file, { name, ext, root = CAPTURES, now = new Date() } = {}) {
+  const target = file === undefined ? capturePath(name, ext, { root, now }) : file;
+  const folder = path.dirname(path.resolve(target));
+  if (real(folder) === null || real(folder) !== real(root)) {
+    const done = () => {};
+    return { file: target, writing: target, finish: done, finished: done, abandon: done };
+  }
+  const hidden = path.join(folder, UNFINISHED);
+  fs.mkdirSync(hidden, { recursive: true });
+  const writing = path.join(hidden, path.basename(target));
+  fs.rmSync(writing, { force: true });
+  return {
+    file: target,
+    writing,
+    finish() {
+      fs.renameSync(writing, target);
+      pruneCaptures(root);
+    },
+    finished() {
+      pruneCaptures(root);
+    },
+    abandon() {
+      fs.rmSync(writing, { force: true });
+    },
+  };
 }
 
-// Saves a capture in the folder, as capturePath names it: `write` makes it at the hidden name
-// it is given, which then becomes the capture's own; a capture that fails leaves nothing.
-// Then, and not before, so a capture made from another one there can read it, deletes the
-// folder's old captures. Resolves with the capture's path.
-async function saveCapture(name, ext, write, { root = CAPTURES, now = new Date() } = {}) {
-  const file = capturePath(name, ext, { root, now });
-  const writing = unfinished(file);
+// Saves a capture as startCapture does, written by `write` at the path it is given, and then,
+// not before, so a capture made from another one there can read it, prunes the folder. One
+// that fails leaves nothing under a hidden name. Resolves with { file, value }, its path and
+// what `write` resolved with.
+async function saveCapture(file, options, write) {
+  const capture = startCapture(file, options);
+  let value;
   try {
-    await write(writing);
-    fs.renameSync(writing, file);
-  } finally {
-    fs.rmSync(writing, { force: true });
+    value = await write(capture.writing);
+    capture.finish();
+  } catch (error) {
+    capture.abandon();
+    throw error;
   }
-  pruneCaptures(root);
-  return file;
+  return { file: capture.file, value };
 }
 
 // Deletes what is in `root` older than KEEP_DAYS by its modification time, and what is in its
@@ -101,4 +139,4 @@ if (require.main === module) {
   }
 }
 
-module.exports = { CAPTURES, KEEP_DAYS, capturePath, saveCapture, unfinished, pruneCaptures, finishedCaptures };
+module.exports = { CAPTURES, KEEP_DAYS, capturePath, startCapture, saveCapture, pruneCaptures, finishedCaptures };

@@ -5,10 +5,10 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
-const { CAPTURES, capturePath, saveCapture, pruneCaptures, finishedCaptures } = require("../captures.js");
+const { CAPTURES, capturePath, startCapture, saveCapture, pruneCaptures, finishedCaptures } = require("../captures.js");
 
 function folder(t) {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "captures-test-"));
+  const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "captures-test-")));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
   return root;
 }
@@ -43,12 +43,14 @@ test("a capture's default path deletes nothing", (t) => {
 test("a capture saved in the folder deletes the captures there older than 7 days once it is saved, not before", async (t) => {
   const root = folder(t);
   const old = file(root, "old.mov", 8);
-  const saved = await saveCapture("live-window", ".png", async (at) => {
+  const saved = await saveCapture(undefined, { name: "live-window", ext: ".png", root }, async (at) => {
     assert.ok(fs.existsSync(old), "still there while the capture is made");
     fs.writeFileSync(at, "png");
-  }, { root });
-  assert.equal(path.dirname(saved), root);
-  assert.equal(fs.readFileSync(saved, "utf8"), "png");
+    return "said";
+  });
+  assert.equal(path.dirname(saved.file), root);
+  assert.equal(saved.value, "said", "what the writer resolved with");
+  assert.equal(fs.readFileSync(saved.file, "utf8"), "png");
   assert.ok(!fs.existsSync(old), "deleted once it was saved");
 });
 
@@ -56,25 +58,81 @@ test("a capture is written under a hidden name in the folder, and given its own 
   const root = folder(t);
   let writing;
   const name = path.join(root, "2030-01-02T03-04-05-006-live-window.png");
-  const saved = await saveCapture("live-window", ".png", async (at) => {
+  const saved = await saveCapture(undefined, { name: "live-window", ext: ".png", root, now: new Date(2030, 0, 2, 3, 4, 5, 6) }, async (at) => {
     writing = at;
     fs.writeFileSync(at, "png");
     assert.ok(!fs.existsSync(name), "not under its name until it is saved");
-  }, { root, now: new Date(2030, 0, 2, 3, 4, 5, 6) });
-  assert.equal(saved, name);
+  });
+  assert.equal(saved.file, name);
   assert.equal(writing, path.join(root, ".unfinished", "2030-01-02T03-04-05-006-live-window.png"));
-  assert.equal(fs.readFileSync(saved, "utf8"), "png");
+  assert.equal(fs.readFileSync(saved.file, "utf8"), "png");
   assert.ok(!fs.existsSync(writing));
 });
 
-test("a capture that fails as it is written leaves nothing in the folder", async (t) => {
+test("a capture given a path in the folder is written under its hidden name too, also when the path reaches the folder through a link", async (t) => {
   const root = folder(t);
-  await assert.rejects(saveCapture("live-window", ".png", async (at) => {
+  const link = path.join(folder(t), "link");
+  fs.symlinkSync(root, link);
+  for (const given of [path.join(root, "mine.png"), path.join(link, "linked.png")]) {
+    let writing;
+    const saved = await saveCapture(given, { root }, async (at) => {
+      writing = at;
+      fs.writeFileSync(at, "png");
+      assert.ok(!fs.existsSync(given), "not under its name until it is saved");
+    });
+    assert.equal(path.basename(writing), path.basename(given));
+    assert.equal(fs.realpathSync(path.dirname(writing)), path.join(root, ".unfinished"), given);
+    assert.equal(fs.readFileSync(given, "utf8"), "png");
+    assert.equal(fs.realpathSync(saved.file), path.join(root, path.basename(given)));
+  }
+});
+
+test("a capture given a path in the folder replaces one there of that name, and clears what a writer killed before left under its hidden name", async (t) => {
+  const root = folder(t);
+  file(root, "mine.png");
+  fs.mkdirSync(path.join(root, ".unfinished"));
+  file(root, ".unfinished/mine.png");
+  await saveCapture(path.join(root, "mine.png"), { root }, async (at) => {
+    assert.ok(!fs.existsSync(at), "the left one is gone before the writer starts");
+    fs.writeFileSync(at, "new");
+  });
+  assert.equal(fs.readFileSync(path.join(root, "mine.png"), "utf8"), "new");
+});
+
+test("a capture given a path outside the folder is written there as it is, and prunes nothing", async (t) => {
+  const root = folder(t);
+  const old = file(root, "old.png", 8);
+  const elsewhere = path.join(folder(t), "kept.png");
+  const saved = await saveCapture(elsewhere, { root }, async (at) => {
+    assert.equal(at, elsewhere);
+    fs.writeFileSync(at, "png");
+  });
+  assert.equal(saved.file, elsewhere);
+  assert.equal(fs.readFileSync(elsewhere, "utf8"), "png");
+  assert.ok(fs.existsSync(old), "the folder isn't pruned for a capture outside it");
+});
+
+test("a capture that fails as it is written leaves nothing in the folder, and prunes nothing", async (t) => {
+  const root = folder(t);
+  const old = file(root, "old.png", 8);
+  await assert.rejects(saveCapture(undefined, { name: "live-window", ext: ".png", root }, async (at) => {
     fs.writeFileSync(at, "half");
     throw new Error("the capture failed");
-  }, { root }), /the capture failed/);
-  assert.deepEqual(fs.readdirSync(root), [".unfinished"]);
+  }), /the capture failed/);
+  assert.deepEqual(fs.readdirSync(root).sort(), [".unfinished", "old.png"]);
   assert.deepEqual(fs.readdirSync(path.join(root, ".unfinished")), []);
+});
+
+test("a capture whose writer moves it itself is given its path and the hidden one, and prunes the folder once finished", (t) => {
+  const root = folder(t);
+  const old = file(root, "old.mov", 8);
+  const capture = startCapture(undefined, { name: "live-window", ext: ".mov", root, now: new Date(2030, 0, 2, 3, 4, 5, 6) });
+  assert.equal(capture.file, path.join(root, "2030-01-02T03-04-05-006-live-window.mov"));
+  assert.equal(capture.writing, path.join(root, ".unfinished", "2030-01-02T03-04-05-006-live-window.mov"));
+  fs.writeFileSync(capture.file, "mov");
+  assert.ok(fs.existsSync(old), "not pruned before it is finished");
+  capture.finished();
+  assert.ok(!fs.existsSync(old), "pruned once it is finished");
 });
 
 test("pruning deletes what is older than 7 days there, a hidden capture left unfinished too, and nothing newer or outside the folder", (t) => {

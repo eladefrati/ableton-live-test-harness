@@ -87,12 +87,9 @@ async function run(argv) {
     const id = at === -1 ? undefined : Number(rest[at + 1]);
     const files = rest.filter((a, i) => !a.startsWith("--") && (at === -1 || i !== at + 1));
     if (files.length > 1 || (at !== -1 && !Number.isInteger(id))) throw new Error(USAGE);
-    if (files[0] !== undefined) return { file: files[0], window: await captureWindow(files[0], { window: id }) };
-    let window;
-    const file = await saveCapture(id === undefined ? "live-window" : `live-window-${id}`, ".png", async (to) => {
-      window = await captureWindow(to, { window: id });
-    });
-    return { file, window };
+    const saved = await saveCapture(files[0], { name: id === undefined ? "live-window" : `live-window-${id}`, ext: ".png" },
+      (to) => captureWindow(to, { window: id }));
+    return { file: saved.file, window: saved.value };
   }
   const live = await connect();
   try {
@@ -111,10 +108,8 @@ async function run(argv) {
         const [track, device] = args.slice(0, 2).map(Number);
         if (!Number.isInteger(track) || !Number.isInteger(device) || args.length > 3) throw new Error(USAGE);
         const window = await openPluginWindow(live, { track, device });
-        if (args[2] !== undefined) return { file: args[2], window: window.title, editor: await window.capture(args[2]) };
-        let editor;
-        const file = await saveCapture("plugin-window", ".png", async (to) => { editor = await window.capture(to); });
-        return { file, window: window.title, editor };
+        const saved = await saveCapture(args[2], { name: "plugin-window", ext: ".png" }, (to) => window.capture(to));
+        return { file: saved.file, window: window.title, editor: saved.value };
       }
       default: throw new Error(USAGE);
     }

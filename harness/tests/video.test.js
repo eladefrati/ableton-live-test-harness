@@ -440,14 +440,60 @@ test("a frame of a video in the captures folder older than 7 days is saved befor
   assert.ok(!fs.existsSync(video), "pruned after the frame was saved");
 });
 
-test("a video given no file prunes the captures folder once it has ended, not while it records", async (t) => {
-  const helper = fakeHelper(t, RECORDS_UNTIL_SIGINT);
-  const system = fakeSystem(helper);
+// A capture 8 days old in `system`'s captures folder.
+function oldCapture(system) {
   fs.mkdirSync(system.captures, { recursive: true });
   const old = path.join(system.captures, "old.png");
   fs.writeFileSync(old, "");
   const when = new Date(Date.now() - 8 * 24 * 60 * 60 * 1000);
   fs.utimesSync(old, when, when);
+  return old;
+}
+
+test("a video that fails prunes nothing", async (t) => {
+  const helper = fakeHelper(t, `
+console.log("recording");
+setTimeout(() => { console.error("The recording failed: disk full"); process.exit(1); }, 100);
+`);
+  const system = fakeSystem(helper);
+  const old = oldCapture(system);
+  const video = await recordVideo(undefined, {}, system);
+  await assert.rejects(video.done(), /disk full/);
+  assert.ok(fs.existsSync(old));
+});
+
+test("a video at a path in the captures folder prunes the folder once it has ended, and clears what a killed helper left under its hidden name first", async (t) => {
+  // Notes whether the hidden name it is given was there as it started.
+  const helper = fakeHelper(t, `require("node:fs").writeFileSync(require("node:path").join(__dirname, "found"), String(require("node:fs").existsSync(process.argv[3])));
+${RECORDS_UNTIL_SIGINT}`);
+  const system = fakeSystem(helper);
+  const old = oldCapture(system);
+  fs.mkdirSync(path.join(system.captures, ".unfinished"));
+  fs.writeFileSync(path.join(system.captures, ".unfinished", "mine.mov"), "left");
+  const video = await recordVideo(path.join(system.captures, "mine.mov"), {}, system);
+  t.after(() => video.stop().catch(() => {}));
+  assert.equal(fs.readFileSync(path.join(helper.folder, "found"), "utf8"), "false");
+  assert.ok(fs.existsSync(old), "still there while it records");
+  await video.stop();
+  assert.ok(!fs.existsSync(old), "pruned once it ended");
+});
+
+test("a frame at a path in the captures folder is written under its hidden name", async (t) => {
+  const helper = fakeHelper(t, SAVES_A_FRAME);
+  const video = path.join(helper.folder, "clip.mov");
+  fs.writeFileSync(video, "");
+  const system = fakeSystem(helper);
+  const png = path.join(system.captures, "mine.png");
+  const frame = await videoFrame(video, 1.5, png, system);
+  assert.equal(helper.args()[3], path.join(system.captures, ".unfinished", "mine.png"));
+  assert.equal(frame.file, png);
+  assert.ok(fs.existsSync(png));
+});
+
+test("a video given no file prunes the captures folder once it has ended, not while it records", async (t) => {
+  const helper = fakeHelper(t, RECORDS_UNTIL_SIGINT);
+  const system = fakeSystem(helper);
+  const old = oldCapture(system);
   const video = await recordVideo(undefined, {}, system);
   t.after(() => video.stop().catch(() => {}));
   assert.ok(fs.existsSync(old), "still there while it records");

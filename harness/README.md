@@ -216,8 +216,9 @@ Node 18 or later. See [ADR-0001](../docs/adr/0001-fork-abletonosc.md) for the de
   `plugin-window`, `video` and `video-frame` and from `recordVideo` and `videoFrame`: the
   captures folder, `ableton-harness-captures` in the system temp folder, apart from the
   harness's temp folder that `relaunch.js` and `quit.js` empty, named by the local time and
-  what it shows. `captureWindow` and `ui.capture` take a path; code that wants one of theirs
-  in the folder saves it with `saveCapture(name, ext, write)`. A capture is proof to show
+  what it shows. Every capture they make goes through `startCapture`, given a path or none.
+  `captureWindow` and `ui.capture` take a path; code that saves one of theirs uses
+  `saveCapture(file, { name, ext }, write)`, with no `file` for the folder. A capture is proof to show
   once, not part of a project, so no project keeps a folder or a `.gitignore` line for one.
   macOS doesn't clear unused files from that temp folder within days: on macOS 26, whose
   clean-up (`dirhelper`) is set to 3 days, files more than 3 days old by both their times
