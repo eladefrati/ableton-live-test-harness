@@ -756,9 +756,11 @@ function orphaned(binaries, args) {
 }
 
 // Starts the overlay over the run `pid`, with the click token `token`, and resolves once it
-// says its windows are on screen: { pid, keyRefused, stopping, said, end }. `keyRefused` is
-// why it couldn't claim the stop key, as it said before "shown", or null. `stopping` resolves with when the overlay said that Stop was
-// pressed ("stopping"), if it does. `said` resolves, once the overlay has ended and so taken
+// says its windows are on screen: { pid, keyRefused, stopping, ending, exited, said, end }.
+// `keyRefused` is why it couldn't claim the stop key, as it said before "shown", or null.
+// `stopping` resolves with when the overlay said that Stop was pressed ("stopping"), if it
+// does. `ending` resolves once it has said its last words, which it says before it waits for
+// its notification, and `exited` is whether it has exited. `said` resolves, once the overlay has ended and so taken
 // its windows down, with all else it said as it did and when it began to ({ text, at }), or
 // with null if it doesn't end in time. `end` ends one that is still up, which doesn't notify,
 // by SIGTERM or the signal it is given.
@@ -769,8 +771,11 @@ async function showOverlay(binary, pid, token = TOKEN) {
   let [first, keyRefused] = [await line(), null];
   while (first?.startsWith("no stop key: ")) [keyRefused, first] = [first.slice("no stop key: ".length), await line()];
   if (first !== "shown") throw new Error("The overlay ended before its windows showed");
-  let saidStopping;
+  let [saidStopping, beganToEnd] = [null, null];
   const stopping = new Promise((resolve) => { saidStopping = resolve; });
+  const ending = new Promise((resolve) => { beganToEnd = resolve; });
+  let exited = false;
+  ended.then(() => { exited = true; });
   // Read from now on, not when asked for, so that `at` is when the overlay said it.
   const last = (async () => {
     const lines = [];
@@ -782,7 +787,9 @@ async function showOverlay(binary, pid, token = TOKEN) {
       }
       at ??= Date.now();
       lines.push(next);
+      beganToEnd();
     }
+    beganToEnd();
     await ended;
     return { text: lines.join("\n"), at };
   })();
@@ -790,6 +797,10 @@ async function showOverlay(binary, pid, token = TOKEN) {
     pid: child.pid,
     keyRefused,
     stopping: () => stopping,
+    // Resolves once the overlay has said its last words, before the notification it then
+    // waits for, or once it has ended.
+    ending: () => within(OVERLAY_WAIT_MS, ending),
+    exited: () => exited,
     said: () => within(OVERLAY_WAIT_MS, last),
     async end(signal = "SIGTERM") {
       child.kill(signal);
@@ -884,7 +895,7 @@ async function unreapedFailures(test, binaries) {
 // then (ADR-0015): it has said that it is stopping, and its pill is on screen, the button
 // reading Stopping. Its border is up too in Stop's last resort (`shows` is "border"), where
 // the run can still click, and is down once the token is gone ("pill").
-async function stoppingFailures(shows, overlay, binary) {
+async function stoppingFailures(shows, overlay, binary, stopKey) {
   const said = await within(END_WAIT_MS, overlay.stopping());
   let shown;
   try {
@@ -897,6 +908,7 @@ async function stoppingFailures(shows, overlay, binary) {
     said === null && "the overlay didn't say that it was stopping",
     !shown.windows.includes(PILL_TITLE) && "the pill wasn't on screen while the stopped run went on",
     shown.button !== "Stopping" && `the pill's button read ${JSON.stringify(shown.button)}, not "Stopping", while the stopped run went on`,
+    stopKey && shown.texts.includes(stopKey.symbols) && `the pill still showed the stop key ${JSON.stringify(stopKey.symbols)} while it read Stopping`,
     border && shows === "pill" && "the border was still up once the token was gone",
     !border && shows === "border" && "the border wasn't up while the run could still click",
   ].filter(Boolean);
@@ -1012,9 +1024,13 @@ async function keyTargetFailures(binaries, { killed = false } = {}) {
     await sleep(EVENT_WAIT_MS);
     const whileUp = stopKeys();
     const tokenLeft = fs.existsSync(TOKEN);
+    // The key once the overlay has said its last words, while it waits for its notification:
+    // it gives the key up first, so the app in front must get this press.
     await run.end();
-    const said = await overlay.said();
+    await overlay.ending();
     await pressStopKey(binaries);
+    const pressedWhileUp = !overlay.exited();
+    const said = await overlay.said();
     await sleep(EVENT_WAIT_MS);
     const afterwards = stopKeys() - whileUp;
     return [
@@ -1024,7 +1040,8 @@ async function keyTargetFailures(binaries, { killed = false } = {}) {
       whileUp && `the app in front got the stop key ${whileUp} times while the overlay was up`,
       said === null && `the overlay was still up ${OVERLAY_WAIT_MS} ms after the run had ended`,
       said !== null && !SAID_STOPPED.test(said.text) && `the overlay said ${JSON.stringify(said.text)}, not ${SAID_STOPPED}`,
-      afterwards !== 1 && `the app in front got the stop key ${afterwards} times once the overlay had gone, not once`,
+      afterwards !== 1 && `the app in front got the stop key ${afterwards} times once the overlay had said its last words, not once`,
+      !pressedWhileUp && "not shown that the key is given up before the notification: the overlay had exited before the key was pressed",
     ].filter(Boolean);
   } finally {
     if (overlay) await overlay.end();
@@ -1043,8 +1060,10 @@ const CLICK_INTO_HOLD_MS = 200;
 
 // A click the helper posts while a person holds the stop key's modifiers, before their key
 // (ADR-0017): the helper builds its events from the keyboard's state as it is, so its click's
-// events carry the modifiers held then (`carries`). No overlay runs, and F13 is pressed in
-// place of the key, which would otherwise go to the app in front.
+// events carry the modifiers held then (`carries`). This measures a cost ADR-0017 accepts,
+// not what the harness wants: a helper that cleared its events' modifiers would change it.
+// No overlay runs, and F13 is pressed in place of the key, which would otherwise go to the
+// app in front. Whatever happens, the modifiers are let go of at the end.
 async function heldModifiersFailures(binaries, carries) {
   fs.mkdirSync(FOLDER, { recursive: true });
   fs.writeFileSync(TOKEN, "");
@@ -1065,10 +1084,11 @@ async function heldModifiersFailures(binaries, carries) {
       unpressed && `the modifiers couldn't be held: ${unpressed}`,
       ended.status !== 0 && `the helper exited ${ended.status}${ended.stderr && `, with "${ended.stderr}"`}`,
       buttons.length !== 2 && `the target received ${JSON.stringify(buttons)}, not one down and one up`,
-      !buttons.every((event) => event.flags.join() === carries.join()) && `the click's events carried ${carried}, not [${carries.join(", ")}]`,
+      !buttons.every((event) => [...event.flags].sort().join() === [...carries].sort().join()) && `the click's events carried ${carried}, not [${carries.join(", ")}]`,
     ].filter(Boolean);
   } finally {
     if (!printed.length) await target.end();
+    await tools.run(binaries.key, [F13, ...binaries.stopKey.modifiers, "--release"]).catch(() => {});
     await run.end();
     unlockToken();
   }
@@ -1138,17 +1158,21 @@ async function failures(test, binaries) {
       await tools.run(binaries.press, [overlay.pid, ...after]).catch((error) => { unpressed = `: ${error.message}`; });
       stoppedAt = tokenWentAt() ?? stoppedAt;
     };
-    // The key, as press-stop presses the pill's Stop: given the run, once it has ended.
+    // The key, as press-stop presses the pill's Stop: given the run, press-key ends it and
+    // presses as soon as it has gone. Otherwise the press counts once the overlay has said
+    // that it is stopping, as press-stop returns once the button's action has run.
     const pressKey = async (ended) => {
-      if (overlay.keyRefused) unpressed = `: the overlay couldn't claim the stop key (${overlay.keyRefused})`;
-      if (ended) {
-        process.kill(ended, "SIGTERM");
-        for (const deadline = Date.now() + END_WAIT_MS; alive(ended) && Date.now() < deadline;) await sleep(1);
+      if (overlay.keyRefused) {
+        keyMissed = `the overlay couldn't claim the stop key (${overlay.keyRefused})`;
+        return;
       }
       stoppedAt = Date.now();
-      await pressStopKey(binaries).catch((error) => { unpressed = `: ${error.message}`; });
+      const failed = await pressStopKey(binaries, ...(ended ? ["--after-end", ended] : [])).then(() => null, (error) => error.message);
+      if (failed) keyMissed = `the stop key couldn't be pressed: ${failed}`;
+      else if (!ended && (await within(END_WAIT_MS, overlay.stopping())) === null) keyMissed = "the overlay didn't say that it was stopping after the key";
       stoppedAt = tokenWentAt() ?? stoppedAt;
     };
+    let keyMissed = "";
     const press = test.by === "key" ? pressKey : pressStop;
     let lost = null;
     const lose = () => {
@@ -1198,7 +1222,7 @@ async function failures(test, binaries) {
       printed = await target.end();
     }
     await lost;
-    const stopping = test.stopping ? await stoppingFailures(test.stopping, overlay, binaries.state) : [];
+    const stopping = test.stopping ? await stoppingFailures(test.stopping, overlay, binaries.state, binaries.stopKey) : [];
     // A run stopped by its token's removal goes on until it ends by itself, and the overlay
     // stays up until it has: the check ends the run, unless the case is of a run that goes
     // on, which the overlay must leave (`leavesMs`). In Stop's last resort the run ends at
@@ -1225,6 +1249,7 @@ async function failures(test, binaries) {
     // bound gets that millisecond.
     const left = said?.at - stoppedAt;
     return [
+      keyMissed,
       ended && ended.status !== test.status && `the helper exited ${ended.status}, not ${test.status}${ended.stderr && `, with "${ended.stderr}"`}`,
       ended && ended.status === test.status && test.stderr && !test.stderr.test(ended.stderr) && `the helper's error was "${ended.stderr}"`,
       took > test.withinMs && `the helper took ${took} ms, over ${test.withinMs}`,

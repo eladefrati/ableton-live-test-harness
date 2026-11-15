@@ -406,20 +406,23 @@ Node 18 or later. See [ADR-0001](../docs/adr/0001-fork-abletonosc.md) for the de
   and nothing more is posted. The press takes about 0.1 s to remove the token, longer than
   the helper holds a button, so for these four the window suspends the helper at that
   event (SIGSTOP), and the check lets it go on (SIGCONT) once the token is gone. The stop
-  key, posted as a keyboard's events (`checks/press-key.swift`, given the key the overlay's
-  `--stop-key` names), is pressed in place of Stop in every case above that presses Stop on
-  the pill, and each must end as it does with Stop on the pill. Pressed as soon as the
+  key, posted as the key's events carrying its modifiers (`checks/press-key.swift`, given the
+  key the overlay's `--stop-key` names), is pressed in place of Stop in every case above
+  that presses Stop on the pill, and each must end as it does with Stop on the pill, the
+  overlay saying that it is stopping after the key; once the pill reads Stopping it must no
+  longer show the key. Pressed as soon as the
   overlay has claimed it, before its windows show, with an app in front that prints the
   keys it gets (`checks/key-target.swift`), it must be taken as an early Stop, and none of
   the presses may reach that app once the overlay has said it is stopping; and pressed with
   that app in front, the pill must show it, it must stop the run, and the app
-  must not get it while the overlay is up, and must once the overlay has gone, also when the
-  overlay was killed (SIGKILL). With two overlays up, each over a run of its own, the
+  must not get it while the overlay is up, and must once the overlay has said its last
+  words, while it still waits for its notification, and once it was killed (SIGKILL). With two overlays up, each over a run of its own, the
   second's claim on the key must be refused: its pill shows no key and its Stop still
   stops its run, and one press of the key stops only the first run. A click the helper
   posts while the key's modifiers are held, before the key (`press-key --hold`, with F13
-  in place of Space), must carry them, as `checks/pointer-target.swift` reports each event's
-  modifiers. First of
+  in place of Space), carries them, as `checks/pointer-target.swift` reports each event's
+  modifiers: a measurement of the cost ADR-0017 accepts, after which the modifiers are let
+  go of whatever happened (`press-key --release`). First of
   all the overlay is started with the process id 0, and with -1, for its run: it must
   refuse, saying nothing and exiting 1 with its usage. After every case it is started over a run
   that has ended and that nothing has waited for, which still answers signal 0: it must say

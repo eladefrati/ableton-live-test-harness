@@ -1,25 +1,24 @@
-// Presses a key for pointer-guards.js as a person does on a keyboard: each modifier down in
-// turn, the key down and up, the modifiers up, posted as events (CGEvent) where a keyboard's
-// would come in. It presses harness-computer-use's stop key (computer-use-overlay.swift,
-// ADR-0017), given as the overlay's --stop-key gives it.
+// Presses a key for pointer-guards.js, posted as events (CGEvent) where a keyboard's would come
+// in: harness-computer-use's stop key (computer-use-overlay.swift, ADR-0017), given as the
+// overlay's --stop-key gives it.
 //
-//   press-key <code> <modifier>... [--until-gone <file>] [--hold <ms>]
+//   press-key <code> <modifier>... [--until-gone <file> | --after-end <pid> | --hold <ms> | --release]
 //
-// The modifiers are control, option, shift and command. With --hold it holds them down for
-// <ms> before the key, as a person's fingers take a moment to reach it. With --until-gone it
-// holds the modifiers down and presses the key every 20 ms until <file> is gone, for up to
-// UNTIL_SECONDS, for a press that must come as soon as the overlay has claimed the key, and
-// exits 1 if the file is still there. Only the key repeats: the whole chord every 10 ms, 800
-// events a second, held up the overlay's start by more than 3 s (live-notes.md).
+// The modifiers are control, option, shift and command. The key goes down and up carrying
+// them as its flags, with no modifier pressed on its own: the hot key takes that as the key
+// (live-notes.md), and nothing is left held. With --until-gone it presses the key every 20 ms
+// until <file> is gone, for up to UNTIL_SECONDS, for a press that must come as soon as the
+// overlay has claimed the key, and exits 1 if the file is still there: the whole chord every
+// 10 ms, 800 events a second, held up the overlay's start by more than 3 s. With --after-end
+// it ends the process <pid> (SIGTERM) and presses as soon as it has gone, as press-stop does
+// with its <run>. With --hold it presses the modifiers on their own first, as a person does,
+// and holds them down for <ms> before the key; it lets them go however it ends but SIGKILL:
+// on SIGINT, SIGTERM or SIGHUP, and when it fails. With --release it only lets the modifiers
+// go, for a check to call after one that may have been killed holding them.
 // Exits 1, posting nothing, if the terminal app may not post events (Accessibility).
 
 import ApplicationServices
 import Foundation
-
-func fail(_ message: String) -> Never {
-    FileHandle.standardError.write(Data((message + "\n").utf8))
-    exit(1)
-}
 
 let UNTIL_SECONDS = 3.0
 // An event posted just before the process exits is lost, and with it a modifier's release.
@@ -34,63 +33,124 @@ func value(_ name: String) -> String? {
     defer { options.removeSubrange(index...index + 1) }
     return options[index + 1]
 }
+func flag(_ name: String) -> Bool {
+    guard let index = options.firstIndex(of: name) else { return false }
+    options.remove(at: index)
+    return true
+}
+func usageFail() -> Never {
+    FileHandle.standardError.write(Data("usage: press-key <code> <modifier>... [--until-gone <file> | --after-end <pid> | --hold <ms> | --release]\n".utf8))
+    exit(1)
+}
 let until = value("--until-gone")
-let usage = "usage: press-key <code> <modifier>... [--until-gone <file>] [--hold <ms>]"
+let afterEnd = value("--after-end").map { text -> pid_t in
+    guard let pid = pid_t(text), pid > 0 else { usageFail() }
+    return pid
+}
 let hold = value("--hold").map { text -> useconds_t in
-    guard let ms = useconds_t(text) else { fail(usage) }
+    guard let ms = useconds_t(text) else { usageFail() }
     return ms * 1000
-} ?? 0
-guard let first = options.first, let code = CGKeyCode(first) else { fail(usage) }
+}
+let releaseOnly = flag("--release")
+guard [until != nil, afterEnd != nil, hold != nil, releaseOnly].filter({ $0 }).count <= 1 else { usageFail() }
+guard let first = options.first, let code = CGKeyCode(first) else { usageFail() }
 let modifiers = options.dropFirst().map { name -> (code: CGKeyCode, flag: CGEventFlags) in
-    guard let key = MODIFIER_KEYS[name] else { fail("press-key takes the modifiers \(MODIFIER_KEYS.keys.sorted().joined(separator: ", ")), not \(name)") }
+    guard let key = MODIFIER_KEYS[name] else {
+        FileHandle.standardError.write(Data("press-key takes the modifiers \(MODIFIER_KEYS.keys.sorted().joined(separator: ", ")), not \(name)\n".utf8))
+        exit(1)
+    }
     return key
+}
+let allModifiers = modifiers.reduce(CGEventFlags()) { $0.union($1.flag) }
+
+let eventSource = CGEventSource(stateID: .hidSystemState)
+// The modifiers pressed on their own and not yet let go, which every way out lets go.
+let heldLock = NSLock()
+var held = CGEventFlags()
+
+// Posts a key event: a modifier's press or release (flagsChanged), or the key's.
+func post(_ key: CGKeyCode, down: Bool, flags: CGEventFlags, modifier: Bool) -> Bool {
+    guard let event = CGEvent(keyboardEventSource: eventSource, virtualKey: key, keyDown: down) else { return false }
+    if modifier { event.type = .flagsChanged }
+    event.flags = flags
+    event.post(tap: .cghidEventTap)
+    return true
+}
+func letGo() {
+    heldLock.lock()
+    defer { heldLock.unlock() }
+    for modifier in modifiers.reversed() where held.contains(modifier.flag) {
+        held.remove(modifier.flag)
+        _ = post(modifier.code, down: false, flags: held, modifier: true)
+    }
+    usleep(SETTLE_MICROSECONDS)
+}
+func fail(_ message: String) -> Never {
+    letGo()
+    FileHandle.standardError.write(Data((message + "\n").utf8))
+    exit(1)
+}
+func pressModifiers() {
+    var made = true
+    heldLock.lock()
+    for modifier in modifiers where made {
+        held.insert(modifier.flag)
+        made = post(modifier.code, down: true, flags: held, modifier: true)
+    }
+    heldLock.unlock()
+    if !made { fail("The key event couldn't be made") }
+}
+// The key down and up, carrying the modifiers as its flags.
+func tapKey() {
+    guard post(code, down: true, flags: allModifiers, modifier: false), post(code, down: false, flags: allModifiers, modifier: false)
+    else { fail("The key event couldn't be made") }
 }
 
 // Without Accessibility the events would be dropped with no error.
 guard AXIsProcessTrusted() else { fail("Pressing a key needs Accessibility for the terminal app") }
-let source = CGEventSource(stateID: .hidSystemState)
-func post(_ key: CGKeyCode, down: Bool, flags: CGEventFlags, modifier: Bool) {
-    guard let event = CGEvent(keyboardEventSource: source, virtualKey: key, keyDown: down) else { fail("The key event couldn't be made") }
-    if modifier { event.type = .flagsChanged }
-    event.flags = flags
-    event.post(tap: .cghidEventTap)
-}
-// The modifiers held as they are pressed in turn, all of them once all are down.
-let allHeld = modifiers.reduce(CGEventFlags()) { $0.union($1.flag) }
-func holdModifiers() {
-    var held = CGEventFlags()
-    for modifier in modifiers {
-        held.insert(modifier.flag)
-        post(modifier.code, down: true, flags: held, modifier: true)
+
+// An interrupt, termination or hangup lets the modifiers go before this process ends by it:
+// on another thread, since the main one sleeps between events.
+var signalSources: [DispatchSourceSignal] = []
+for number in [SIGINT, SIGTERM, SIGHUP] {
+    signal(number, SIG_IGN)
+    let signalSource = DispatchSource.makeSignalSource(signal: number, queue: .global())
+    signalSource.setEventHandler {
+        letGo()
+        signal(number, SIG_DFL)
+        kill(getpid(), number)
     }
-}
-func releaseModifiers() {
-    var held = allHeld
-    for modifier in modifiers.reversed() {
-        held.remove(modifier.flag)
-        post(modifier.code, down: false, flags: held, modifier: true)
-    }
-}
-func tapKey() {
-    post(code, down: true, flags: allHeld, modifier: false)
-    post(code, down: false, flags: allHeld, modifier: false)
+    signalSource.resume()
+    signalSources.append(signalSource)
 }
 
-holdModifiers()
+if releaseOnly {
+    heldLock.lock()
+    held = allModifiers
+    heldLock.unlock()
+    letGo()
+    exit(0)
+}
+if let afterEnd {
+    kill(afterEnd, SIGTERM)
+    let deadline = Date().addingTimeInterval(UNTIL_SECONDS)
+    while kill(afterEnd, 0) == 0 {
+        if Date() > deadline { fail("The process \(afterEnd) didn't end") }
+        usleep(1000)
+    }
+}
 if let until {
     let deadline = Date().addingTimeInterval(UNTIL_SECONDS)
     while FileManager.default.fileExists(atPath: until) {
-        if Date() > deadline {
-            releaseModifiers()
-            usleep(SETTLE_MICROSECONDS)
-            fail("\(until) was still there \(Int(UNTIL_SECONDS)) s after the key was first pressed")
-        }
+        if Date() > deadline { fail("\(until) was still there \(Int(UNTIL_SECONDS)) s after the key was first pressed") }
         tapKey()
         usleep(20_000)
     }
-} else {
+} else if let hold {
+    pressModifiers()
     usleep(hold)
     tapKey()
+} else {
+    tapKey()
 }
-releaseModifiers()
-usleep(SETTLE_MICROSECONDS)
+letGo()
