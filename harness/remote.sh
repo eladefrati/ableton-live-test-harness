@@ -66,10 +66,6 @@ sync $harness
 # non-interactive ssh shell doesn't have them on PATH. Expanded by the remote's shell.
 remote_path='export PATH=$HOME/.local/bin:/opt/homebrew/bin:/usr/local/bin:$PATH'
 
-# The command is passed as words; quote each so it reaches the remote shell intact.
-run_status=0
-ssh "$host" "$remote_path; cd ~/dev/${(q)repo} && ${(j: :)${(q)@}}" || run_status=$?
-
 # Move the run's logs here, after a failed run too, if the remote has any. Logs that can't be
 # moved stay on the remote, where the sync leaves them alone, and come back after the next run.
 bring_back_logs() {
@@ -85,7 +81,7 @@ bring_back_logs() {
 # is deleted there after 7 days.
 bring_back_captures() {
   local listed
-  listed=$(ssh "$host" "$remote_path; cd ~/dev/$harness && node harness/captures.js finished") || {
+  listed=$(ssh "$host" "$remote_path; rm -f $group_file; cd ~/dev/$harness && node harness/captures.js finished") || {
     print -u2 "remote.sh: could not list the remote's captures; a later run will bring them back"
     return 0
   }
@@ -121,6 +117,38 @@ bring_back_captures() {
   fi
   rm -f $list
 }
+
+# The remote shell writes its process id here, which is the process group of what it runs
+# (sshd makes it a session leader), for stop_recordings.
+group_file="\${TMPDIR:-/tmp}/ableton-harness-remote-$$.pid"
+
+# Ctrl-C or SIGTERM here ends ssh, but nothing reaches the command on the remote, which has no
+# terminal: a check there runs on to its end, as it always has. A recording would go on for
+# its length, 10 minutes if none was given, so each `cli.js video` of this run is given SIGINT,
+# as Ctrl-C would give it here, and has 20 s to finish: one around a command ends after the
+# command, which gets the SIGINT from it. A recording made by a check's own code ends with the
+# check.
+stop_recordings() {
+  ssh "$host" "group=\$(cat $group_file 2>/dev/null) || exit 0
+    pids=\$(pgrep -g \$group -f 'cli[.]js video') || exit 0
+    echo \"\$pids\" | xargs kill -INT
+    for i in \$(seq 40); do pgrep -g \$group -f 'cli[.]js video' >/dev/null || exit 0; sleep 0.5; done
+    echo 'remote.sh: a recording on the remote was still running 20 s after SIGINT' >&2" \
+    || print -u2 "remote.sh: could not stop the run's recordings on $host"
+}
+interrupted() {
+  trap - INT TERM
+  stop_recordings
+  bring_back_logs
+  bring_back_captures
+  exit $1
+}
+trap 'interrupted 130' INT
+trap 'interrupted 143' TERM
+
+# The command is passed as words; quote each so it reaches the remote shell intact.
+run_status=0
+ssh "$host" "$remote_path; echo \$\$ > $group_file; cd ~/dev/${(q)repo} && ${(j: :)${(q)@}}" || run_status=$?
 
 bring_back_logs
 bring_back_captures
