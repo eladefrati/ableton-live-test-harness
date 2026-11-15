@@ -286,7 +286,7 @@ test("the run gives the dialog its border's program, or null when none was built
   for (const binary of ["border binary", null]) {
     const system = fakeMachine();
     const told = [];
-    Object.assign(system, { hostname: () => "another-mac", buildComputerUse: async () => binary, ask: async (...border) => { told.push(border); return true; } });
+    Object.assign(system, { hostname: () => "another-mac", buildComputerUse: async () => binary, ask: async (...given) => { told.push(given); return true; } });
     await (await open(system)).press("Button");
     assert.deepEqual(told, [[binary]]);
   }
@@ -1171,7 +1171,7 @@ test("showComputerUse resolves once the border says it has shown, having given i
   }
 });
 
-test("a border that couldn't claim its stop key is warned of, and the run clicks on", async () => {
+test("a border that couldn't claim its stop key is warned of", async () => {
   const border = standIn('echo "no stop key: RegisterEventHotKey returned -9878"', "echo shown", STAYS);
   const warnings = await warningsOf(() => showComputerUse(border));
   assert.deepEqual(warnings, ["warn harness-computer-use couldn't claim its stop key (RegisterEventHotKey returned -9878). Stop on its pill still stops the run"]);
@@ -1191,10 +1191,14 @@ test("every border the run shows is given the run's one click token, so Stop on 
   assert.equal(first, clickToken());
 });
 
-test("the stop key's words are read from the border's program, and are null when it can't say them", async () => {
+test("the stop key's words are read from the border's program, and are null, with a warning, when it can't say them in time", async () => {
   const says = standIn('test "$1" = --stop-key || exit 2', `echo '{"code":7,"modifiers":["control"],"words":"Control-X","symbols":"^X"}'`);
-  assert.equal(await stopKeyOf(says), "Control-X");
-  for (const lines of [["exit 1"], ["echo not json"], ["echo '{}'"]]) assert.equal(await stopKeyOf(standIn(...lines)), null);
+  assert.deepEqual(await warningsOf(async () => assert.equal(await stopKeyOf(says), "Control-X")), []);
+  for (const lines of [["exit 1"], ["echo not json"], ["echo '{}'"], ["sleep 5"]]) {
+    const warnings = await warningsOf(async () => assert.equal(await stopKeyOf(standIn(...lines), { timeoutMs: 300 }), null));
+    assert.equal(warnings.length, 1);
+    assert.match(warnings[0], /^warn harness-computer-use couldn't read its stop key \(.+\)\. The dialog doesn't name it$/);
+  }
 });
 
 test("showComputerUse leaves this process's environment as it was", async () => {
@@ -1219,7 +1223,8 @@ test("the dialog says that the glow will show and names the stop key or, with no
     tools.run = run;
   }
   assert.deepEqual(texts, [
-    "harness-computer-use wants to click in Live on this Mac for tests/live/check.js. It moves the pointer until the run ends, while a purple glow shows around the screen. Stop on its pill, or Control-Option-Command-Space, takes the mouse back.",
+    "harness-computer-use wants to click in Live on this Mac for tests/live/check.js. It moves the pointer until the run ends, while a purple glow shows around the screen. "
+      + "Stop on its pill, or the key it shows (Control-Option-Command-Space), takes the mouse back.",
     "harness-computer-use wants to click in Live on this Mac for tests/live/check.js. It moves the pointer until the run ends, while a purple glow shows around the screen.",
     "harness-computer-use wants to click in Live on this Mac. It moves the pointer until the run ends. Nothing on screen will show that it may take the pointer, and there will be no Stop and no stop key.",
   ]);

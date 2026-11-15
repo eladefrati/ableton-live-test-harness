@@ -283,7 +283,7 @@ function runName(script = runScript()) {
 // tests.
 async function askToClick(script, border, key) {
   const text = `harness-computer-use wants to click in Live on this Mac${script ? ` for ${script}` : ""}. `
-    + (border ? `It moves the pointer until the run ends, while a purple glow shows around the screen.${key ? ` Stop on its pill, or ${key}, takes the mouse back.` : ""}`
+    + (border ? `It moves the pointer until the run ends, while a purple glow shows around the screen.${key ? ` Stop on its pill, or the key it shows (${key}), takes the mouse back.` : ""}`
       : "It moves the pointer until the run ends. Nothing on screen will show that it may take the pointer, and there will be no Stop and no stop key.");
   const dialog = [
     "on run argv",
@@ -307,15 +307,29 @@ async function askToClick(script, border, key) {
 // run is killed.
 const OVERLAY_SOURCE = path.join(__dirname, "computer-use-overlay.swift");
 
+// How long the border's program has to say its stop key. It says it at once, with no window
+// server needed.
+const STOP_KEY_MS = 2000;
+
 // The border's stop key in words (ADR-0017), as its program gives it (`--stop-key`), which
-// holds the key in one place; null if the program can't say, and the dialog then doesn't
-// name a key. Exported for the tests.
-async function stopKeyOf(binary) {
+// holds the key in one place; null, with a warning, if the program can't say within
+// `timeoutMs`, and the dialog then doesn't name a key. Exported for the tests.
+async function stopKeyOf(binary, { timeoutMs = STOP_KEY_MS } = {}) {
+  let [child, timer] = [null, null];
   try {
-    const { words } = JSON.parse(await tools.run(binary, ["--stop-key"]));
-    return typeof words === "string" && words ? words : null;
-  } catch {
+    const said = await Promise.race([
+      tools.run(binary, ["--stop-key"], { started: (started) => { child = started; } }),
+      new Promise((resolve, reject) => { timer = setTimeout(() => reject(new Error(`it said nothing within ${timeoutMs} ms`)), timeoutMs); }),
+    ]);
+    const { words } = JSON.parse(said);
+    if (typeof words !== "string" || !words) throw new Error(`it said ${JSON.stringify(said.trim())}`);
+    return words;
+  } catch (error) {
+    console.error(`warn harness-computer-use couldn't read its stop key (${error.message.split("\n")[0]}). The dialog doesn't name it`);
     return null;
+  } finally {
+    clearTimeout(timer);
+    child?.kill();
   }
 }
 

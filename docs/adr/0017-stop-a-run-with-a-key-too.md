@@ -36,7 +36,9 @@ so reaching Stop means competing with the run for the pointer. A key needs no po
    press the key itself (see Consequences).
 4. **The pill and the dialog name it.** The pill shows ⌃⌥⌘Space, dim, before its Stop button.
    When the border was built, the dialog that asks for the clicks (ADR-0006) says that Stop on
-   the pill, or the key, takes the mouse back. When it wasn't, the dialog says that there will
+   the pill, or the key the pill shows, takes the mouse back, and names the key. The dialog
+   comes before the key is claimed, so it doesn't promise it: a pill whose key couldn't be
+   claimed shows none. When it wasn't, the dialog says that there will
    be no Stop and no stop key.
 5. **A key that can't be claimed only goes without saying so on the pill.** The pill then
    leaves its hint out, and the run warns and clicks on: Stop on the pill still stops it. So
