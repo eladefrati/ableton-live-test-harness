@@ -89,9 +89,17 @@ async function recordVideo(file, { window, screen = false, seconds = MAX_SECONDS
   if (screen && window !== undefined) throw new VideoError("Record a window or the screen, not both");
   if (path.extname(file) !== ".mov") throw new VideoError(`A video is saved as a .mov, not ${path.basename(file)}`);
   if (!(seconds > 0)) throw new VideoError(`A recording lasts more than 0 s, not ${seconds}`);
+  // Built first: a first build can take most of a minute, long enough for the display to
+  // sleep again, and a recording started with it asleep makes no file.
+  const binary = await system.binary();
+  // wakeDisplay's own message speaks of bringing Live to the front, which a recording doesn't
+  // do; it stays as the cause.
+  await system.wake().catch((error) => {
+    throw new VideoError("The display couldn't be woken for the recording. Waking it needs Automation for System Events "
+      + "for the terminal app: System Settings > Privacy & Security > Automation", { cause: error });
+  });
   let target;
   if (screen) {
-    await system.wake();
     target = ["screen"];
   } else if (window === undefined) {
     target = ["window", String((await system.mainWindow()).id)];
@@ -99,7 +107,6 @@ async function recordVideo(file, { window, screen = false, seconds = MAX_SECONDS
     if (!(await system.windows()).some((w) => w.id === window)) throw new VideoError(`Live has no window ${window} on screen`);
     target = ["window", String(window)];
   }
-  const binary = await system.binary();
   file = path.resolve(file);
   fs.mkdirSync(path.dirname(file), { recursive: true });
   fs.rmSync(file, { force: true });

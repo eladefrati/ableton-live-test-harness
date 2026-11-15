@@ -107,13 +107,24 @@ test("a window given by id must be one of Live's on screen", async (t) => {
   await video.stop();
 });
 
-test("the screen is recorded after waking the display", async (t) => {
+test("the helper is built before the display is woken, and the window looked up after, so a long build can't let it sleep again", async (t) => {
   const helper = fakeHelper(t, RECORDS_UNTIL_SIGINT);
   const system = fakeSystem(helper);
+  await (await recordVideo(out(helper), {}, system)).stop();
+  assert.deepEqual(system.calls, ["binary", "wake", "mainWindow"]);
+  system.calls.length = 0;
   const video = await recordVideo(out(helper), { screen: true }, system);
   assert.deepEqual(helper.args().slice(2), ["screen", "600"]);
-  assert.deepEqual(system.calls, ["wake", "binary"]);
+  assert.deepEqual(system.calls, ["binary", "wake"]);
   await video.stop();
+});
+
+test("a display that can't be woken is refused with a reason that fits a recording, naming the permission it needs", async (t) => {
+  const helper = fakeHelper(t, RECORDS_UNTIL_SIGINT);
+  const system = fakeSystem(helper);
+  system.wake = async () => { throw new Error("No app is frontmost 3000 ms after declaring user activity; Live can't be brought to the front"); };
+  await assert.rejects(recordVideo(out(helper), {}, system), (e) => e instanceof VideoError
+    && /couldn't be woken for the recording/.test(e.message) && /Automation for System Events/.test(e.message) && !/brought to the front/.test(e.message));
 });
 
 test("a recording given a length ends by itself: done() resolves with the file's length and size", async (t) => {
