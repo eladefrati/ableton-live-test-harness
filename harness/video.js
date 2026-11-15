@@ -23,6 +23,7 @@ const path = require("node:path");
 const { spawn } = require("node:child_process");
 const mac = require("./macos.js");
 const tools = require("./tools.js");
+const captures = require("./captures.js");
 const { liveMainWindow, liveWindows } = require("./device-ui.js");
 
 class VideoError extends Error {}
@@ -36,11 +37,12 @@ const STARTED_MS = 15000;
 // macOS 15 is Darwin 24: SCRecordingOutput, which writes the file, came with it.
 const FIRST_DARWIN = 24;
 
-const USAGE = "usage: cli.js video <file.mov> [--seconds <n>] [--window <id> | --screen] [-- <command...>]";
-const FRAME_USAGE = "usage: cli.js video-frame <file.mov> <seconds> <file.png>";
+const USAGE = "usage: cli.js video [<file.mov>] [--seconds <n>] [--window <id> | --screen] [-- <command...>]";
+const FRAME_USAGE = "usage: cli.js video-frame <file.mov> <seconds> [<file.png>]";
 
 const machine = {
   startedMs: STARTED_MS,
+  captures: captures.CAPTURES,
   release: () => os.release(),
   wake: () => mac.wakeDisplay(),
   mainWindow: () => liveMainWindow(),
@@ -75,13 +77,14 @@ function parseVideoArgs(argv) {
     } else if (word.startsWith("--") || options.file !== undefined) refuse();
     else options.file = word;
   }
-  if (!options.file || path.extname(options.file) !== ".mov") refuse();
+  if (options.file !== undefined && path.extname(options.file) !== ".mov") refuse();
   if (options.screen && options.window !== undefined) refuse();
   if (dash !== -1 && command.length === 0) refuse();
   return options;
 }
 
-// Starts recording to `file` (a .mov; its folder is made, a file there replaced) and resolves
+// Starts recording to `file` (a .mov; its folder is made, a file there replaced), or with no
+// `file` to a new one in the captures folder (captures.js), and resolves
 // once the helper says it records, with { file, pid, stop(), done() }: `pid` is the helper's,
 // stop() ends the recording now, done() waits for it to end by itself, and both resolve with
 // { file, seconds, bytes }, the video's length and size, with `early`, the reason, when it
@@ -89,7 +92,7 @@ function parseVideoArgs(argv) {
 async function recordVideo(file, { window, screen = false, seconds = MAX_SECONDS } = {}, system = machine) {
   requireMacOS15(system);
   if (screen && window !== undefined) throw new VideoError("Record a window or the screen, not both");
-  if (path.extname(file) !== ".mov") throw new VideoError(`A video is saved as a .mov, not ${path.basename(file)}`);
+  if (file !== undefined && path.extname(file) !== ".mov") throw new VideoError(`A video is saved as a .mov, not ${path.basename(file)}`);
   if (!(seconds > 0)) throw new VideoError(`A recording lasts more than 0 s, not ${seconds}`);
   // Built first: a first build can take most of a minute, long enough for the display to
   // sleep again, and a recording started with it asleep makes no file.
@@ -109,9 +112,11 @@ async function recordVideo(file, { window, screen = false, seconds = MAX_SECONDS
     if (!(await system.windows()).some((w) => w.id === window)) throw new VideoError(`Live has no window ${window} on screen`);
     target = ["window", String(window)];
   }
-  file = path.resolve(file);
+  file = file === undefined ? captures.capturePath(screen ? "live-screen" : "live-window", ".mov", { root: system.captures }) : path.resolve(file);
   fs.mkdirSync(path.dirname(file), { recursive: true });
   fs.rmSync(file, { force: true });
+  // In the captures folder, a mark says the file is being written, until the helper has ended.
+  const marked = path.dirname(file) === path.resolve(system.captures);
   // A process group of its own: Ctrl-C in a terminal signals the run's whole group, and the
   // recording must end when the run says, after a command it wraps has ended.
   const child = system.spawn(binary, ["record", file, ...target, String(seconds)], { stdio: ["ignore", "pipe", "pipe"], detached: true });
@@ -119,11 +124,13 @@ async function recordVideo(file, { window, screen = false, seconds = MAX_SECONDS
   child.stdout.on("data", (data) => { said += data; });
   child.stderr.on("data", (data) => { complained += data; });
   const reason = () => complained.trim().split("\n").pop();
+  if (marked && child.pid) captures.markRecording(file, child.pid);
 
   // Settles when the helper has ended: with its last line, the file's length and size.
   const ended = new Promise((resolve, reject) => {
     child.on("error", (error) => reject(new VideoError(`The video helper couldn't run: ${error.message}`)));
     child.on("close", (code, signal) => {
+      if (marked) captures.unmarkRecording(file);
       const last = said.trim().split("\n").pop();
       if (code === 0 && last.startsWith("{")) resolve({ file, ...JSON.parse(last) });
       else reject(new VideoError(reason() || `The video helper ended with ${signal ?? `status ${code}`}`));
@@ -217,17 +224,24 @@ async function runVideoCommand({ file, seconds, window, screen, command = [] }, 
 // The arguments of `cli.js video-frame`, after the command's name.
 function parseFrameArgs(argv) {
   const [file, at, png] = [argv[0], Number(argv[1]), argv[2]];
-  if (argv.length !== 3 || path.extname(file) !== ".mov" || !(at >= 0) || path.extname(png) !== ".png") throw new VideoError(FRAME_USAGE);
+  if (![2, 3].includes(argv.length) || path.extname(file) !== ".mov" || argv[1] === "" || !(at >= 0)
+    || (png !== undefined && path.extname(png) !== ".png")) throw new VideoError(FRAME_USAGE);
   return { file, at, png };
 }
 
-// Saves the frame `file` shows at `at` seconds as the PNG `png` (its folder is made), and
+// Saves the frame `file` shows at `at` seconds as the PNG `png` (its folder is made), or with no
+// `png` as `<video's name>-<at>s.png` in the captures folder, and
 // resolves with { file: png, at, w, h, seconds }: the time of that frame, its size in pixels,
 // and the video's length. For an agent to see what a video shows, as it can't watch one.
 async function videoFrame(file, at, png, system = machine) {
   requireMacOS15(system);
   if (!fs.existsSync(file)) throw new VideoError(`No video at ${file}`);
   const binary = await system.binary();
+  if (png === undefined) {
+    fs.mkdirSync(system.captures, { recursive: true });
+    captures.pruneCaptures(system.captures);
+    png = path.join(system.captures, `${path.basename(file, ".mov")}-${at}s.png`);
+  }
   png = path.resolve(png);
   fs.mkdirSync(path.dirname(png), { recursive: true });
   const args = ["frame", path.resolve(file), String(at), png];

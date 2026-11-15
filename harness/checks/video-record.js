@@ -5,7 +5,8 @@
 // changes, it records Live's main window and the main display for a length of time, a video
 // around a command, one around a command given Ctrl-C, one that cli.js video stops on
 // SIGTERM, one of a window that closes (a panel of its own, pointer-target.swift), and one
-// whose run is killed, and saves frames of each. Every video must be playable, as long as
+// whose run is killed, and saves frames of each; and the captures cli.js makes given no file,
+// which it deletes. Every video must be playable, as long as
 // asked within a tolerance, and have a frame at each time checked, and two frames of one that
 // moved must differ; the frames are left to look at with --out. Leaves the transport stopped.
 //
@@ -22,6 +23,7 @@ const { connect } = require("../live.js");
 const mac = require("../macos.js");
 const { liveMainWindow } = require("../device-ui.js");
 const { recordVideo, runVideoCommand, videoFrame } = require("../video.js");
+const { CAPTURES } = require("../captures.js");
 const tools = require("../tools.js");
 
 const CLI = path.join(__dirname, "..", "cli.js");
@@ -175,6 +177,32 @@ const CASES = [
       const result = JSON.parse(out.trim().split("\n").pop());
       if (!near(result.seconds, 3)) throw new Error(`The video is ${result.seconds} s long`);
       return `${result.seconds.toFixed(2)} s; ${await frames(file, [1, 2.5])}`;
+    },
+  },
+  {
+    name: "cli.js video, capture and video-frame with no file, for 2 s",
+    async run() {
+      // Into the captures folder, under the time, each saying where; deleted here once checked.
+      const made = [];
+      try {
+        const { ended } = await node([CLI, "video", "--seconds", "2"], "recording ");
+        const { code, out, err } = await ended;
+        if (code !== 0) throw new Error(`cli.js video ended with status ${code}: ${err.trim()}`);
+        const video = JSON.parse(out.trim().split("\n").pop()).file;
+        made.push(video);
+        const still = await node([CLI, "capture"]).then(({ ended }) => ended);
+        if (still.code !== 0) throw new Error(`cli.js capture ended with status ${still.code}: ${still.err.trim()}`);
+        made.push(JSON.parse(still.out).file);
+        const frame = await node([CLI, "video-frame", video, "1"]).then(({ ended }) => ended);
+        if (frame.code !== 0) throw new Error(`cli.js video-frame ended with status ${frame.code}: ${frame.err.trim()}`);
+        made.push(JSON.parse(frame.out).file);
+        const elsewhere = made.filter((file) => path.dirname(file) !== CAPTURES || !fs.existsSync(file));
+        if (elsewhere.length) throw new Error(`Not in ${CAPTURES}: ${elsewhere.join(", ")}`);
+        if (!err.includes(`recording ${video}`)) throw new Error(`cli.js video didn't say where it records: ${err.trim()}`);
+        return made.map((file) => path.basename(file)).join(", ");
+      } finally {
+        made.forEach((file) => fs.rmSync(file, { force: true }));
+      }
     },
   },
   {

@@ -41,6 +41,7 @@ function fakeSystem(helper, { release = "25.6.0", windows = [{ id: 7, title: "Se
   return {
     calls,
     said,
+    captures: path.join(helper.folder, "captures"),
     say: (text) => said.push(text),
     startedMs,
     release: () => release,
@@ -56,6 +57,9 @@ const out = (helper, name = "video.mov") => path.join(helper.folder, "out", name
 
 test("the video command reads a file, a length, a window or the screen, and a command after --", () => {
   assert.deepEqual(parseVideoArgs(["a.mov"]), { file: "a.mov", seconds: undefined, window: undefined, screen: false, command: [] });
+  assert.deepEqual(parseVideoArgs([]), { file: undefined, seconds: undefined, window: undefined, screen: false, command: [] });
+  assert.deepEqual(parseVideoArgs(["--seconds", "3", "--", "node", "a.js"]),
+    { file: undefined, seconds: 3, window: undefined, screen: false, command: ["node", "a.js"] });
   assert.deepEqual(parseVideoArgs(["a.mov", "--seconds", "2.5", "--window", "12"]),
     { file: "a.mov", seconds: 2.5, window: 12, screen: false, command: [] });
   assert.deepEqual(parseVideoArgs(["--screen", "a.mov", "--", "node", "check.js", "--tempo", "97"]),
@@ -64,7 +68,7 @@ test("the video command reads a file, a length, a window or the screen, and a co
 
 test("the video command refuses what it can't record, saying how to call it", () => {
   for (const argv of [
-    [], ["a.png"], ["a.mov", "b.mov"], ["a.mov", "--window", "3", "--screen"], ["a.mov", "--seconds", "0"],
+    ["a.png"], ["a.mov", "b.mov"], ["a.mov", "--window", "3", "--screen"], ["a.mov", "--seconds", "0"],
     ["a.mov", "--seconds", "x"], ["a.mov", "--seconds"], ["a.mov", "--window", "1.5"], ["a.mov", "--keep"], ["a.mov", "--"],
   ]) {
     assert.throws(() => parseVideoArgs(argv), (e) => e instanceof VideoError && /usage: cli\.js video/.test(e.message), argv.join(" "));
@@ -99,6 +103,30 @@ test("by default Live's main window is recorded for up to 10 minutes, by a helpe
   assert.equal(video.pid, helper.pid(), "the helper's process");
   assert.deepEqual(await video.stop(), { file, seconds: 1.5, bytes: 1000 });
   assert.ok(fs.existsSync(path.dirname(file)), "the file's folder is made");
+});
+
+test("with no file, a video goes to the captures folder under the time and what it shows, marked as recording until it ends", async (t) => {
+  const helper = fakeHelper(t, RECORDS_UNTIL_SIGINT);
+  const system = fakeSystem(helper);
+  const video = await recordVideo(undefined, {}, system);
+  assert.equal(path.dirname(video.file), system.captures);
+  assert.match(path.basename(video.file), /^\d{4}-\d\d-\d\dT\d\d-\d\d-\d\d-\d{3}-live-window\.mov$/);
+  assert.equal(helper.args()[1], video.file);
+  const mark = path.join(system.captures, `.${path.basename(video.file)}.recording`);
+  assert.equal(fs.readFileSync(mark, "utf8"), String(video.pid));
+  await video.stop();
+  assert.ok(!fs.existsSync(mark), "the mark goes when the recording has ended");
+  const screen = await recordVideo(undefined, { screen: true }, system);
+  assert.match(path.basename(screen.file), /-live-screen\.mov$/);
+  await screen.stop();
+});
+
+test("a video at a path of the caller's leaves no mark there", async (t) => {
+  const helper = fakeHelper(t, RECORDS_UNTIL_SIGINT);
+  const file = out(helper);
+  const video = await recordVideo(file, {}, fakeSystem(helper));
+  assert.deepEqual(fs.readdirSync(path.dirname(file)).filter((name) => name.startsWith(".")), []);
+  await video.stop();
 });
 
 test("a window given by id must be one of Live's on screen", async (t) => {
@@ -199,7 +227,7 @@ setInterval(() => {}, 1000);
 const { spawn } = require("node:child_process");
 const { runVideoCommand } = require(${JSON.stringify(path.join(__dirname, "..", "video.js"))});
 const system = { startedMs: 5000, release: () => "25.6.0", wake: async () => {}, mainWindow: async () => ({ id: 7 }),
-  windows: async () => [], binary: async () => ${JSON.stringify(helper.file)}, spawn, say: () => {} };
+  windows: async () => [], binary: async () => ${JSON.stringify(helper.file)}, spawn, say: () => {}, captures: ${JSON.stringify(at("captures"))} };
 runVideoCommand({ file: ${JSON.stringify(at("video.mov"))}, screen: true, command: [process.execPath, ${JSON.stringify(at("command.js"))}] }, system)
   .then((result) => { process.exitCode = result.status; });
 `);
@@ -247,9 +275,10 @@ setInterval(() => {}, 1000);
   assert.ok(system.said.some((line) => /The recording failed: the window closed/.test(line)), system.said.join("\n"));
 });
 
-test("the video-frame command reads a video, a time in seconds and a PNG", () => {
+test("the video-frame command reads a video, a time in seconds and a PNG, or no PNG", () => {
   assert.deepEqual(parseFrameArgs(["a.mov", "1.5", "a.png"]), { file: "a.mov", at: 1.5, png: "a.png" });
-  for (const argv of [[], ["a.mov", "1"], ["a.mov", "x", "a.png"], ["a.mov", "-1", "a.png"], ["a.mov", "1", "a.jpg"], ["a.mp4", "1", "a.png"], ["a.mov", "1", "a.png", "b"]]) {
+  assert.deepEqual(parseFrameArgs(["a.mov", "1.5"]), { file: "a.mov", at: 1.5, png: undefined });
+  for (const argv of [[], ["a.mov"], ["a.mov", "x", "a.png"], ["a.mov", "-1", "a.png"], ["a.mov", "1", "a.jpg"], ["a.mp4", "1", "a.png"], ["a.mov", "1", "a.png", "b"]]) {
     assert.throws(() => parseFrameArgs(argv), (e) => e instanceof VideoError && /usage: cli\.js video-frame/.test(e.message), argv.join(" "));
   }
 });
@@ -271,6 +300,16 @@ test("a frame on a Mac before macOS 15 is refused, saying so, before the helper 
   const system = fakeSystem(helper, { release: "23.6.0" });
   await assert.rejects(videoFrame(video, 1, path.join(helper.folder, "a.png"), system), (e) => e instanceof VideoError && /macOS 15 or later/.test(e.message));
   assert.deepEqual(system.calls, []);
+});
+
+test("with no PNG, a frame goes to the captures folder, named after the video and the time", async (t) => {
+  const helper = fakeHelper(t, `console.log(JSON.stringify({ at: 1.5, w: 20, h: 10, seconds: 3 }));`);
+  const video = path.join(helper.folder, "clip.mov");
+  fs.writeFileSync(video, "");
+  const system = fakeSystem(helper);
+  const frame = await videoFrame(video, 1.5, undefined, system);
+  assert.equal(frame.file, path.join(system.captures, "clip-1.5s.png"));
+  assert.equal(helper.args()[3], frame.file);
 });
 
 test("a frame of a video that isn't there is refused before the helper runs", async (t) => {
