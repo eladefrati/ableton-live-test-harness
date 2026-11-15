@@ -391,14 +391,51 @@ test("a frame on a Mac before macOS 15 is refused, saying so, before the helper 
   assert.deepEqual(system.calls, []);
 });
 
-test("with no PNG, a frame goes to the captures folder, named after the video and the time", async (t) => {
-  const helper = fakeHelper(t, `console.log(JSON.stringify({ at: 1.5, w: 20, h: 10, seconds: 3 }));`);
+// Saves an empty PNG where it is asked to, and says what a frame does, failing if the video
+// isn't there to read.
+const SAVES_A_FRAME = `
+const [, video, , png] = process.argv.slice(2);
+if (!require("node:fs").existsSync(video)) { console.error("Can't read " + video + " as a video"); process.exit(1); }
+require("node:fs").writeFileSync(png, "");
+console.log(JSON.stringify({ at: 1.5, w: 20, h: 10, seconds: 3 }));`;
+
+test("with no PNG, a frame goes to the captures folder, named by the time as other captures are, then the video and the time in it", async (t) => {
+  const helper = fakeHelper(t, SAVES_A_FRAME);
   const video = path.join(helper.folder, "clip.mov");
   fs.writeFileSync(video, "");
   const system = fakeSystem(helper);
   const frame = await videoFrame(video, 1.5, undefined, system);
-  assert.equal(frame.file, path.join(system.captures, "clip-1.5s.png"));
-  assert.equal(helper.args()[3], frame.file);
+  assert.equal(path.dirname(frame.file), system.captures);
+  assert.match(path.basename(frame.file), /^\d{4}-\d\d-\d\dT\d\d-\d\d-\d\d-\d{3}-clip-1\.5s\.png$/);
+  assert.ok(fs.existsSync(frame.file));
+});
+
+test("a frame of a video in the captures folder older than 7 days is saved before the folder is pruned", async (t) => {
+  const helper = fakeHelper(t, SAVES_A_FRAME);
+  const system = fakeSystem(helper);
+  fs.mkdirSync(system.captures, { recursive: true });
+  const video = path.join(system.captures, "old.mov");
+  fs.writeFileSync(video, "");
+  const old = new Date(Date.now() - 8 * 24 * 60 * 60 * 1000);
+  fs.utimesSync(video, old, old);
+  const frame = await videoFrame(video, 1.5, undefined, system);
+  assert.ok(fs.existsSync(frame.file));
+  assert.ok(!fs.existsSync(video), "pruned after the frame was saved");
+});
+
+test("a video given no file prunes the captures folder once it has ended, not while it records", async (t) => {
+  const helper = fakeHelper(t, RECORDS_UNTIL_SIGINT);
+  const system = fakeSystem(helper);
+  fs.mkdirSync(system.captures, { recursive: true });
+  const old = path.join(system.captures, "old.png");
+  fs.writeFileSync(old, "");
+  const when = new Date(Date.now() - 8 * 24 * 60 * 60 * 1000);
+  fs.utimesSync(old, when, when);
+  const video = await recordVideo(undefined, {}, system);
+  t.after(() => video.stop().catch(() => {}));
+  assert.ok(fs.existsSync(old), "still there while it records");
+  await video.stop();
+  assert.ok(!fs.existsSync(old), "pruned once it ended");
 });
 
 test("a frame of a video that isn't there is refused before the helper runs", async (t) => {

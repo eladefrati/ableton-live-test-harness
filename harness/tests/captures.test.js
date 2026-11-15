@@ -6,7 +6,7 @@ const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 const { spawn } = require("node:child_process");
-const { CAPTURES, capturePath, pruneCaptures, markRecording, finishedCaptures } = require("../captures.js");
+const { CAPTURES, capturePath, saveCapture, pruneCaptures, markRecording, finishedCaptures } = require("../captures.js");
 
 function folder(t) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "captures-test-"));
@@ -48,7 +48,26 @@ test("a capture's default path is in the captures folder, named by the local tim
   assert.ok(fs.existsSync(root));
 });
 
-test("a new capture's path deletes captures there older than 7 days, but not one still being recorded", (t) => {
+test("a capture's default path deletes nothing", (t) => {
+  const root = folder(t);
+  const old = file(root, "old.png", 8);
+  capturePath("live-window", ".png", { root });
+  assert.ok(fs.existsSync(old));
+});
+
+test("a capture saved in the folder deletes the captures there older than 7 days once it is saved, not before", async (t) => {
+  const root = folder(t);
+  const old = file(root, "old.mov", 8);
+  const saved = await saveCapture("live-window", ".png", async (at) => {
+    assert.ok(fs.existsSync(old), "still there while the capture is made");
+    fs.writeFileSync(at, "png");
+  }, { root });
+  assert.equal(path.dirname(saved), root);
+  assert.equal(fs.readFileSync(saved, "utf8"), "png");
+  assert.ok(!fs.existsSync(old), "deleted once it was saved");
+});
+
+test("pruning deletes captures older than 7 days, but not one still being recorded", (t) => {
   const root = folder(t);
   const old = file(root, "old.png", 8);
   const recent = file(root, "recent.png", 6);
@@ -57,7 +76,7 @@ test("a new capture's path deletes captures there older than 7 days, but not one
   const oldFolder = path.join(root, "frames");
   fs.mkdirSync(oldFolder);
   fs.utimesSync(oldFolder, new Date(Date.now() - 8 * DAY), new Date(Date.now() - 8 * DAY));
-  capturePath("live-window", ".png", { root });
+  pruneCaptures(root);
   assert.ok(!fs.existsSync(old), "older than 7 days");
   assert.ok(!fs.existsSync(oldFolder), "a folder older than 7 days");
   assert.ok(fs.existsSync(recent), "6 days old");

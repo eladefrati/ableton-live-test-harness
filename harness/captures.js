@@ -6,8 +6,8 @@
 // which relaunch.js and quit.js empty. A capture is proof to show once, not part of a
 // project, so no project keeps a folder for it. macOS doesn't clear this folder of files left
 // unused (measured on macOS 26: files more than 3 days old outlived its daily clean-up), so
-// each new path here deletes the captures older than KEEP_DAYS. A path the caller gives is
-// used as given, and nothing here deletes it.
+// each capture saved here deletes, once it is saved, the captures older than KEEP_DAYS. A path
+// the caller gives outside this folder is used as given, and nothing here deletes it.
 //
 // A video being recorded here has a hidden mark beside it, `.<name>.recording`, holding its
 // recorder's process id: remote.sh brings back only finished captures, and pruning leaves a
@@ -29,11 +29,20 @@ const two = (n, width = 2) => String(n).padStart(width, "0");
 const stamp = (d) => `${d.getFullYear()}-${two(d.getMonth() + 1)}-${two(d.getDate())}T${two(d.getHours())}-${two(d.getMinutes())}-${two(d.getSeconds())}-${two(d.getMilliseconds(), 3)}`;
 
 // The path of a new capture in the folder, named by the time and `name`, what it shows, with
-// the extension `ext`. Makes the folder and deletes its old captures first.
+// the extension `ext`. Makes the folder; deletes nothing.
 function capturePath(name, ext, { root = CAPTURES, now = new Date() } = {}) {
   fs.mkdirSync(root, { recursive: true });
-  pruneCaptures(root, now);
   return path.join(root, `${stamp(now)}-${name}${ext}`);
+}
+
+// Saves a capture in the folder, as capturePath names it: `write` (its path) makes it. Then,
+// and not before, so a capture made from another one there can read it, deletes the folder's
+// old captures. Resolves with the capture's path.
+async function saveCapture(name, ext, write, { root = CAPTURES, now = new Date() } = {}) {
+  const file = capturePath(name, ext, { root, now });
+  await write(file);
+  pruneCaptures(root, now);
+  return file;
 }
 
 const markOf = (file) => path.join(path.dirname(file), `.${path.basename(file)}.recording`);
@@ -104,4 +113,4 @@ if (require.main === module) {
   }
 }
 
-module.exports = { CAPTURES, KEEP_DAYS, capturePath, pruneCaptures, markRecording, unmarkRecording, recording, finishedCaptures };
+module.exports = { CAPTURES, KEEP_DAYS, capturePath, saveCapture, pruneCaptures, markRecording, unmarkRecording, recording, finishedCaptures };

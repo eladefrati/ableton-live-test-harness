@@ -112,7 +112,9 @@ async function recordVideo(file, { window, screen = false, seconds = MAX_SECONDS
     if (!(await system.windows()).some((w) => w.id === window)) throw new VideoError(`Live has no window ${window} on screen`);
     target = ["window", String(window)];
   }
-  file = file === undefined ? captures.capturePath(screen ? "live-screen" : "live-window", ".mov", { root: system.captures }) : path.resolve(file);
+  // One given no file prunes the captures folder once it has ended (captures.js).
+  const named = file === undefined;
+  file = named ? captures.capturePath(screen ? "live-screen" : "live-window", ".mov", { root: system.captures }) : path.resolve(file);
   fs.mkdirSync(path.dirname(file), { recursive: true });
   fs.rmSync(file, { force: true });
   // In the captures folder, a mark says the file is being written, until the helper has ended.
@@ -132,6 +134,7 @@ async function recordVideo(file, { window, screen = false, seconds = MAX_SECONDS
     child.on("error", (error) => reject(new VideoError(`The video helper couldn't run: ${error.message}`)));
     child.on("close", (code, signal) => {
       if (marked) captures.unmarkRecording(file);
+      if (named) captures.pruneCaptures(system.captures);
       const last = said.trim().split("\n").pop();
       if (code === 0 && last.startsWith("{")) resolve({ file, ...JSON.parse(last) });
       else reject(new VideoError(reason() || `The video helper ended with ${signal ?? `status ${code}`}`));
@@ -243,26 +246,30 @@ function parseFrameArgs(argv) {
 }
 
 // Saves the frame `file` shows at `at` seconds as the PNG `png` (its folder is made), or with no
-// `png` as `<video's name>-<at>s.png` in the captures folder, and
+// `png` in the captures folder, named by the time, the video's name and `at` (captures.js), and
 // resolves with { file: png, at, w, h, seconds }: the time of that frame, its size in pixels,
 // and the video's length. For an agent to see what a video shows, as it can't watch one.
 async function videoFrame(file, at, png, system = machine) {
   requireMacOS15(system);
   if (!fs.existsSync(file)) throw new VideoError(`No video at ${file}`);
   const binary = await system.binary();
+  const save = async (to) => {
+    const args = ["frame", path.resolve(file), String(at), to];
+    const said = await tools.run(binary, args).catch((error) => {
+      // The helper's reason, without the command line run() puts before it.
+      throw new VideoError(error.message.replace(`${[binary, ...args].join(" ")} failed: `, ""), { cause: error });
+    });
+    return JSON.parse(said);
+  };
   if (png === undefined) {
-    fs.mkdirSync(system.captures, { recursive: true });
-    captures.pruneCaptures(system.captures);
-    png = path.join(system.captures, `${path.basename(file, ".mov")}-${at}s.png`);
+    let frame;
+    const saved = await captures.saveCapture(`${path.basename(file, ".mov")}-${at}s`, ".png", async (to) => { frame = await save(to); },
+      { root: system.captures });
+    return { file: saved, ...frame };
   }
   png = path.resolve(png);
   fs.mkdirSync(path.dirname(png), { recursive: true });
-  const args = ["frame", path.resolve(file), String(at), png];
-  const said = await tools.run(binary, args).catch((error) => {
-    // The helper's reason, without the command line run() puts before it.
-    throw new VideoError(error.message.replace(`${[binary, ...args].join(" ")} failed: `, ""), { cause: error });
-  });
-  return { file: png, ...JSON.parse(said) };
+  return { file: png, ...(await save(png)) };
 }
 
 module.exports = { VideoError, parseVideoArgs, recordVideo, runVideoCommand, parseFrameArgs, videoFrame, MAX_SECONDS };
