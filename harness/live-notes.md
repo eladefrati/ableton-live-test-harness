@@ -510,9 +510,12 @@ unexpected.
   other windows, without harness-computer-use's border and pill, the pointer included; Live
   in the background shows its title bar inactive. While the display sleeps a recording gets
   no frames: a display put to sleep 3 s into a 10 s recording left a 10 s video whose
-  picture stopped at 3 s. A recorder started with the display asleep made no file, so
-  `video.js` wakes the display first, and its helper keeps the display from sleeping while it
-  records (remote Mac, macOS 26.7, Live 12.4.25b1, 2026-11-14).
+  picture stopped at 3 s. A ScreenCaptureKit recorder, the kind `video.swift` is, started
+  with the display asleep made no file, so `video.js` wakes the display first; and the
+  helper keeps the display from sleeping while it records, though only from idle sleep: a
+  display put to sleep on purpose (`pmset displaysleepnow`) during a recording of the helper's
+  still slept, and the video froze from then on, which `checks/video-record.js` catches by
+  comparing frames (remote Mac, macOS 26.7, Live 12.4.25b1, 2026-11-14).
 - `ui.capture` crops its capture of Live's window with the helper's `crop`, as a capture of
   a plug-in's editor does, no longer with `sips`. The helper's crop gave its PNG no
   resolution, which reads as 72 dpi, where the capture has 144 and a crop by `sips` kept
