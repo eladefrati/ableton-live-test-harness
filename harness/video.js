@@ -49,6 +49,12 @@ const machine = {
   spawn,
 };
 
+// Refuses a Mac before macOS 15, where the helper doesn't build.
+function requireMacOS15(system) {
+  const darwin = Number(system.release().split(".")[0]);
+  if (!(darwin >= FIRST_DARWIN)) throw new VideoError(`Recording a video or reading its frames needs macOS 15 or later; this Mac runs Darwin ${system.release()}`);
+}
+
 // The arguments of `cli.js video`, after the command's name.
 function parseVideoArgs(argv) {
   const dash = argv.indexOf("--");
@@ -79,8 +85,7 @@ function parseVideoArgs(argv) {
 // stop() ends the recording now, done() waits for it to end by itself, and both resolve with
 // { file, seconds, bytes }, the video's length and size, or reject with the helper's reason.
 async function recordVideo(file, { window, screen = false, seconds = MAX_SECONDS } = {}, system = machine) {
-  const darwin = Number(system.release().split(".")[0]);
-  if (!(darwin >= FIRST_DARWIN)) throw new VideoError(`Recording a video needs macOS 15 or later; this Mac runs Darwin ${system.release()}`);
+  requireMacOS15(system);
   if (screen && window !== undefined) throw new VideoError("Record a window or the screen, not both");
   if (path.extname(file) !== ".mov") throw new VideoError(`A video is saved as a .mov, not ${path.basename(file)}`);
   if (!(seconds > 0)) throw new VideoError(`A recording lasts more than 0 s, not ${seconds}`);
@@ -198,6 +203,7 @@ function parseFrameArgs(argv) {
 // resolves with { file: png, at, w, h }: the time of that frame, and its size in pixels. For
 // an agent to see what a video shows, as it can't watch one.
 async function videoFrame(file, at, png, system = machine) {
+  requireMacOS15(system);
   if (!fs.existsSync(file)) throw new VideoError(`No video at ${file}`);
   const binary = await system.binary();
   png = path.resolve(png);

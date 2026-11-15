@@ -175,6 +175,15 @@ test("a frame is saved by the helper at the time asked, and resolves with the ti
   assert.ok(fs.existsSync(path.dirname(png)), "the PNG's folder is made");
 });
 
+test("a frame on a Mac before macOS 15 is refused, saying so, before the helper is built", async (t) => {
+  const helper = fakeHelper(t, `console.log("{}");`);
+  const video = path.join(helper.folder, "video.mov");
+  fs.writeFileSync(video, "");
+  const system = fakeSystem(helper, { release: "23.6.0" });
+  await assert.rejects(videoFrame(video, 1, path.join(helper.folder, "a.png"), system), (e) => e instanceof VideoError && /macOS 15 or later/.test(e.message));
+  assert.deepEqual(system.calls, []);
+});
+
 test("a frame of a video that isn't there is refused before the helper runs", async (t) => {
   const helper = fakeHelper(t, `console.log("{}");`);
   const system = fakeSystem(helper);
@@ -192,8 +201,10 @@ test("a frame the helper can't save rejects with its reason", async (t) => {
 const hasDeveloperTools = (() => {
   try { require("node:child_process").execFileSync("xcode-select", ["-p"], { stdio: "ignore" }); return true; } catch { return false; }
 })();
+// The helper uses SCRecordingOutput, which macOS 15 (Darwin 24) brought: it doesn't build before.
+const before15 = Number(os.release().split(".")[0]) < 24;
 test("the helper refuses arguments it can't use, with its usage, and a video it can't read",
-  { skip: !hasDeveloperTools && "no developer tools", timeout: 300000 }, async () => {
+  { skip: (!hasDeveloperTools && "no developer tools") || (before15 && "the helper needs macOS 15"), timeout: 300000 }, async () => {
   const { execFile } = require("node:child_process");
   const binary = await require("../tools.js").helperBinary(path.join(__dirname, "..", "video.swift"));
   const fails = (args) => new Promise((resolve) => execFile(binary, args, (error, stdout, stderr) => resolve({ error, stderr })));
