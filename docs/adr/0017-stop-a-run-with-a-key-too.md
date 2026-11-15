@@ -26,8 +26,10 @@ so reaching Stop means competing with the run for the pointer. A key needs no po
    system hot key (`RegisterEventHotKey`, exclusive) once the pill is made, before its
    windows show, and holds it until it ends, giving it up first as it does. The key then goes
    to it and to no app or other program: Live doesn't get it while a run shows its pill, and
-   gets it again once the border's program has ended. A program that holds the key already
-   keeps it, and the claim fails. A program that tries to register the key while a run shows
+   gets it again once the border's program has ended. A program that holds the key
+   exclusively already, as another run's border does, keeps it, and the claim fails; one that
+   holds it the ordinary way doesn't stop the claim, and gets no press while the border's
+   program holds the key. A program that tries to register the key while a run shows
    its pill fails, and one that registers it only once, as it starts, stays without it after
    the run.
 3. **The key is a choice, not a constraint.** One constant in `computer-use-overlay.swift`
@@ -82,6 +84,9 @@ Probed on the remote Mac (macOS 26), with a stand-in app in front and keys poste
 - A claimed plain Escape (key code 53) caught an Escape posted with no modifiers.
 - With Live in front, the key stopped a run as Stop on the pill does, and once the border's
   program had gone it didn't start Live's transport (live-notes.md).
+- With a program holding the key the ordinary way, the border's program still claimed it,
+  and a press went to the border's program alone; with another border's program holding it,
+  the claim failed (live-notes.md).
 
 Not proven:
 

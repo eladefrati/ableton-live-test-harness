@@ -463,22 +463,30 @@ unexpected.
   and with secure input on in the front app. Claimed by two programs it went to both, with
   no error to either, and claimed against Spotlight's ⌘Space it went to the program and
   Spotlight opened too; that was without the exclusive option, with which the overlay now
-  claims the key, so that a program that holds it already makes the claim fail. A claimed
+  claims the key (below). A claimed
   plain Escape caught an Escape posted with no modifiers; the harness types its Escape, to
   close a menu, through System Events, which wasn't tried (remote Mac, macOS 26,
   2026-11-15). Not tried: a real keyboard.
 - The overlay's exclusive claim on the stop key: with one overlay up, a second's claim was
   refused (`eventHotKeyExistsErr`), its pill showed no key and its Stop still stopped its
   run, and one press of the key stopped only the first run. An overlay killed with SIGKILL
-  gave the key up: the app in front got the next press (`checks/pointer-guards.js`, 62 of
-  62, remote Mac, macOS 26, 2026-11-15).
+  gave the key up: the app in front got the next press, and so did one that had said its
+  last words and still waited for its notification (`checks/pointer-guards.js`, 63 of 63 in
+  286 s, remote Mac, macOS 26, 2026-11-15). With a program holding the key without the
+  exclusive option first, the overlay's claim wasn't refused, and a press went to the
+  overlay alone, which took it as Stop, the other program getting nothing, in 2 of 2: a
+  program that holds the key the ordinary way doesn't block the overlay and loses the key
+  while the overlay holds it; one that holds it exclusively makes the claim fail.
 - The stop key in Live, posted as key events with Live in front while a press's click waited
   under a notification's cover: the token went 228 and 251 ms after the presser was
   started, its own start included, the glow 280 and 282 ms after, the run ended by itself
   768 and 778 ms after, its track deleted and the control's value unchanged, and the pill
   went 1.21 and 1.25 s after; no mouse event of the run's came after the key. Once the
   overlay had gone, the key pressed with Live in front didn't start Live's transport, in 2
-  of 2 (remote Mac, Live 12.4.25b1, macOS 26, 2026-11-15).
+  of 2 (remote Mac, Live 12.4.25b1, macOS 26, 2026-11-15). Pressed as the key's events
+  carrying the modifiers as flags, with their release posted after: the token went 197 ms
+  after the presser was started, the glow 232 ms, the run's end 716 ms, the pill 1.19 s,
+  the transport again not started, and no modifier left held (one run, the same day).
 - Posting the whole stop key chord every 10 ms, about 800 events a second, held up the
   overlay's start: it said "stopping" 3.5 s after it was started, once, and nothing within
   4 s, once, where it otherwise said "shown" after 1.03 to 1.15 s. Holding the modifiers and

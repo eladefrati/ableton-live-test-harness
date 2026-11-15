@@ -128,7 +128,8 @@ Node 18 or later. See [ADR-0001](../docs/adr/0001-fork-abletonosc.md) for the de
   dialog names), presses Stop on the pill through the button's action and needs no
   pointer: while the border's program runs, no app gets that key, Live included
   (ADR-0017). The key is claimed exclusively: a border that couldn't claim it, as when
-  another program or another run's border holds it, shows no key, and the run says so on
+  another run's border, or another program that claimed it exclusively, holds it, shows no
+  key, and the run says so on
   stderr in a line starting `warn harness-computer-use` and clicks on. A run
   whose border can't show, or goes, however it ends, while the run goes
   on and wasn't stopped, says so on stderr in a line starting `warn harness-computer-use`, and clicks without
