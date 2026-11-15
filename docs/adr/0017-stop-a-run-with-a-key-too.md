@@ -111,8 +111,9 @@ Also:
   in flight when the key is pressed can reach Live as a Control-Option-Command click, and
   its release will, whenever the key comes while the helper holds the button: Live may take
   it as another gesture, a Control-click opening a context menu. Clearing the modifiers on
-  the helper's events was tried: the events carried none, but the system then read the
-  person's keys as let go, for every app (live-notes.md). The helper builds its events as
+  the helper's events was tried with the modifiers held by posted key events: the events
+  carried none, but the system then read the modifiers as let go, for every app
+  (live-notes.md). Keys held on a real keyboard weren't tried. The helper builds its events as
   before; that cost stands. The Escape that closes a menu after Stop
   (ADR-0014), which the person may still be holding the modifiers for, waits until none is
   held, for 2 s at most. If one still is, it isn't typed, and the run warns that the menu may
