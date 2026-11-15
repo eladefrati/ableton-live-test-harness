@@ -9,17 +9,17 @@ const { spawn } = require("node:child_process");
 const { VideoError, parseVideoArgs, recordVideo, runVideoCommand, parseFrameArgs, videoFrame } = require("../video.js");
 
 // A stand-in for the video helper: a Node script that saves its arguments to `args.json` beside
-// itself and then does what `body` says.
+// itself and then does what `body` says. It is run by Node (`runByNode`), never as a program
+// of its own: macOS scans each new program the first time it runs, and with the other test
+// files' new programs that queue of scans held up their starts past their tests' times.
 function fakeHelper(t, body) {
   const folder = fs.mkdtempSync(path.join(os.tmpdir(), "video-test-"));
   t.after(() => fs.rmSync(folder, { recursive: true, force: true }));
   const file = path.join(folder, "helper.js");
-  fs.writeFileSync(file, `#!${process.execPath}
-require("node:fs").writeFileSync(${JSON.stringify(path.join(folder, "args.json"))}, JSON.stringify(process.argv.slice(2)));
+  fs.writeFileSync(file, `require("node:fs").writeFileSync(${JSON.stringify(path.join(folder, "args.json"))}, JSON.stringify(process.argv.slice(2)));
 require("node:fs").writeFileSync(${JSON.stringify(path.join(folder, "pid"))}, String(process.pid));
 ${body}
 `);
-  fs.chmodSync(file, 0o755);
   return {
     folder, file,
     args: () => JSON.parse(fs.readFileSync(path.join(folder, "args.json"), "utf8")),
@@ -34,6 +34,11 @@ process.on("SIGINT", () => { console.log(JSON.stringify({ seconds: 1.5, bytes: 1
 console.log("recording");
 setInterval(() => {}, 1000);
 `;
+
+// spawn() and tools.run() for a stand-in helper, run by Node.
+const runByNode = (file, args, options) => spawn(process.execPath, [file, ...args], options);
+const runToEnd = (file, args) => require("../tools.js").run(process.execPath, [file, ...args]);
+const RUN_BY_NODE = `(file, args, options) => require("node:child_process").spawn(process.execPath, [file, ...args], options)`;
 
 function fakeSystem(helper, { release = "25.6.0", windows = [{ id: 7, title: "Set", layer: 0 }], startedMs = 5000 } = {}) {
   const calls = [];
@@ -50,7 +55,8 @@ function fakeSystem(helper, { release = "25.6.0", windows = [{ id: 7, title: "Se
     windows: async () => { calls.push("windows"); return windows; },
     binary: async () => { calls.push("binary"); return helper.file; },
     frontmost: async () => "com.example.app",
-    spawn: (...args) => spawn(...args),
+    spawn: runByNode,
+    run: runToEnd,
   };
 }
 
@@ -199,7 +205,7 @@ test("a helper that doesn't start recording in time is ended, and the call rejec
   const helper = fakeHelper(t, `setInterval(() => {}, 1000);`);
   let child;
   const system = fakeSystem(helper, { startedMs: 300 });
-  system.spawn = (...args) => (child = spawn(...args));
+  system.spawn = (...args) => (child = runByNode(...args));
   await assert.rejects(recordVideo(out(helper), {}, system), /didn't start recording within 300 ms/);
   await new Promise((resolve) => (child.exitCode !== null || child.signalCode !== null ? resolve() : child.once("exit", resolve)));
   assert.equal(child.signalCode, "SIGTERM");
@@ -236,10 +242,9 @@ fs.writeFileSync(${JSON.stringify(at("command-started"))}, "");
 setInterval(() => {}, 1000);
 `);
   fs.writeFileSync(at("run.js"), `
-const { spawn } = require("node:child_process");
 const { runVideoCommand } = require(${JSON.stringify(path.join(__dirname, "..", "video.js"))});
 const system = { startedMs: 5000, release: () => "25.6.0", wake: async () => {}, mainWindow: async () => ({ id: 7 }),
-  windows: async () => [], binary: async () => ${JSON.stringify(helper.file)}, spawn, say: () => {}, captures: ${JSON.stringify(at("captures"))} };
+  windows: async () => [], binary: async () => ${JSON.stringify(helper.file)}, spawn: ${RUN_BY_NODE}, say: () => {}, captures: ${JSON.stringify(at("captures"))} };
 runVideoCommand({ file: ${JSON.stringify(at("video.mov"))}, screen: true, command: [process.execPath, ${JSON.stringify(at("command.js"))}] }, system)
   .then((result) => { process.exitCode = result.status; });
 `);
@@ -260,10 +265,9 @@ runVideoCommand({ file: ${JSON.stringify(at("video.mov"))}, screen: true, comman
 function videoRun(helper, command, then = "") {
   const at = (name) => path.join(helper.folder, name);
   fs.writeFileSync(at("run.js"), `
-const { spawn } = require("node:child_process");
 const { runVideoCommand } = require(${JSON.stringify(path.join(__dirname, "..", "video.js"))});
 const system = { startedMs: 5000, release: () => "25.6.0", wake: async () => {}, mainWindow: async () => ({ id: 7 }),
-  windows: async () => [], binary: async () => ${JSON.stringify(helper.file)}, spawn, say: () => {}, captures: ${JSON.stringify(at("captures"))} };
+  windows: async () => [], binary: async () => ${JSON.stringify(helper.file)}, spawn: ${RUN_BY_NODE}, say: () => {}, captures: ${JSON.stringify(at("captures"))} };
 runVideoCommand({ file: ${JSON.stringify(at("video.mov"))}, screen: true, command: ${JSON.stringify(command)} }, system)
   .then((result) => { process.exitCode = result.status; });
 ${then}

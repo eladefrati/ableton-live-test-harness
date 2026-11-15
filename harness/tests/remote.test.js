@@ -33,6 +33,14 @@ done
 exec /usr/bin/rsync "\${args[@]}"
 `;
 
+// The stand-ins, made once for the file: macOS scans each new program the first time it runs,
+// and a queue of scans held up other test files' programs past their tests' times.
+const BIN = fs.mkdtempSync(path.join(os.tmpdir(), "remote-test-bin-"));
+process.on("exit", () => fs.rmSync(BIN, { recursive: true, force: true }));
+for (const [name, body] of [["ssh", SSH], ["rsync", RSYNC]]) {
+  fs.writeFileSync(path.join(BIN, name), body, { mode: 0o755 });
+}
+
 function macs(t) {
   const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "remote-test-")));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
@@ -41,10 +49,6 @@ function macs(t) {
     fs.mkdirSync(path.dirname(file), { recursive: true });
     fs.writeFileSync(file, text);
   };
-  for (const [name, body] of [["ssh", SSH], ["rsync", RSYNC]]) {
-    write(at("bin", name), body);
-    fs.chmodSync(at("bin", name), 0o755);
-  }
   // The harness as remote.sh copies it: what the remote's side runs of it.
   write(at("here", "dev", "ableton-live-test-harness", "harness", "captures.js"), fs.readFileSync(path.join(__dirname, "..", "captures.js")));
   fs.mkdirSync(at("there"));
@@ -56,7 +60,7 @@ function macs(t) {
       encoding: "utf8",
       env: {
         ...process.env, HOME: at("here"), TMPDIR: `${at("here-tmp")}/`, LIVE_REMOTE: HOST,
-        PATH: `${at("bin")}:${process.env.PATH}`, THERE: at("there"), THERE_TMP: `${at("there-tmp")}/`,
+        PATH: `${BIN}:${process.env.PATH}`, THERE: at("there"), THERE_TMP: `${at("there-tmp")}/`,
       },
     }),
   };

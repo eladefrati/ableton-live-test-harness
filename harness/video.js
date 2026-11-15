@@ -50,6 +50,7 @@ const machine = {
   binary: () => tools.helperBinary(HELPER_SOURCE),
   frontmost: () => mac.frontmostApp(),
   spawn,
+  run: (binary, args) => tools.run(binary, args),
   say: (text) => console.error(text),
 };
 
@@ -262,7 +263,7 @@ async function videoFrame(file, at, png, system = machine) {
   const binary = await system.binary();
   const save = async (to) => {
     const args = ["frame", path.resolve(file), String(at), to];
-    const said = await tools.run(binary, args).catch((error) => {
+    const said = await system.run(binary, args).catch((error) => {
       // The helper's reason, without the command line run() puts before it.
       throw new VideoError(error.message.replace(`${[binary, ...args].join(" ")} failed: `, ""), { cause: error });
     });
