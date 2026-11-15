@@ -504,10 +504,9 @@ remote with no path come back too, from its captures folder to this Mac's (`capt
 only finished ones, not a video still being recorded, and none whose name this Mac's folder
 has already, which stays on the remote and is said so; `remote.sh` names each one it brings
 back, at its path here. A path given on the remote stays there. Ctrl-C or SIGTERM on
-`remote.sh` gives each `cli.js video` of the run SIGINT on the remote, as Ctrl-C does here,
-and waits up to 20 s for them to end before bringing logs and captures back: nothing else
-reaches the remote, so a check there runs on to its end, and so does a recording its own
-code made. There is no lock; the slot rule below is what keeps two runs apart.
+`remote.sh` ends it and its ssh, and nothing reaches the remote: the run there goes on to its
+end, and a recording there ends with its command, its `--seconds` or the 10-minute cap. Its
+logs and captures stay there and come back after the next run. There is no lock; the slot rule below is what keeps two runs apart.
 
 The remote only runs checks. Its copies are mirrors, replaced on every run, `.git` included:
 never edit or commit in them, since the next run discards the work. Changes are made and

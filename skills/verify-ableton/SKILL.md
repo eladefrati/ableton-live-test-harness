@@ -209,8 +209,9 @@ any command there from this Mac:
 It copies the working copies of the harness and `~/dev/<repo>` to the remote first, replacing what's there, then runs the
 command in `~/dev/<repo>` there; its exit status is the command's. Stills, videos and frames
 taken there with no path come back to this Mac's captures folder, and `remote.sh` names each
-at its path here: show the user that path, not the remote's. Ctrl-C on `remote.sh` stops its
-`cli.js video` there too. A build made on the
+at its path here: show the user that path, not the remote's. Ctrl-C on `remote.sh` doesn't reach the
+remote: the run there goes on to its end, and its logs and captures come back after the next
+run. A build made on the
 remote (a plug-in's, say) goes outside `~/dev/<repo>`, which the next run replaces; delete
 it when the work is done. The project's builds folder
 must be in the remote's Places (see "Running on a second Mac" in `harness/README.md`).
