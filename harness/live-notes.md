@@ -495,6 +495,16 @@ unexpected.
   pressing the stop key holds its modifiers first, so a click in flight then can reach Live
   as a Control-Option-Command click. The Escape that closes a menu after Stop now waits until
   no modifier is held, for 2 s at most, and isn't typed if one still is (ADR-0017).
+- Trap: a posted key event (`CGEvent` from the HID system state, at the HID tap) that carries
+  modifiers as its flags leaves them held, for every app and every later posted event, until
+  their release is posted. After `press-key` pressed F13 that way with Control, Option and
+  Command, the system read all three as held; once their release was posted, none. The key
+  cases of `checks/pointer-guards.js` had left them held that way, and the next check,
+  `checks/editor-guards.js`, failed its two `drag-editor` cases: a drag that should have
+  moved Dry/Wet Mix from 0.5 to 0.7145 moved it to 0.5021, the step a drag takes with a
+  modifier held (remote Mac, macOS 26, 2026-11-15). `press-key` now posts the release
+  however it ends but SIGKILL, and `pointer-guards.js` fails a key case, naming them, that
+  leaves a modifier held, and lets them go.
 - With no window server, as for a process with no desktop session, a program gets no session
   (`CGSessionCopyCurrentDictionary()` is nil), no screens, and windows that say they are
   visible and never show, all with no error; `display dialog` fails there with -1713, "No

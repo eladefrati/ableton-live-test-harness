@@ -422,7 +422,8 @@ Node 18 or later. See [ADR-0001](../docs/adr/0001-fork-abletonosc.md) for the de
   posts while the key's modifiers are held, before the key (`press-key --hold`, with F13
   in place of Space), carries them, as `checks/pointer-target.swift` reports each event's
   modifiers: a measurement of the cost ADR-0017 accepts, after which the modifiers are let
-  go of whatever happened (`press-key --release`). First of
+  go of whatever happened (`press-key --release`). After every case that presses the key,
+  and once more at the end, no modifier key may be left held. First of
   all the overlay is started with the process id 0, and with -1, for its run: it must
   refuse, saying nothing and exiting 1 with its usage. After every case it is started over a run
   that has ended and that nothing has waited for, which still answers signal 0: it must say

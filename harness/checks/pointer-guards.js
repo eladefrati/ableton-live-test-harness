@@ -914,6 +914,25 @@ async function stoppingFailures(shows, overlay, binary, stopKey) {
   ].filter(Boolean);
 }
 
+// The modifier keys the system reads as held now, by name. A posted key event that carries
+// modifiers as its flags leaves them held until their release is posted (live-notes.md).
+const HELD_MODIFIERS = `ObjC.import("AppKit");
+const flags = $.NSEvent.modifierFlags;
+[["shift", 0x20000], ["control", 0x40000], ["option", 0x80000], ["command", 0x100000]]
+  .filter(([, mask]) => flags & mask).map(([name]) => name).join(",")`;
+async function heldModifiers() {
+  return (await tools.run("osascript", ["-l", "JavaScript", "-e", HELD_MODIFIERS])).trim().split(",").filter(Boolean);
+}
+
+// What differs from no modifier key held, naming those that are, which it then lets go of so
+// that no later case starts with them held.
+async function leftHeld(binaries) {
+  const held = await heldModifiers();
+  if (!held.length) return [];
+  await tools.run(binaries.key, [F13, ...held, "--release"]).catch(() => {});
+  return [`modifier keys were left held: ${held.join(", ")}`];
+}
+
 // Presses the stop key, as the overlay's --stop-key gives it (`binaries.stopKey`), with the
 // press-key options `extra`.
 const pressStopKey = (binaries, ...extra) => tools.run(binaries.key, [binaries.stopKey.code, ...binaries.stopKey.modifiers, ...extra]);
@@ -1304,16 +1323,20 @@ async function main() {
     for (const pid of NO_RUNS) {
       report(`the overlay refuses the process id ${pid} for its run: it says nothing, and exits 1 with its usage`, await unrefused(binaries.overlay, pid));
     }
-    for (const test of [...CASES, ...KEY_CASES]) report(test.name, await failures(test, binaries));
+    for (const test of CASES) report(test.name, await failures(test, binaries));
+    // Every case that presses the stop key must leave no modifier held.
+    const withKey = async (name, failed) => report(`${name}; no modifier key is left held`, [...(await failed), ...(await leftHeld(binaries))]);
+    for (const test of KEY_CASES) await withKey(test.name, failures(test, binaries));
     for (const test of UNREAPED) report(test.name, await unreapedFailures(test, binaries));
-    report("the stop key pressed before the overlay says that its windows are on screen is taken as an early Stop: it says stopping, "
-      + "then shown once the pill is listed, with the border left out and the pill reading Stopping", await earlyKeyFailures(binaries));
-    report("the stop key with another app in front: the pill shows the key, the key stops the run, the app doesn't get it while the "
-      + "overlay is up, and gets it once the overlay has gone", await keyTargetFailures(binaries));
-    report("the stop key with another app in front once the overlay has been killed (SIGKILL): the app gets it", await keyTargetFailures(binaries, { killed: true }));
-    report("a click the helper posts while a person holds the stop key's modifiers carries them", await heldModifiersFailures(binaries, binaries.stopKey.modifiers));
-    report("two overlays: the second's claim on the stop key is refused, its pill shows no key and its Stop still works, and one press of "
-      + "the key stops only the first run", await twoOverlaysFailures(binaries));
+    await withKey("the stop key pressed before the overlay says that its windows are on screen is taken as an early Stop: it says stopping, "
+      + "then shown once the pill is listed, with the border left out and the pill reading Stopping", earlyKeyFailures(binaries));
+    await withKey("the stop key with another app in front: the pill shows the key, the key stops the run, the app doesn't get it while the "
+      + "overlay is up, and gets it once the overlay has gone", keyTargetFailures(binaries));
+    await withKey("the stop key with another app in front once the overlay has been killed (SIGKILL): the app gets it", keyTargetFailures(binaries, { killed: true }));
+    await withKey("a click the helper posts while a person holds the stop key's modifiers carries them", heldModifiersFailures(binaries, binaries.stopKey.modifiers));
+    await withKey("two overlays: the second's claim on the stop key is refused, its pill shows no key and its Stop still works, and one press of "
+      + "the key stops only the first run", twoOverlaysFailures(binaries));
+    report("no modifier key is held at the end of the check", await leftHeld(binaries));
   } finally {
     display.stop();
   }
