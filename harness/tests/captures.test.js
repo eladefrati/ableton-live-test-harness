@@ -69,6 +69,33 @@ test("a capture is written under a hidden name in the folder, and given its own 
   assert.ok(!fs.existsSync(writing));
 });
 
+test("two captures given no file at the same moment, of the same thing, are both kept, each under a name of its own", async (t) => {
+  const root = folder(t);
+  const now = new Date(2030, 0, 2, 3, 4, 5, 6);
+  const save = (text) => saveCapture(undefined, { name: "clip-1s", ext: ".png", root, now }, async (at) => {
+    fs.writeFileSync(at, text);
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    assert.equal(fs.readFileSync(at, "utf8"), text, "nothing else writes under its hidden name meanwhile");
+  });
+  const [a, b] = await Promise.all([save("a"), save("b")]);
+  assert.notEqual(a.file, b.file);
+  assert.equal(fs.readFileSync(a.file, "utf8"), "a");
+  assert.equal(fs.readFileSync(b.file, "utf8"), "b");
+});
+
+test("a capture given no file replaces no file that has taken its name while it was written", async (t) => {
+  const root = folder(t);
+  const saved = await saveCapture(undefined, { name: "clip-1s", ext: ".png", root }, async (at) => {
+    // As another process's capture of the same moment would.
+    fs.writeFileSync(path.join(root, path.basename(at)), "other");
+    fs.writeFileSync(at, "mine");
+  });
+  assert.equal(fs.readFileSync(saved.file, "utf8"), "mine");
+  const other = fs.readdirSync(root).filter((name) => name !== ".unfinished" && path.join(root, name) !== saved.file);
+  assert.equal(other.length, 1);
+  assert.equal(fs.readFileSync(path.join(root, other[0]), "utf8"), "other");
+});
+
 test("a capture given a path in the folder is written under its hidden name too, also when the path reaches the folder through a link", async (t) => {
   const root = folder(t);
   const link = path.join(folder(t), "link");

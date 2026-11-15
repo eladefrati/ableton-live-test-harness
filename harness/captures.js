@@ -47,37 +47,75 @@ const real = (file) => {
   }
 };
 
+// The hidden names this process's captures given no path are being written under.
+const writingHere = new Set();
+
+// A path for a capture given no path, by capturePath, that no capture in the folder has and
+// none is being written under in this process: two of the same thing in one millisecond get
+// "-2", "-3" after the name.
+function freePath(name, ext, { root, now }) {
+  for (let n = 1; ; n++) {
+    const file = capturePath(n === 1 ? name : `${name}-${n}`, ext, { root, now });
+    const writing = path.join(path.dirname(file), UNFINISHED, path.basename(file));
+    if (!fs.existsSync(file) && !fs.existsSync(writing) && !writingHere.has(writing)) return file;
+  }
+}
+
 // Starts a capture: every still, frame and video the harness saves goes through here. Its
-// path is `file`, the caller's, or with none a new one in the folder (capturePath, by `name`
-// and `ext`). Returns { file, writing, finish(), finished(), abandon() }. `writing` is where
-// the capture is to be written: in the folder, however the path names it, its hidden name,
-// cleared of what a writer killed before left there; elsewhere `file` itself, as given.
-// finish() moves what was written to `file`, replacing one there; finished() is for a writer
-// that moves it itself, as a video's helper does; either then prunes the folder, if the
-// capture is in it. abandon() deletes what a failed writer left under a hidden name.
+// path is `file`, the caller's, or with none a new one in the folder (freePath, by `name` and
+// `ext`). Returns { file, writing, finish(), finished(), abandon() }. `writing` is where the
+// capture is to be written: in the folder, however the path names it, its hidden name, cleared
+// of what a writer killed before left there; elsewhere `file` itself, as given. finish() moves
+// what was written to `file` and returns the capture's path: one given a path replaces a file
+// there, one given none replaces nothing and takes the next free name if another process's
+// capture has taken its own meanwhile. finished() is for a writer that moves it itself, as a
+// video's helper does, which replaces nothing. Either then prunes the folder, if the capture
+// is in it. abandon() deletes what a failed writer left under a hidden name.
 function startCapture(file, { name, ext, root = CAPTURES, now = new Date() } = {}) {
-  const target = file === undefined ? capturePath(name, ext, { root, now }) : file;
+  const target = file === undefined ? freePath(name, ext, { root, now }) : file;
   const folder = path.dirname(path.resolve(target));
   if (real(folder) === null || real(folder) !== real(root)) {
-    const done = () => {};
+    const done = () => target;
     return { file: target, writing: target, finish: done, finished: done, abandon: done };
   }
   const hidden = path.join(folder, UNFINISHED);
   fs.mkdirSync(hidden, { recursive: true });
   const writing = path.join(hidden, path.basename(target));
   fs.rmSync(writing, { force: true });
+  writingHere.add(writing);
   return {
     file: target,
     writing,
     finish() {
-      fs.renameSync(writing, target);
+      writingHere.delete(writing);
+      let saved = target;
+      if (file === undefined) {
+        // A link fails where a file has the name, as a rename doesn't.
+        for (;;) {
+          try {
+            fs.linkSync(writing, saved);
+            break;
+          } catch (error) {
+            if (error.code !== "EEXIST") throw error;
+            saved = freePath(name, ext, { root, now });
+          }
+        }
+        fs.rmSync(writing);
+      } else {
+        fs.renameSync(writing, target);
+      }
       pruneCaptures(root);
+      return saved;
     },
     finished() {
+      writingHere.delete(writing);
       pruneCaptures(root);
+      return target;
     },
     abandon() {
+      writingHere.delete(writing);
       fs.rmSync(writing, { force: true });
+      return target;
     },
   };
 }
@@ -89,14 +127,15 @@ function startCapture(file, { name, ext, root = CAPTURES, now = new Date() } = {
 async function saveCapture(file, options, write) {
   const capture = startCapture(file, options);
   let value;
+  let saved;
   try {
     value = await write(capture.writing);
-    capture.finish();
+    saved = capture.finish();
   } catch (error) {
     capture.abandon();
     throw error;
   }
-  return { file: capture.file, value };
+  return { file: saved, value };
 }
 
 // Deletes what is in `root` older than KEEP_DAYS by its modification time, and what is in its
