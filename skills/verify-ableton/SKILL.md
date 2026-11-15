@@ -133,7 +133,8 @@ its points were measured at (ADR-0008). On the click host (`clickHost` in `harne
 once; on any other machine the run's first press shows the user a dialog and waits up to 2
 minutes for Allow (ADR-0006), so tell the user before such a run. From Allow until the run
 ends, a purple border around their screen shows the run may take the pointer, and Stop on
-its pill takes the mouse back, failing the run at the press under way, or at its next one (ADR-0012).
+its pill, or Control-Option-Command-Space, takes the mouse back, failing the run at the press under way, or at its next one (ADR-0012,
+ADR-0017).
 These clicks, the asking and the border are harness-computer-use: a request by that name
 means this section. Bring
 Live to the front only when a step needs it: keystrokes through System Events go to the frontmost app. Before acting on a Live window, list Live's windows (System

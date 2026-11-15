@@ -453,6 +453,20 @@ unexpected.
   run was given a file of its own, after which the run no longer read the first (unit tests,
   remote Mac, 2026-11-13). A token named in the environment a run starts with neither stops
   the run nor reaches its helper.
+- harness-computer-use's stop key, Control-Option-Command-Space, is a system hot key that the
+  overlay registers (`RegisterEventHotKey`), with no permission asked (ADR-0017). Probed
+  with a program that registered it and a stand-in app in front, the keys posted as events
+  (`CGEvent`): the program got the key whether its modifiers were posted as key presses of
+  their own or only as flags of the key, and the app in front got the modifiers but not the
+  key; once the program had ended, the app got the key. It came with a mouse button held
+  down in the front app's window, 2 ms after it was posted, the button-up arriving after,
+  and with secure input on in the front app. Claimed by two programs it went to both, with
+  no error to either, and claimed against Spotlight's ⌘Space it went to the program and
+  Spotlight opened too: a clash with another app's shortcut can't be found, and one press
+  stops every run on the Mac that shows a pill. A claimed plain Escape caught an Escape
+  posted with no modifiers; the harness types its Escape, to close a menu, through System
+  Events, which wasn't tried (remote Mac, macOS 26, 2026-11-15). Not tried: a real
+  keyboard, and Live in front.
 - With no window server, as for a process with no desktop session, a program gets no session
   (`CGSessionCopyCurrentDictionary()` is nil), no screens, and windows that say they are
   visible and never show, all with no error; `display dialog` fails there with -1713, "No

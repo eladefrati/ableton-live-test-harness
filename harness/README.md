@@ -111,7 +111,12 @@ Node 18 or later. See [ADR-0001](../docs/adr/0001-fork-abletonosc.md) for the de
   pill stays, its button reading Stopping, until the run's process has ended: the
   notification that the mouse is free comes then. A run still going 10 s after Stop is left
   running: the pill goes, and the notification says that the run was stopped and is still
-  running (ADR-0015). If only the press's release was
+  running (ADR-0015). The stop key, Control-Option-Command-Space (⌃⌥⌘Space, which the pill
+  shows before its Stop and the dialog names), presses Stop on the pill through the
+  button's own action and needs no pointer: while the border's program runs, no app gets
+  that key, Live included, and an app that has claimed the same key gets it too (ADR-0017).
+  A border that couldn't claim it shows no key, and the run says so on stderr in a line
+  starting `warn harness-computer-use` and clicks on. If only the press's release was
   left, the click or the drag has happened: `error.done` is `true` on that press's error, and
   set on no other, so a check that must undo what a click did reads it in its cleanup. Stop
   removes the run's click token, a file the run and its click helper must be able to read
@@ -127,7 +132,8 @@ Node 18 or later. See [ADR-0001](../docs/adr/0001-fork-abletonosc.md) for the de
   whose border can't show, or goes, however it ends, while the run goes
   on and wasn't stopped, says so on stderr in a line starting `warn harness-computer-use`, and clicks without
   it; when the border couldn't be built, the dialog says, in place of the glow, that nothing
-  on screen will show that the run may take the pointer, and that there will be no Stop.
+  on screen will show that the run may take the pointer, and that there will be no Stop and
+  no stop key.
   The dialog, the pill and the
   notification name a check in `tests/live/` as
   `tests/live/<check>.js`, another script by its file, and code run with `node -e` or given
@@ -397,7 +403,15 @@ Node 18 or later. See [ADR-0001](../docs/adr/0001-fork-abletonosc.md) for the de
   helper exits 4; and with a drag's button down, before its move, where the button comes up
   and nothing more is posted. The press takes about 0.1 s to remove the token, longer than
   the helper holds a button, so for these four the window suspends the helper at that
-  event (SIGSTOP), and the check lets it go on (SIGCONT) once the token is gone. First of
+  event (SIGSTOP), and the check lets it go on (SIGCONT) once the token is gone. The stop
+  key, posted as a keyboard's events (`checks/press-key.swift`, given the key the overlay's
+  `--stop-key` names), is pressed in place of Stop at a click's first move, with a click's
+  button down and with a drag's, and in the last resort over a run that ignores the
+  signal, where pressed again 5 s in it changes nothing; each must end as after Stop on
+  the pill. Pressed as soon as the overlay has claimed it, before its windows show, it must
+  be taken as an early Stop; and pressed with another app in front (`checks/key-target.swift`,
+  which prints the keys it gets), the pill must show it, it must stop the run, and the app
+  must not get it while the overlay is up, and must once the overlay has gone. First of
   all the overlay is started with the process id 0, and with -1, for its run: it must
   refuse, saying nothing and exiting 1 with its usage. After every case it is started over a run
   that has ended and that nothing has waited for, which still answers signal 0: it must say
