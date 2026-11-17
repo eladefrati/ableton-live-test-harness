@@ -621,9 +621,10 @@ unexpected.
   the file and replaces the file only once that is there, so each of the three throws
   `DeviceUiError` naming the file, exits 1 from `cli.js`, and leaves a file already there as
   it was. A read-only file in a folder that can be written is replaced, as `screencapture`
-  alone replaced it. The file it writes beside is `<name>-capturing-<pid>.png`, `<name>` the
-  file's name without its extension, in the same folder: a run killed while it captures can
-  leave it there. Beside a path the caller gave, nothing deletes it; for a capture in the
+  alone replaced it. The file it writes beside is `<name>-capturing-<random>.png`, `<name>` the
+  file's name without its extension and `<random>` 8 hex digits new for each capture, in the
+  same folder, so two captures at once never share it and a later capture never takes one a
+  killed run left for its own: a run killed while it captures can leave it there. Beside a path the caller gave, nothing deletes it; for a capture in the
   captures folder it is in the `.unfinished` folder, whose prune deletes it once it is 7 days
   old and another capture is saved there. `startCapture` makes a missing folder first, for
   `cli.js capture`, `plugin-window`, `video` and `video-frame` alike, so they fail only on a

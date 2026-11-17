@@ -35,6 +35,7 @@
 //   await editor.close();
 
 const fs = require("node:fs");
+const crypto = require("node:crypto");
 const os = require("node:os");
 const path = require("node:path");
 const mac = require("./macos.js");
@@ -711,12 +712,14 @@ async function liveMainWindow(system = machine) {
 //
 // screencapture exits 0 when it can't write its file, so the capture is written beside `file`
 // and replaces it only once it is there: a folder that is missing or can't be written throws,
-// and leaves a file already at `file` as it was.
+// and leaves a file already at `file` as it was. The name beside it is random, so neither
+// another capture under way nor what a killed one left can be taken for this one's picture.
 async function captureWindow(file, { window: id } = {}, system = machine) {
   await system.wake();
   const window = id === undefined ? await system.window() : (await system.windows()).find((w) => w.id === id);
   if (!window) throw new DeviceUiError(`Live has no window ${id} on screen`);
-  const writing = path.join(path.dirname(file), `${path.basename(file, path.extname(file))}-capturing-${process.pid}.png`);
+  const random = crypto.randomBytes(4).toString("hex");
+  const writing = path.join(path.dirname(file), `${path.basename(file, path.extname(file))}-capturing-${random}.png`);
   try {
     await system.capture(window.id, writing);
     if (!fs.existsSync(writing)) {

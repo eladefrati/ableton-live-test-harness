@@ -611,6 +611,30 @@ test("captureWindow throws DeviceUiError naming the file when the capture writes
   assert.deepEqual(fs.readdirSync(folder), ["live.png"]);
 }));
 
+test("two captures of Live's windows at once, to a.png and a.jpg in one folder, each save their own window", () => inTempFolder(async (folder) => {
+  const { captureWindow } = require("../device-ui.js");
+  const tick = () => new Promise((resolve) => setImmediate(resolve));
+  const system = { ...captureSystem(), capture: async (id, file) => { await tick(); fs.writeFileSync(file, `window ${id}`); await tick(); } };
+  const [a, b] = [path.join(folder, "a.png"), path.join(folder, "a.jpg")];
+  await Promise.all([captureWindow(a, {}, system), captureWindow(b, { window: 9 }, system)]);
+  assert.equal(fs.readFileSync(a, "utf8"), "window 7");
+  assert.equal(fs.readFileSync(b, "utf8"), "window 9");
+  assert.deepEqual(fs.readdirSync(folder).sort(), ["a.jpg", "a.png"]);
+}));
+
+test("what a killed window capture wrote is never reported as a later capture of the same file that writes nothing", () => inTempFolder(async (folder) => {
+  const { captureWindow } = require("../device-ui.js");
+  const file = path.join(folder, "live.png");
+  let written;
+  const wrote = new Promise((resolve) => { written = resolve; });
+  // A capture that never ends stands for a run killed after its picture was written.
+  const killed = { ...captureSystem(), capture: async (id, at) => { fs.writeFileSync(at, "stale"); written(); await new Promise(() => {}); } };
+  captureWindow(file, {}, killed);
+  await wrote;
+  await assert.rejects(captureWindow(file, {}, captureSystem({ writes: false })), (error) => error instanceof DeviceUiError && error.message.includes(file));
+  assert.equal(fs.existsSync(file), false);
+}));
+
 test("a capture of Live's window given no path that writes nothing throws DeviceUiError naming where it was writing, and leaves nothing in the captures folder", () => inTempFolder(async (root) => {
   const { captureWindow } = require("../device-ui.js");
   const { saveCapture } = require("../captures.js");
