@@ -621,7 +621,9 @@ unexpected.
   the file and replaces the file only once that is there, so each of the three throws
   `DeviceUiError` naming the file, exits 1 from `cli.js`, and leaves a file already there as
   it was. A read-only file in a folder that can be written is replaced, as `screencapture`
-  alone replaced it.
+  alone replaced it. `startCapture` makes a missing folder first, so `cli.js capture` and
+  `plugin-window`, like `video` and `video-frame`, fail only on a folder that can't be
+  written; `captureWindow` called with a path of its own still throws on a missing one.
 - openrsync with `--remove-source-files`, failing on one listed file it couldn't read, copied
   the other file it was given but didn't delete its source, and exited non-zero; `remote.sh`
   names what it copied, and a later run finds that name already here (remote Mac, macOS 26.7,

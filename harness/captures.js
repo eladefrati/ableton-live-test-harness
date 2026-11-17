@@ -62,8 +62,8 @@ function freePath(name, ext, { root, now }) {
 }
 
 // Starts a capture: every still, frame and video the harness saves goes through here. Its
-// path is `file`, the caller's, or with none a new one in the folder (freePath, by `name` and
-// `ext`). Returns { file, writing, finish(), finished(), abandon() }. `writing` is where the
+// path is `file`, the caller's, its folder made if it is missing, or with none a new one in the
+// folder (freePath, by `name` and `ext`). Returns { file, writing, finish(), finished(), abandon() }. `writing` is where the
 // capture is to be written: in the folder, however the path names it, its hidden name, cleared
 // of what a writer killed before left there; elsewhere `file` itself, as given. finish() moves
 // what was written to `file` and returns the capture's path: one given a path replaces a file
@@ -74,6 +74,7 @@ function freePath(name, ext, { root, now }) {
 function startCapture(file, { name, ext, root = CAPTURES, now = new Date() } = {}) {
   const target = file === undefined ? freePath(name, ext, { root, now }) : file;
   const folder = path.dirname(path.resolve(target));
+  fs.mkdirSync(folder, { recursive: true });
   if (real(folder) === null || real(folder) !== real(root)) {
     const done = () => target;
     return { file: target, writing: target, finish: done, finished: done, abandon: done };

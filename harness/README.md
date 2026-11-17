@@ -240,7 +240,8 @@ Node 18 or later. See [ADR-0001](../docs/adr/0001-fork-abletonosc.md) for the de
   `-3` after the name, and none given no path replaces a file. A capture is written in the folder's hidden `.unfinished`
   folder and moved out once it is finished, a video by its helper, so a file in the captures
   folder itself is whole (a folder, as `screencapture` refuses a file name that starts with a
-  dot). A path the caller gives outside the folder is used as given, and nothing deletes it;
+  dot). A path the caller gives outside the folder is used as given, its folder made if it is
+  missing, and nothing deletes it;
   one inside it follows the folder's rules. `node harness/captures.js finished` lists the
   folder's finished captures, for `remote.sh`.
 - `doctor.js`: read-only check that Live is ready to be driven; run it first. What it
@@ -323,8 +324,8 @@ Node 18 or later. See [ADR-0001](../docs/adr/0001-fork-abletonosc.md) for the de
   project's repo, `node ~/dev/ableton-live-test-harness/harness/cli.js video -- node
   tests/live/<check>.js`. `video-frame` saves the frame a video
   shows at a time, in seconds (`videoFrame`). `capture`, `plugin-window`, `video` and
-  `video-frame` given no file save to the captures folder (`captures.js`), and each prints the
-  file's path.
+  `video-frame` given a file make its folder if it is missing, given no file save to the
+  captures folder (`captures.js`), and each prints the file's path.
 - `checks/record-roundtrip.js`: checks the recording path itself. It adds two tracks,
   records one's clip into the other through MIDI routing, compares, and deletes them.
 - `checks/plugin-record.js [--keep]`: checks the plug-in path on Apple's AUDelay, which

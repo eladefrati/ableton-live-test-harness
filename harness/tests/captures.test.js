@@ -139,6 +139,14 @@ test("a capture given a path outside the folder is written there as it is, and p
   assert.ok(fs.existsSync(old), "the folder isn't pruned for a capture outside it");
 });
 
+test("a capture given a path in a folder that doesn't exist makes the folder", async (t) => {
+  const root = folder(t);
+  const missing = path.join(folder(t), "new", "sub", "made.png");
+  const saved = await saveCapture(missing, { root }, async (at) => fs.writeFileSync(at, "png"));
+  assert.equal(saved.file, missing);
+  assert.equal(fs.readFileSync(missing, "utf8"), "png");
+});
+
 test("a capture that fails as it is written leaves nothing in the folder, and prunes nothing", async (t) => {
   const root = folder(t);
   const old = file(root, "old.png", 8);
