@@ -621,7 +621,11 @@ unexpected.
   the file and replaces the file only once that is there, so each of the three throws
   `DeviceUiError` naming the file, exits 1 from `cli.js`, and leaves a file already there as
   it was. A read-only file in a folder that can be written is replaced, as `screencapture`
-  alone replaced it. `startCapture` makes a missing folder first, so `cli.js capture` and
+  alone replaced it. The file it writes beside is `<name>-capturing-<pid>.png`, `<name>` the
+  file's name without its extension, in the same folder: a run killed while it captures can
+  leave it there. Beside a path the caller gave, nothing deletes it; for a capture in the
+  captures folder it is in the `.unfinished` folder, whose prune deletes it once it is 7 days
+  old and another capture is saved there. `startCapture` makes a missing folder first, so `cli.js capture` and
   `plugin-window`, like `video` and `video-frame`, fail only on a folder that can't be
   written; `captureWindow` called with a path of its own still throws on a missing one.
 - openrsync with `--remove-source-files`, failing on one listed file it couldn't read, copied
