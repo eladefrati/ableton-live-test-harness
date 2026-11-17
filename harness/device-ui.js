@@ -723,7 +723,7 @@ async function captureWindow(file, { window: id } = {}, system = machine) {
   try {
     await system.capture(window.id, writing);
     if (!fs.existsSync(writing)) {
-      throw new DeviceUiError(`Couldn't save the picture of Live's window as ${file}: is its folder there, and can it be written? Not captured`);
+      throw new DeviceUiError(`Couldn't save the picture of Live's window as ${file}: screencapture wrote no file. Not captured`);
     }
     fs.renameSync(writing, file);
   } finally {

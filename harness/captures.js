@@ -61,24 +61,24 @@ function freePath(name, ext, { root, now }) {
   }
 }
 
-// Starts a capture: every still, frame and video the harness saves goes through here. Its
-// path is `file`, the caller's, its folder made if it is missing, or with none a new one in the
-// folder (freePath, by `name` and `ext`). Returns { file, writing, finish(), finished(), abandon() }. `writing` is where the
-// capture is to be written: in the folder, however the path names it, its hidden name, cleared
-// of what a writer killed before left there; elsewhere `file` itself, as given. finish() moves
-// what was written to `file` and returns the capture's path: one given a path replaces a file
-// there, one given none replaces nothing and takes the next free name if another process's
-// capture has taken its own meanwhile. finished() is for a writer that moves it itself, as a
-// video's helper does, which replaces nothing. Either then prunes the folder, if the capture
-// is in it. abandon() deletes what a failed writer left under a hidden name.
+// Starts a capture: every still, frame and video the harness saves goes through here. Its path
+// is `file`, the caller's, its folder made if it is missing, or with none a new one in the
+// folder (freePath, by `name` and `ext`). Returns { file, writing, finish(), finished(),
+// abandon() }. `writing` is where the capture is to be written: in the folder, however the path
+// names it, its hidden name, cleared of what a writer killed before left there; elsewhere
+// `file` itself, as given. finish() moves what was written to `file` and returns the capture's
+// path: one given a path replaces a file there, one given none replaces nothing and takes the
+// next free name if another process's capture has taken its own meanwhile. finished() is for a
+// writer that moves it itself, as a video's helper does, which replaces nothing. Either then
+// prunes the folder, if the capture is in it. abandon() deletes what a failed writer left under
+// a hidden name.
 function startCapture(file, { name, ext, root = CAPTURES, now = new Date() } = {}) {
   const target = file === undefined ? freePath(name, ext, { root, now }) : file;
   const folder = path.dirname(path.resolve(target));
   try {
     fs.mkdirSync(folder, { recursive: true });
   } catch (error) {
-    const why = ["EACCES", "EPERM"].includes(error.code) ? "a folder above it can't be written" : error.message;
-    throw new Error(`Couldn't save ${target}: its folder can't be made (${why}). Not captured`, { cause: error });
+    throw new Error(`Couldn't save ${target}: ${error.message}. Not captured`, { cause: error });
   }
   if (real(folder) !== real(root)) {
     const done = () => target;
