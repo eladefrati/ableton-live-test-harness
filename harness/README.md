@@ -241,9 +241,11 @@ Node 18 or later. See [ADR-0001](../docs/adr/0001-fork-abletonosc.md) for the de
   folder and moved out once it is finished, a video by its helper, so a file in the captures
   folder itself is whole (a folder, as `screencapture` refuses a file name that starts with a
   dot). A path the caller gives outside the folder is used as given, its folder made if it is
-  missing, and nothing deletes it;
-  one inside it follows the folder's rules. `node harness/captures.js finished` lists the
-  folder's finished captures, for `remote.sh`.
+  missing, and nothing deletes it; one inside it follows the folder's rules. A capture of
+  Live's window (`captureWindow`, `cli.js capture`) is written beside its file as
+  `<name>-capturing-<random>.png` and renamed to it once whole: a run killed while it captures
+  can leave that file there, and nothing deletes it outside the captures folder.
+  `node harness/captures.js finished` lists the folder's finished captures, for `remote.sh`.
 - `doctor.js`: read-only check that Live is ready to be driven; run it first. What it
   checks and what to do about each line: the
   [`verify-ableton` skill](../skills/verify-ableton/SKILL.md).
