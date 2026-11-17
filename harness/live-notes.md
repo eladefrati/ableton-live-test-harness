@@ -614,6 +614,14 @@ unexpected.
 - `screencapture` refuses a file name that starts with a dot ("cannot write file to intended
   destination") and still exits 0; a file in a hidden folder it writes (remote Mac, macOS
   26.7, 2026-11-14).
+- `screencapture` also exits 0, saying the same on stderr, when the file's folder doesn't
+  exist or can't be written; in a folder that can't be written, a file already at the path
+  stays as it was. `cli.js capture` printed such a path as saved, with exit 0, in 3 of 3
+  (remote Mac, macOS 26.7.1, 2026-11-17). `captureWindow` now has `screencapture` write beside
+  the file and replaces the file only once that is there, so each of the three throws
+  `DeviceUiError` naming the file, exits 1 from `cli.js`, and leaves a file already there as
+  it was. A read-only file in a folder that can be written is replaced, as `screencapture`
+  alone replaced it.
 - openrsync with `--remove-source-files`, failing on one listed file it couldn't read, copied
   the other file it was given but didn't delete its source, and exited non-zero; `remote.sh`
   names what it copied, and a later run finds that name already here (remote Mac, macOS 26.7,

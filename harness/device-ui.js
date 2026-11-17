@@ -708,11 +708,24 @@ async function liveMainWindow(system = machine) {
 // capture works behind other windows. The window is Live's main one, or the one with the id
 // `window` (from liveWindows); a window that isn't Live's is refused. Needs Screen Recording
 // for the terminal app, not the click host. Resolves with the window captured.
+//
+// screencapture exits 0 when it can't write its file, so the capture is written beside `file`
+// and replaces it only once it is there: a folder that is missing or can't be written throws,
+// and leaves a file already at `file` as it was.
 async function captureWindow(file, { window: id } = {}, system = machine) {
   await system.wake();
   const window = id === undefined ? await system.window() : (await system.windows()).find((w) => w.id === id);
   if (!window) throw new DeviceUiError(`Live has no window ${id} on screen`);
-  await system.capture(window.id, file);
+  const writing = path.join(path.dirname(file), `${path.basename(file, path.extname(file))}-capturing-${process.pid}.png`);
+  try {
+    await system.capture(window.id, writing);
+    if (!fs.existsSync(writing)) {
+      throw new DeviceUiError(`Couldn't save the picture of Live's window as ${file}: is its folder there, and can it be written? Not captured`);
+    }
+    fs.renameSync(writing, file);
+  } finally {
+    fs.rmSync(writing, { force: true });
+  }
   return window;
 }
 

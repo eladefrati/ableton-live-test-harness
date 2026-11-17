@@ -559,20 +559,66 @@ test("text returns the lines inside a rectangle of the panel, top first", async 
   assert.deepEqual(await ui.text([200, 0, 60, 20]), []);
 });
 
-test("captureWindow captures Live's main window, or one of Live's windows by id, and refuses another id", async () => {
-  const { captureWindow } = require("../device-ui.js");
-  const captured = [];
-  const system = {
-    wake: async () => {},
-    window: async () => ({ id: 7, x: 0, y: 0, w: 800, h: 600 }),
-    windows: async () => [{ id: 9, title: "Save", x: 10, y: 10, w: 300, h: 200 }, { id: 7, title: "Set", x: 0, y: 0, w: 800, h: 600 }],
-    capture: async (id, file) => { captured.push([id, file]); },
-  };
-  assert.equal((await captureWindow("/tmp/main.png", {}, system)).id, 7);
-  assert.equal((await captureWindow("/tmp/panel.png", { window: 9 }, system)).title, "Save");
-  await assert.rejects(captureWindow("/tmp/other.png", { window: 4 }, system), /Live has no window 4 on screen/);
-  assert.deepEqual(captured, [[7, "/tmp/main.png"], [9, "/tmp/panel.png"]]);
+// A stand-in for captureWindow's system: Live's main window is 7, and `capture` writes the
+// window's id to the file it is given, or with `writes` false writes nothing, as screencapture
+// does when it can't write the file.
+const captureSystem = ({ writes = true } = {}) => ({
+  wake: async () => {},
+  window: async () => ({ id: 7, x: 0, y: 0, w: 800, h: 600 }),
+  windows: async () => [{ id: 9, title: "Save", x: 10, y: 10, w: 300, h: 200 }, { id: 7, title: "Set", x: 0, y: 0, w: 800, h: 600 }],
+  capture: async (id, file) => { if (writes) fs.writeFileSync(file, `window ${id}`); },
 });
+
+const inTempFolder = async (run) => {
+  const folder = fs.mkdtempSync(path.join(os.tmpdir(), "capture-window-"));
+  try {
+    await run(folder);
+  } finally {
+    fs.rmSync(folder, { recursive: true, force: true });
+  }
+};
+
+test("captureWindow captures Live's main window, or one of Live's windows by id, and refuses another id", () => inTempFolder(async (folder) => {
+  const { captureWindow } = require("../device-ui.js");
+  const system = captureSystem();
+  const [main, panel, other] = ["main.png", "panel.png", "other.png"].map((name) => path.join(folder, name));
+  assert.equal((await captureWindow(main, {}, system)).id, 7);
+  assert.equal((await captureWindow(panel, { window: 9 }, system)).title, "Save");
+  await assert.rejects(captureWindow(other, { window: 4 }, system), /Live has no window 4 on screen/);
+  assert.equal(fs.readFileSync(main, "utf8"), "window 7");
+  assert.equal(fs.readFileSync(panel, "utf8"), "window 9");
+  assert.deepEqual(fs.readdirSync(folder).sort(), ["main.png", "panel.png"]);
+}));
+
+test("captureWindow replaces a file already there", () => inTempFolder(async (folder) => {
+  const { captureWindow } = require("../device-ui.js");
+  const file = path.join(folder, "live.png");
+  fs.writeFileSync(file, "old");
+  await captureWindow(file, {}, captureSystem());
+  assert.equal(fs.readFileSync(file, "utf8"), "window 7");
+  assert.deepEqual(fs.readdirSync(folder), ["live.png"]);
+}));
+
+test("captureWindow throws DeviceUiError naming the file when the capture writes nothing, and leaves a file already there as it was", () => inTempFolder(async (folder) => {
+  const { captureWindow } = require("../device-ui.js");
+  const file = path.join(folder, "live.png");
+  const names = (error) => error instanceof DeviceUiError && error.message.includes(file);
+  await assert.rejects(captureWindow(file, {}, captureSystem({ writes: false })), names);
+  assert.deepEqual(fs.readdirSync(folder), []);
+  fs.writeFileSync(file, "old");
+  await assert.rejects(captureWindow(file, {}, captureSystem({ writes: false })), names);
+  assert.equal(fs.readFileSync(file, "utf8"), "old");
+  assert.deepEqual(fs.readdirSync(folder), ["live.png"]);
+}));
+
+test("a capture of Live's window given no path that writes nothing throws DeviceUiError naming where it was writing, and leaves nothing in the captures folder", () => inTempFolder(async (root) => {
+  const { captureWindow } = require("../device-ui.js");
+  const { saveCapture } = require("../captures.js");
+  const save = () => saveCapture(undefined, { name: "live-window", ext: ".png", root }, (to) => captureWindow(to, {}, captureSystem({ writes: false })));
+  await assert.rejects(save(), (error) => error instanceof DeviceUiError && error.message.includes(root));
+  assert.deepEqual(fs.readdirSync(root), [".unfinished"]);
+  assert.deepEqual(fs.readdirSync(path.join(root, ".unfinished")), []);
+}));
 
 test("readPanelWidth is the right edge of the rightmost object in presentation", () => {
   assert.equal(readPanelWidth(amxd()), 260);
