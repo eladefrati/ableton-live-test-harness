@@ -14,6 +14,10 @@ Built on [AbletonOSC](https://github.com/ideoforms/AbletonOSC): see [Origin](#or
 
 **To change this repo,** see [CONTRIBUTING.md](CONTRIBUTING.md).
 
+**To see what changed,** see the
+[releases](https://github.com/eladefrati/ableton-live-test-harness/releases): tagged releases
+with notes. `main` is the development line.
+
 AbletonOSC is a MIDI remote script that provides an [Open Sound Control (OSC)](https://ccrma.stanford.edu/groups/osc/) interface to
 control [Ableton Live](https://www.ableton.com/en/live/). AbletonOSC's aim is to expose the
 entire [Live Object Model](https://docs.cycling74.com/max8/vignettes/live_object_model) API
