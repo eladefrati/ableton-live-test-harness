@@ -124,7 +124,6 @@ async function recordVideo(file, { window, screen = false, seconds = MAX_SECONDS
   }
   if (file !== undefined) {
     file = path.resolve(file);
-    fs.mkdirSync(path.dirname(file), { recursive: true });
   }
   // In the captures folder it is written under a hidden name, which the helper renames to `file`
   // once it is finished, however the recording ends (captures.js).
@@ -285,7 +284,6 @@ async function videoFrame(file, at, png, system = machine) {
   };
   if (png !== undefined) {
     png = path.resolve(png);
-    fs.mkdirSync(path.dirname(png), { recursive: true });
   }
   const saved = await captures.saveCapture(png, { name: `${path.basename(file, ".mov")}-${at}s`, ext: ".png", root: system.captures }, save);
   return { file: saved.file, ...saved.value };

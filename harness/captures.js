@@ -74,8 +74,13 @@ function freePath(name, ext, { root, now }) {
 function startCapture(file, { name, ext, root = CAPTURES, now = new Date() } = {}) {
   const target = file === undefined ? freePath(name, ext, { root, now }) : file;
   const folder = path.dirname(path.resolve(target));
-  fs.mkdirSync(folder, { recursive: true });
-  if (real(folder) === null || real(folder) !== real(root)) {
+  try {
+    fs.mkdirSync(folder, { recursive: true });
+  } catch (error) {
+    const why = ["EACCES", "EPERM"].includes(error.code) ? "a folder above it can't be written" : error.message;
+    throw new Error(`Couldn't save ${target}: its folder can't be made (${why}). Not captured`, { cause: error });
+  }
+  if (real(folder) !== real(root)) {
     const done = () => target;
     return { file: target, writing: target, finish: done, finished: done, abandon: done };
   }

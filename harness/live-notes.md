@@ -625,9 +625,11 @@ unexpected.
   file's name without its extension, in the same folder: a run killed while it captures can
   leave it there. Beside a path the caller gave, nothing deletes it; for a capture in the
   captures folder it is in the `.unfinished` folder, whose prune deletes it once it is 7 days
-  old and another capture is saved there. `startCapture` makes a missing folder first, so `cli.js capture` and
-  `plugin-window`, like `video` and `video-frame`, fail only on a folder that can't be
-  written; `captureWindow` called with a path of its own still throws on a missing one.
+  old and another capture is saved there. `startCapture` makes a missing folder first, for
+  `cli.js capture`, `plugin-window`, `video` and `video-frame` alike, so they fail only on a
+  folder that can't be written; one it can't make, under a folder that can't be written,
+  throws an error naming the file before anything is captured. `captureWindow` called with a
+  path of its own still throws on a missing folder.
 - openrsync with `--remove-source-files`, failing on one listed file it couldn't read, copied
   the other file it was given but didn't delete its source, and exited non-zero; `remote.sh`
   names what it copied, and a later run finds that name already here (remote Mac, macOS 26.7,

@@ -147,6 +147,21 @@ test("a capture given a path in a folder that doesn't exist makes the folder", a
   assert.equal(fs.readFileSync(missing, "utf8"), "png");
 });
 
+test("a capture given a path whose folder can't be made throws an error naming the file, before anything is written", async (t) => {
+  const root = folder(t);
+  const locked = folder(t);
+  const unmade = path.join(locked, "sub", "made.png");
+  let wrote = false;
+  fs.chmodSync(locked, 0o555);
+  try {
+    await assert.rejects(saveCapture(unmade, { root }, async () => { wrote = true; }), (error) => error.message.includes(unmade));
+  } finally {
+    fs.chmodSync(locked, 0o755);
+  }
+  assert.equal(wrote, false);
+  assert.deepEqual(fs.readdirSync(locked), []);
+});
+
 test("a capture that fails as it is written leaves nothing in the folder, and prunes nothing", async (t) => {
   const root = folder(t);
   const old = file(root, "old.png", 8);
