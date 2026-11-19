@@ -156,6 +156,17 @@ test("findTitle uses the first word's edge, past icons read as characters, and a
   assert.deepEqual(findTitle([line("Dev1ce 2O3O.11.08.I", 100, 50)], TITLE), { x: 100, y: 50 });
 });
 
+test("findTitle matches a title whose last word has an icon read onto its end", () => {
+  assert.deepEqual(findTitle([line(`${TITLE}\\`, 100, 50)], TITLE), { x: 100, y: 50 });
+  assert.deepEqual(findTitle([line(`> ${TITLE}\\ V`, 1800, 1400)], TITLE), { x: 1830, y: 1400 });
+});
+
+test("findTitle refuses a last word that goes on in letters or digits, or symbols inside the title", () => {
+  assert.throws(() => findTitle([line(`${TITLE}2\\`, 0, 0)], TITLE), /isn't on screen/);
+  assert.throws(() => findTitle([line("Device\\ 2030.11.08.1", 0, 0)], TITLE), /isn't on screen/);
+  assert.throws(() => findTitle([line(`${TITLE}\\`, 0, 0), line(TITLE, 900, 0)], TITLE), /2 times/);
+});
+
 test("findTitle skips a match left of the given edge, as the browser's or the Info View's", () => {
   const lines = [line(TITLE, 26, 1400), line(TITLE, 260, 400), line(`> ${TITLE}`, 1800, 1400)];
   assert.deepEqual(findTitle(lines, TITLE, 480), { x: 1830, y: 1400 });

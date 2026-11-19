@@ -162,6 +162,11 @@ function controlPoint(control, item) {
 const SHORTENED_MIN = 3;
 const ELLIPSIS = /(\.\.\.|…)$/;
 
+// Whether a recognized word is the title's last word with an icon Live draws right after the
+// title read onto its end as symbols, such as the hand of a device a control surface appoints
+// ("2030.11.08.1\").
+const withIconAfter = (word, wanted) => word.startsWith(wanted) && /^[^\p{L}\p{N}_]+$/u.test(word.slice(wanted.length));
+
 // Whether the recognized words, from the first, read as the title: all its words, or its start
 // cut short with an ellipsis.
 function matchesTitle(words, wanted) {
@@ -171,7 +176,8 @@ function matchesTitle(words, wanted) {
       const shown = [...wanted.slice(0, i), stem].join(" ");
       return wanted[i].startsWith(stem) && shown.replace(/ /g, "").length >= SHORTENED_MIN;
     }
-    if (words[i] !== wanted[i]) return false;
+    const last = i === wanted.length - 1;
+    if (words[i] !== wanted[i] && !(last && withIconAfter(words[i], wanted[i]))) return false;
   }
   return words.length >= wanted.length;
 }
