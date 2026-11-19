@@ -134,11 +134,16 @@ unexpected.
   Not tried with both devices on one track.
 - The browser and the Info View can show a device's name in the same window as its title
   bar, left of 240 points; `device-ui.js` looks for titles right of that.
-- Live draws a hand right after the title of the device a Control Surface controls, and
-  AbletonOSC is one, so the devices the harness drives show it. Before any click the text reader left the
-  hand out; once a press had selected the device, it read a title "Device 2030.11.08.1" as
-  ") Device 2030.11.08.1\", the hand on the end of the last word, every time (remote Mac,
-  2026-11-19). `device-ui.js` takes symbols on the end of a title's last word as an icon.
+- Live draws a hand right after the title of the device a Control Surface controls. The
+  text reader's first read of a device's title had no hand; every read after a press read
+  "Device 2030.11.08.1" as ") Device 2030.11.08.1\", the hand on the end of the last word,
+  every time (remote Mac, 2026-11-19). The cause is not known: `DeviceUi.locate()` selects
+  the device over OSC before every read, the first too, so selecting it is not what changed.
+  The likely source, unverified: AbletonOSC's `Manager` subclasses
+  `ableton.v2.control_surface.ControlSurface`, which sets up a device provider, and the
+  names in Live 12's compiled `device_provider.pyc` (`_appoint_device_from_song`,
+  `__on_selected_device_changed`) suggest it appoints the selected device. `device-ui.js`
+  takes symbols on the end of a title's last word as an icon.
 - Live cuts a title too long for its device short with an ellipsis: a folded AUDelay's title
   bar reads "AUD..."; unfolded, the device is wider and it reads "AUDelay" (remote Mac,
   2026-11-11).
