@@ -730,7 +730,7 @@ unexpected.
   one placed at -9000 or 20000 beats is kept there. So with no arguments, the note queries
   read every note with `Clip.get_all_notes_extended()`, and `/live/clip/remove/notes`
   removes them by their ids, rather than through a fixed range: the old one, pitches 0 and
-  128 from -8192 for 16384 beats, left out notes before -8192 or from 8192 on. On 387 notes
+  127 from -8192 for 16384 beats, left out notes at pitch 127, before -8192 or from 8192 on. On 387 notes
   at every pitch, at times from -9000 to 20000, `get_all_notes_extended()` returned all of
   them, in a Session and an Arrangement clip, in `get_notes_extended()`'s order, pitch then
   time, which the callers rely on (Live 12.4.25b2, remote Mac, 2026-11-19).
