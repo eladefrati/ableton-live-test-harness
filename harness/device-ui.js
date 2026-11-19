@@ -63,6 +63,11 @@ const isPlugin = (className) => /PluginDevice$/.test(className); // AuPluginDevi
 // and the browser's lists are left of this; the device titles right of it.
 const INFO_VIEW_RIGHT = 240; // points from the window's left edge
 const ROW_TOLERANCE = 4; // points
+// Live's status bar, along the window's bottom edge, shows the selected track's and device's
+// names, so a device name short enough to fit there is on screen twice. The device titles are
+// above it. Its height in points, from the window's bottom edge (measured on the remote Mac,
+// Live 12.4.25b2, 2026-11-19).
+const STATUS_BAR_HEIGHT = 37;
 // Long enough for Live to show the control under the pointer in the Info View.
 const INFO_VIEW_SETTLE_MS = 350;
 // How often a press looks for Stop while it waits on a read of Live's window.
@@ -184,13 +189,15 @@ function matchesTitle(words, wanted) {
 
 // Where the device's title is in the recognized lines: its first word's left edge and the
 // line's top, in pixels. Text starting left of `fromX` (pixels) is skipped: the Info View and
-// the browser, which can show the same name. Exactly one must match, or the wrong device could
+// the browser, which can show the same name; so is a line whose top is at or below `toY`
+// (pixels): the status bar, which shows the selected device's name. Exactly one must match, or the wrong device could
 // be pressed. A title too long for its device, which Live cuts short with an ellipsis
 // ("Long Na..."), matches by its start, of at least SHORTENED_MIN characters.
-function findTitle(lines, title, fromX = 0) {
+function findTitle(lines, title, fromX = 0, toY = Infinity) {
   const wanted = title.split(" ").map(normalized);
   const found = [];
   for (const line of lines) {
+    if (line.y >= toY) continue;
     const words = line.words.map((word) => normalized(word.text));
     for (let start = 0; start < words.length; start++) {
       if (line.words[start].x < fromX) continue;
@@ -753,7 +760,7 @@ class DeviceUi {
     const window = await this.system.window();
     const { width, lines } = await read(window.id);
     const scale = width / window.w; // pixels per point
-    const title = findTitle(lines, this.title, INFO_VIEW_RIGHT * scale);
+    const title = findTitle(lines, this.title, INFO_VIEW_RIGHT * scale, (window.h - STATUS_BAR_HEIGHT) * scale);
     return {
       window, scale, title,
       x: window.x + title.x / scale + TITLE_TO_PANEL.x - (this.plugin ? PLUGIN_TITLE_SHIFT : 0),

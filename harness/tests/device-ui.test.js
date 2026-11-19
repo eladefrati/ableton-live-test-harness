@@ -191,6 +191,12 @@ test("findTitle refuses a title that is missing or on screen twice", () => {
   assert.throws(() => findTitle([line(TITLE, 0, 0), line(TITLE, 900, 0)], TITLE), /2 times/);
 });
 
+test("findTitle skips a match from the given top down, as the status bar's", () => {
+  const lines = [line(`> ${TITLE}`, 1800, 1400), line(`Track ${TITLE}`, 2500, 1700)];
+  assert.deepEqual(findTitle(lines, TITLE, 0, 1676), { x: 1830, y: 1400 });
+  assert.throws(() => findTitle(lines, TITLE), /2 times/);
+});
+
 test("infoTitle reads the leftmost text on the titles' row, left of the devices", () => {
   const title = { x: 1830, y: 1400 };
   assert.equal(infoTitle([line(TITLE, 1800, 1400), line("Tab", 26, 1401), line("Other", 26, 1600)], title, 2), "Tab");
@@ -203,6 +209,13 @@ test("a press clicks the control at the point worked out from the title, last, a
   await ui.press("Button");
   const expected = [7, 0 + 1800 / 2 + 15 - 17 + 230, 25 + 1400 / 2 + 14 + 80];
   assert.deepEqual(system.calls, ["focus", ["hover", ...expected], "focus", ["click", ...expected]]);
+});
+
+test("a press finds the title past the selected device's name in the status bar", async () => {
+  const system = fakeMachine({ titles: [line(`> ${TITLE}`, 1800, 1400), line(`Track ${TITLE}`, 2500, 1700)] });
+  const ui = await open(system);
+  await ui.press("Button");
+  assert.deepEqual(clicks(system)[0], ["click", 7, 0 + 1800 / 2 + 15 - 17 + 230, 25 + 1400 / 2 + 14 + 80]);
 });
 
 test("a press on a tab's item goes to its row", async () => {

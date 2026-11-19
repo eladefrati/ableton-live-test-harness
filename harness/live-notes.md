@@ -134,6 +134,10 @@ unexpected.
   Not tried with both devices on one track.
 - The browser and the Info View can show a device's name in the same window as its title
   bar, left of 240 points; `device-ui.js` looks for titles right of that.
+- The status bar, along the bottom of Live's window, shows the selected track's name and the
+  selected device's, right-aligned, and a short device name ("Device-dev") was read there as
+  a second title (Live 12.4.25b2, on the remote Mac, 2026-11-19). The status bar is the bottom 37 points of the window;
+  `device-ui.js` looks for titles above it.
 - Live draws a hand right after the title of the device a Control Surface controls. The
   text reader's first read of a device's title had no hand; every read after a press read
   "Device 2030.11.08.1" as ") Device 2030.11.08.1\", the hand on the end of the last word,
