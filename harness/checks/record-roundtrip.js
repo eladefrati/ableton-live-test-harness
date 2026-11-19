@@ -4,8 +4,10 @@
 // Checks the harness's own recording path: places a clip of off-grid notes in the
 // Arrangement on one new track, records its MIDI output into a second new track, and
 // compares both the clip's notes read back and the recording with the notes the clip plays.
-// The clip's notes include MIDI's lowest and highest pitches, which a note query must not
-// leave out. Prints one PASS/FAIL line per comparison, with the missing and extra notes on
+// Then it reads the notes of the Session clip the Arrangement clip was copied from, and
+// removes them, with no arguments: the defaults of /live/clip/get/notes and
+// /live/clip/remove/notes. The clip's notes include MIDI's lowest and highest pitches, which
+// a note query or removal must not leave out. Prints one PASS/FAIL line per comparison, with the missing and extra notes on
 // a failure. Both tracks are deleted afterwards. Needs Live's Count-In off. Exits 1 if any
 // comparison fails.
 
@@ -49,6 +51,16 @@ async function main() {
     const options = { tempo: await live.get("song", "tempo"), durationToleranceMs: 1 };
     report("read back", compareNotes(played, await live.songNotes(source), options));
     report("recorded", compareNotes(played, await live.songNotes(record), options));
+    report("Session read", compareNotes(placed, await live.notes(source, 0), options));
+    live.send("/live/clip/remove/notes", source, 0);
+    await live.sync();
+    // Read through a window of its own, so a wrong get default can't hide a note left.
+    const left = await live.notes(source, 0, { window: [0, 128, -1000000, 2000000] });
+    console.log(`Session remove: ${left.length ? "FAIL" : "PASS"}: ${left.length} notes left`);
+    if (left.length) {
+      console.log(JSON.stringify({ left }));
+      process.exitCode = 1;
+    }
   } finally {
     // An error in cleanup must not keep the sockets open: Node would never exit.
     try {
