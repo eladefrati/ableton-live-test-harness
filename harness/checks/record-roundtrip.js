@@ -3,11 +3,13 @@
 
 // Checks the harness's own recording path: places a clip of off-grid notes in the
 // Arrangement on one new track, records its MIDI output into a second new track, and
-// compares the recording with the clip. The clip's notes include MIDI's lowest and highest
-// pitches, which a note query must not leave out. Both tracks are deleted afterwards. Needs
-// Live's Count-In off. Exits 1 on a failed comparison.
+// compares both the clip's notes read back and the recording with the notes the clip plays.
+// The clip's notes include MIDI's lowest and highest pitches, which a note query must not
+// leave out. Prints one PASS/FAIL line per comparison, with the missing and extra notes on
+// a failure. Both tracks are deleted afterwards. Needs Live's Count-In off. Exits 1 if any
+// comparison fails.
 
-const { connect } = require("../live.js");
+const { connect, playedNotes } = require("../live.js");
 const { compareNotes, summary } = require("../compare.js");
 
 const SOURCE = "harness-source";
@@ -24,6 +26,12 @@ function testNotes() {
   return notes;
 }
 
+function report(name, result) {
+  console.log(`${name}: ${summary(result)}`);
+  if (!result.pass) console.log(JSON.stringify({ missing: result.missing, extra: result.extra }));
+  if (!result.pass || result.matched === 0) process.exitCode = 1;
+}
+
 async function main() {
   const live = await connect({ timeout: 5000 });
   let first;
@@ -33,19 +41,14 @@ async function main() {
     const record = await live.createMidiTrack(RECORD);
     await live.setInputRouting(record, SOURCE);
     const placed = testNotes();
-    await live.placeClip(source, placed, BEATS);
+    const index = await live.placeClip(source, placed, BEATS);
     live.set("track", "arm", record, 1);
     await live.recordArrangement({ start: 0, length: BEATS, tracks: [record] });
     live.set("track", "arm", record, 0);
-    const sourceNotes = await live.songNotes(source);
-    if (sourceNotes.length !== placed.length) {
-      console.log(`FAIL: the clip's notes read back ${sourceNotes.length} of the ${placed.length} placed`);
-      process.exitCode = 1;
-    }
-    const result = compareNotes(sourceNotes, await live.songNotes(record),
-      { tempo: await live.get("song", "tempo"), durationToleranceMs: 1 });
-    console.log(summary(result));
-    if (!result.pass || result.matched === 0) process.exitCode = 1;
+    const played = playedNotes((await live.arrangementClips(source))[index], placed);
+    const options = { tempo: await live.get("song", "tempo"), durationToleranceMs: 1 };
+    report("read back", compareNotes(played, await live.songNotes(source), options));
+    report("recorded", compareNotes(played, await live.songNotes(record), options));
   } finally {
     // An error in cleanup must not keep the sockets open: Node would never exit.
     try {
