@@ -6,10 +6,11 @@
 // compares both the clip's notes read back and the recording with the notes the clip plays.
 // Then it reads the notes of the Session clip the Arrangement clip was copied from, and
 // removes them, with no arguments: the defaults of /live/clip/get/notes and
-// /live/clip/remove/notes. The clip's notes include MIDI's lowest and highest pitches, which
-// a note query or removal must not leave out. Prints one PASS/FAIL line per comparison, with the missing and extra notes on
-// a failure. Both tracks are deleted afterwards. Needs Live's Count-In off. Exits 1 if any
-// comparison fails.
+// /live/clip/remove/notes. The clip's notes include MIDI's lowest and highest pitches and
+// two notes more than 8192 beats before and after the clip's start, which a note query or
+// removal must not leave out. Prints one PASS/FAIL line per comparison, with the missing and
+// extra notes on a failure. Both tracks are deleted afterwards. Needs Live's Count-In off.
+// Exits 1 if any comparison fails.
 
 const { connect, playedNotes } = require("../live.js");
 const { compareNotes, summary } = require("../compare.js");
@@ -25,6 +26,8 @@ function testNotes() {
     notes.push({ pitch: 60 + (i * 7) % 24, start: i * 0.6 + 0.013 * (i % 5), duration: 0.3, velocity: 90 + i });
   }
   notes.push({ pitch: 0, start: 14.5, duration: 0.3, velocity: 100 }, { pitch: 127, start: 15, duration: 0.3, velocity: 100 });
+  // Outside the clip, so not played: only the Session read and removal see them.
+  notes.push({ pitch: 61, start: -9000, duration: 0.5, velocity: 100 }, { pitch: 62, start: 9000, duration: 0.5, velocity: 100 });
   return notes;
 }
 

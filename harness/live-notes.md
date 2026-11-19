@@ -721,8 +721,14 @@ unexpected.
   clip's own time. `songNotes()` places an Arrangement clip's notes in song beats, including
   loop repeats.
 - Live's note range is a start pitch and a count of pitches: 0 and 127 cover pitches 0 to
-  126. The note queries' and `/live/clip/remove/notes`'s defaults are 0 and 128, so a note at
-  127 is read and removed (remote Mac, 2026-11-19).
+  126. A time range is a start and a length, and a note can sit anywhere in a clip's time:
+  one placed at -9000 or 20000 beats is kept there. So with no arguments, the note queries
+  read every note with `Clip.get_all_notes_extended()`, and `/live/clip/remove/notes`
+  removes them by their ids, rather than through a fixed range: the old one, pitches 0 and
+  128 from -8192 for 16384 beats, left out notes before -8192 or from 8192 on. On 387 notes
+  at every pitch, at times from -9000 to 20000, `get_all_notes_extended()` returned all of
+  them, in a Session and an Arrangement clip, in `get_notes_extended()`'s order, pitch then
+  time, which the callers rely on (Live 12.4.25b2, remote Mac, 2026-11-19).
 - Play starts from the start marker, `Song.start_time`; `recordArrangement()` sets it to
   `start` and leaves cue points alone. Setting `current_song_time` while stopped doesn't
   move the marker, Stop while stopped puts it back at 0, and turning `record_mode` on while
