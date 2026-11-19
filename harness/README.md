@@ -328,8 +328,14 @@ Node 18 or later. See [ADR-0001](../docs/adr/0001-fork-abletonosc.md) for the de
   shows at a time, in seconds (`videoFrame`). `capture`, `plugin-window`, `video` and
   `video-frame` given a file make its folder if it is missing, given no file save to the
   captures folder (`captures.js`), and each prints the file's path.
-- `checks/record-roundtrip.js`: checks the recording path itself. It adds two tracks,
-  records one's clip into the other through MIDI routing, compares, and deletes them.
+- `checks/record-roundtrip.js`: checks the recording path and the note addresses. It adds
+  two tracks, records one's clip into the other through MIDI routing, and compares both the
+  clip's notes read back (`songNotes()`) and the recording with the notes the clip plays.
+  Then it reads the Session clip the Arrangement clip was copied from, and removes its
+  notes, with no arguments, and deletes the tracks. The clip holds notes at pitches 0 and
+  127 and two outside the clip, more than 8192 beats before and after its start, which only
+  the Session read and the removal see. It prints a PASS/FAIL line per comparison, with the
+  missing and extra notes on a failure.
 - `checks/plugin-record.js [--keep]`: checks the plug-in path on Apple's AUDelay, which
   every Mac has. It exposes the parameters, records Operator through the plug-in and checks
   the output equals the signal at Dry/Wet Mix 0, and at Mix 1 trails it by the Delay Time
