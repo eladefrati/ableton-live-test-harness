@@ -217,7 +217,7 @@ any command there from this Mac:
 ~/dev/ableton-live-test-harness/harness/remote.sh <repo> node tests/live/<check>.js
 ```
 
-It copies the working copies of the harness and `~/dev/<repo>` to the remote first, replacing what's there, then runs the
+`<repo>` is a git repo in `~/dev` or one level down (`product/repo`). It copies the working copies of the harness and `~/dev/<repo>` to the remote first, replacing what's there, then runs the
 command in `~/dev/<repo>` there; its exit status is the command's. Stills, videos and frames
 taken there with no path come back to this Mac's captures folder, and `remote.sh` names each
 at its path here: show the user that path, not the remote's. Ctrl-C on `remote.sh` doesn't reach the

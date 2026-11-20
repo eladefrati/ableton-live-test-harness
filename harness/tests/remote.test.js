@@ -54,9 +54,12 @@ function macs(t) {
   };
   // The harness as remote.sh copies it: what the remote's side runs of it.
   write(at("here", "dev", "ableton-live-test-harness", "harness", "captures.js"), fs.readFileSync(path.join(__dirname, "..", "captures.js")));
+  // remote.sh syncs only a git repo: a folder with a .git in it.
+  const repo = (...parts) => fs.mkdirSync(at("here", "dev", ...parts, ".git"), { recursive: true });
+  repo("ableton-live-test-harness");
   fs.mkdirSync(at("there"));
   return {
-    at, write,
+    at, write, repo,
     hereCaptures: at("here-tmp", "ableton-harness-captures"),
     thereCaptures: at("there-tmp", "ableton-harness-captures"),
     // remote.sh run with `words`, and `env` added to its environment.
@@ -79,12 +82,52 @@ const read = (file) => fs.readFileSync(file, "utf8");
 
 test("remote.sh copies the repo over, runs the command there, brings its logs back, and exits with its status", (t) => {
   const mac = macs(t);
+  mac.repo("project");
   mac.write(mac.at("here", "dev", "project", "file.txt"), "here");
   const ran = run(mac, "project", "sh", "-c", "cat file.txt > ran.txt; mkdir -p tests/live/logs; echo log > tests/live/logs/run.log; exit 3");
   assert.equal(ran.status, 3, ran.stderr);
   assert.equal(read(mac.at("there", "dev", "project", "ran.txt")), "here");
   assert.equal(read(mac.at("here", "dev", "project", "tests", "live", "logs", "run.log")), "log\n");
   assert.ok(!fs.existsSync(mac.at("there", "dev", "project", "tests", "live", "logs", "run.log")), "moved, not copied");
+});
+
+test("remote.sh takes a repo one level down in ~/dev, and leaves the other folders of its parent on the remote alone", (t) => {
+  const mac = macs(t);
+  mac.repo("product", "format");
+  mac.write(mac.at("here", "dev", "product", "format", "file.txt"), "here");
+  mac.write(mac.at("there", "dev", "product", "other", "keep.txt"), "kept");
+  const ran = run(mac, "product/format", "sh", "-c", "cat file.txt > ran.txt; mkdir -p tests/live/logs; echo log > tests/live/logs/run.log; exit 3");
+  assert.equal(ran.status, 3, ran.stderr);
+  assert.equal(read(mac.at("there", "dev", "product", "format", "ran.txt")), "here");
+  assert.equal(read(mac.at("there", "dev", "product", "other", "keep.txt")), "kept");
+  assert.equal(read(mac.at("here", "dev", "product", "format", "tests", "live", "logs", "run.log")), "log\n");
+  assert.ok(!fs.existsSync(mac.at("there", "dev", "product", "format", "tests", "live", "logs", "run.log")), "moved, not copied");
+});
+
+test("remote.sh takes a repo one level down whose parent the remote doesn't have yet", (t) => {
+  const mac = macs(t);
+  mac.repo("product", "format");
+  const ran = run(mac, "product/format", "touch", "ran.txt");
+  assert.equal(ran.status, 0, ran.stderr);
+  assert.ok(fs.existsSync(mac.at("there", "dev", "product", "format", "ran.txt")));
+});
+
+test("remote.sh refuses anything but a git repo in ~/dev or one level down, and touches nothing on the remote", (t) => {
+  const mac = macs(t);
+  mac.repo("product", "format");
+  mac.repo("a", "b", "c");
+  mac.write(mac.at("here", "dev", "folder", "file.txt"), "not a repo");
+  mac.write(mac.at("there", "dev", "keep.txt"), "kept");
+  // A folder holding repos, a folder that isn't one, one that doesn't exist, one too deep, and
+  // paths that name a parent of a repo.
+  for (const repo of ["product", "folder", "missing", "a/b/c", "", ".", "..", "./product", "product/.", "product/..",
+    "../dev", "/product", "product/", "product//format"]) {
+    const ran = run(mac, repo, "touch", "ran.txt");
+    assert.equal(ran.status, 2, `${JSON.stringify(repo)}: ${ran.stderr}`);
+    assert.match(ran.stderr, /^remote\.sh: /, JSON.stringify(repo));
+  }
+  assert.deepEqual(fs.readdirSync(mac.at("there", "dev")), ["keep.txt"]);
+  assert.ok(!fs.existsSync(mac.at("there", "ran.txt")));
 });
 
 test("remote.sh brings the remote's finished captures back to this Mac's captures folder, leaving unfinished ones and names already here", (t) => {

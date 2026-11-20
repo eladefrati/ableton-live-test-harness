@@ -4,8 +4,10 @@
 #
 #   harness/remote.sh <repo> <command...>
 #
-# Copies this Mac's working copies of ~/dev/ableton-live-test-harness and ~/dev/<repo> to
-# the same paths under the remote user's home, then runs <command> there in ~/dev/<repo> and
+# <repo> is a git repo in ~/dev or one level down: "project", or "product/repo" for a folder
+# that holds a repo per format. Copies this Mac's working copies of
+# ~/dev/ableton-live-test-harness and ~/dev/<repo> to the same paths under the remote user's
+# home, then runs <command> there in ~/dev/<repo> and
 # exits with its status. The remote may not be able to fetch from this Mac, so code reaches
 # it only by this push; working copies, not commits, because checks prove builds before they
 # are committed. The remote's own build products (.venv,
@@ -25,7 +27,7 @@
 set -euo pipefail
 
 if (( $# < 2 )); then
-  print -u2 "usage: harness/remote.sh <repo in ~/dev> <command...>"
+  print -u2 "usage: harness/remote.sh <repo in ~/dev, or product/repo> <command...>"
   exit 2
 fi
 repo=$1; shift
@@ -40,14 +42,20 @@ if [[ -z $host ]]; then
   exit 2
 fi
 
-# One folder name only: ".", ".." or a path would sync (and --delete) a parent of the repo
-# on the remote, such as all of ~/dev or the remote's home.
-if [[ $repo == */* || $repo == . || $repo == .. || -z $repo ]]; then
-  print -u2 "remote.sh: <repo> must be a folder name in ~/dev, got: $repo"
+# One or two folder names, and the folder a git repo: ".", "..", an empty name, a deeper path
+# or a folder that holds repos would sync (and --delete) a parent of a repo on the remote,
+# such as all of ~/dev, the remote's home, or the other repos of a product.
+parts=("${(@s:/:)repo}")
+if (( $#parts > 2 )) || (( ${parts[(I)]} || ${parts[(I).]} || ${parts[(I)..]} )); then
+  print -u2 "remote.sh: <repo> must be a folder name in ~/dev or one level down (product/repo), got: $repo"
   exit 2
 fi
 if [[ ! -d $HOME/dev/$repo ]]; then
   print -u2 "remote.sh: no such repo: $HOME/dev/$repo"
+  exit 2
+fi
+if [[ ! -e $HOME/dev/$repo/.git ]]; then
+  print -u2 "remote.sh: not a git repo: $HOME/dev/$repo (give the repo, not a folder that holds repos)"
   exit 2
 fi
 
@@ -58,7 +66,8 @@ sync() {
     "$HOME/dev/$1/" "$host:dev/$1/"
 }
 
-ssh "$host" mkdir -p dev
+# rsync makes the repo's folder but not its parent.
+ssh "$host" mkdir -p dev ${(q)${:-dev/$repo:h}}
 sync $harness
 [[ $repo == $harness ]] || sync $repo
 
