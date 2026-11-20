@@ -547,13 +547,15 @@ harness/remote.sh ableton-live-test-harness node harness/doctor.js
 harness/remote.sh <repo> node tests/live/<check>.js --tempo 97
 ```
 
-`<repo>` is a git repo in `~/dev` or one level down (`product/repo`, for a folder that holds a
-repo per format); `remote.sh` refuses any other path, and a folder that isn't a repo, so it never
-syncs, or deletes in, a parent of a repo on the remote. It copies the working copies of this repo
-and `~/dev/<repo>` to the same paths in the remote's
-home (uncommitted changes included; the remote can't fetch from this Mac), runs the command in
-`~/dev/<repo>` there and exits with its status. Checks find the harness through
-`~/dev/ableton-live-test-harness`, so the layout must match. The remote is the host named
+The repos are the folders beside this clone (`~/dev` for a clone at
+`~/dev/ableton-live-test-harness`), which must be under your home folder; on the remote they
+are the folder at the same path under its user's home. `<repo>` is a git repo there or one
+level down (`product/repo`, for a folder that holds a repo per format); `remote.sh` refuses any
+other path, and a folder that isn't a repo, so it never syncs, or deletes in, a parent of a
+repo on the remote. It copies the working copies of this clone and of `<repo>` to the same
+paths in the remote's home (uncommitted changes included; the remote can't fetch from this
+Mac), runs the command in `<repo>` there, with `LIVE_HARNESS` set to the remote's copy of
+`harness/`, and exits with its status. The remote is the host named
 as `remote` in `harness/local.json`, a file git ignores (`local.example.json` shows its
 keys); `LIVE_REMOTE` names another for one run. `clickHost` in the same file is the hostname (without `.local`)
 of the one machine `device-ui.js` clicks on without asking. A click takes that machine's pointer, so
@@ -584,9 +586,10 @@ is working in Live there; if one is, it agrees slots with that session.
 On the remote, link AbletonOSC into `~/Music/Ableton/User Library/Remote Scripts` from the
 remote's copy of this repo, and give Live the same settings as on this Mac (Control Surface,
 Count-In, any Options.txt entries). A project's builds folder must be in the remote's Places, pointing at the remote's copy
-(`<remote home>/dev/<repo>/builds`): with Live quit there,
+(`<repo>/builds` there): with Live quit there,
 `harness/remote.sh <repo> node ../ableton-live-test-harness/harness/add-place.js builds`
-(`../../ableton-live-test-harness` for a repo one level down).
+(`../../ableton-live-test-harness` for a repo one level down; the clone's folder name if it
+has another).
 `macos.js` there runs under sshd, so give
 `/usr/libexec/sshd-keygen-wrapper` Accessibility (System Settings > Privacy & Security);
 System Events then needs no separate Automation approval. A command run

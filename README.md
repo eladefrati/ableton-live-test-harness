@@ -31,8 +31,9 @@ later (no packages to install) and, for the plug-in and device-ui helpers, `swif
 or its Command Line Tools. Checks of Max for Live devices, including the example below, need
 Max for Live. Live's language must be English: the harness finds its menus and dialogs by name.
 
-- Clone it anywhere; the commands here assume `~/dev/ableton-live-test-harness`. Only
-  `harness/remote.sh` (runs on a second Mac) needs it there. A project's checks load the
+- Clone it anywhere; the commands here assume `~/dev/ableton-live-test-harness`.
+  `harness/remote.sh` (runs on a second Mac) needs the clone in a folder under your home
+  folder, beside the repos it runs, and the same layout on the second Mac. A project's checks load the
   harness by path: by convention they read `LIVE_HARNESS` (the path of the `harness/`
   folder) and fall back to this path.
 - Link the clone into Live's Remote Scripts as `AbletonOSC`, so Live runs the working tree.

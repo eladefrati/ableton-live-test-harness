@@ -36,8 +36,8 @@ the projects that used it. A published repo can carry none of that.
   `remote.sh` will run without `LIVE_REMOTE`.
 - `remote.sh` copies the working copy to the remote, `local.json` with it, so both machines
   read the same values.
-- Only `remote.sh` assumes the clone is at `~/dev/ableton-live-test-harness`. Checks that
-  load the harness by path can read `LIVE_HARNESS` instead.
+- `remote.sh` takes the repos as the folders beside the clone, at the same path under the
+  home folder on both Macs. Checks that load the harness by path can read `LIVE_HARNESS`.
 - `git diff upstream-base` shows everything this repo changed and added; there is no
   commit-by-commit record of it before publication.
 

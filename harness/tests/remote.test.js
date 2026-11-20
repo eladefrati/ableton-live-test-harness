@@ -10,7 +10,6 @@ const os = require("node:os");
 const path = require("node:path");
 const { spawnSync } = require("node:child_process");
 
-const REMOTE_SH = path.join(__dirname, "..", "remote.sh");
 const HOST = "stand-in";
 
 // ssh <host> <words...>: runs the words in the remote's home, as ssh runs them in a shell
@@ -44,7 +43,10 @@ for (const [name, body] of [["ssh", SSH], ["rsync", RSYNC]]) {
   fs.writeFileSync(path.join(BIN, name), body, { mode: 0o755 });
 }
 
-function macs(t) {
+// The two Macs, with this Mac's harness clone at `clone` (path parts under the test's folder;
+// "here" is this Mac's home), which remote.sh is run from: it takes the folder holding the
+// clone as the repos' folder.
+function macs(t, clone = ["here", "dev", "ableton-live-test-harness"]) {
   const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "remote-test-")));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
   const at = (...parts) => path.join(root, ...parts);
@@ -52,18 +54,20 @@ function macs(t) {
     fs.mkdirSync(path.dirname(file), { recursive: true });
     fs.writeFileSync(file, text);
   };
-  // The harness as remote.sh copies it: what the remote's side runs of it.
-  write(at("here", "dev", "ableton-live-test-harness", "harness", "captures.js"), fs.readFileSync(path.join(__dirname, "..", "captures.js")));
-  // remote.sh syncs only a git repo: a folder with a .git in it.
-  const repo = (...parts) => fs.mkdirSync(at("here", "dev", ...parts, ".git"), { recursive: true });
-  repo("ableton-live-test-harness");
+  // The harness as remote.sh copies it: remote.sh itself, and what the remote's side runs of it.
+  const remoteSh = at(...clone, "harness", "remote.sh");
+  write(remoteSh, fs.readFileSync(path.join(__dirname, "..", "remote.sh")));
+  write(at(...clone, "harness", "captures.js"), fs.readFileSync(path.join(__dirname, "..", "captures.js")));
+  // remote.sh syncs only a git repo: a folder with a .git in it, beside the clone.
+  const repo = (...parts) => fs.mkdirSync(path.join(at(...clone), "..", ...parts, ".git"), { recursive: true });
+  repo(clone[clone.length - 1]);
   fs.mkdirSync(at("there"));
   return {
     at, write, repo,
     hereCaptures: at("here-tmp", "ableton-harness-captures"),
     thereCaptures: at("there-tmp", "ableton-harness-captures"),
     // remote.sh run with `words`, and `env` added to its environment.
-    runWith: (env, ...words) => spawnSync("zsh", [REMOTE_SH, ...words], {
+    runWith: (env, ...words) => spawnSync("zsh", [remoteSh, ...words], {
       encoding: "utf8",
       timeout: RUN_MS,
       env: {
@@ -110,6 +114,27 @@ test("remote.sh takes a repo one level down whose parent the remote doesn't have
   const ran = run(mac, "product/format", "touch", "ran.txt");
   assert.equal(ran.status, 0, ran.stderr);
   assert.ok(fs.existsSync(mac.at("there", "dev", "product", "format", "ran.txt")));
+});
+
+test("remote.sh takes the repos from the folder holding a clone of any name, and the same folder on the remote, and gives the command LIVE_HARNESS", (t) => {
+  const mac = macs(t, ["here", "code", "harness-clone"]);
+  mac.repo("project");
+  mac.write(mac.at("here", "code", "project", "file.txt"), "here");
+  const ran = run(mac, "project", "sh", "-c", 'cat file.txt > ran.txt; echo "$LIVE_HARNESS" > harness.txt');
+  assert.equal(ran.status, 0, ran.stderr);
+  assert.equal(read(mac.at("there", "code", "project", "ran.txt")), "here");
+  assert.equal(read(mac.at("there", "code", "project", "harness.txt")), `${mac.at("there", "code", "harness-clone", "harness")}\n`);
+  assert.ok(fs.existsSync(mac.at("there", "code", "harness-clone", "harness", "captures.js")), "the clone synced");
+  assert.ok(!fs.existsSync(mac.at("there", "dev")));
+});
+
+test("remote.sh run from a clone outside the home folder refuses, and touches nothing on the remote", (t) => {
+  const mac = macs(t, ["elsewhere", "ableton-live-test-harness"]);
+  mac.repo("project");
+  const ran = run(mac, "project", "touch", "ran.txt");
+  assert.equal(ran.status, 2, ran.stderr);
+  assert.match(ran.stderr, /^remote\.sh: the harness clone must be in a folder under your home folder/);
+  assert.deepEqual(fs.readdirSync(mac.at("there")), []);
 });
 
 test("remote.sh refuses anything but a git repo in ~/dev or one level down, and touches nothing on the remote", (t) => {
