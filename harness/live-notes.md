@@ -697,6 +697,11 @@ unexpected.
 - New audio tracks get the devices of Live's default audio track template, as MIDI tracks
   do; `createAudioTrack()` removes them.
 - A Max for Live device's parameters arrive seconds after the device; `loadDevice()` waits.
+  A Max device with no parameters lists only Device On, and nothing else the harness reads
+  (its name, `is_active`, `class_name`) changes once it has loaded (Live 12.4.25b2,
+  2026-11-20), so `loadDevice()` can't tell it has loaded: pass `{ parameters: 0 }`. In that
+  version a Max device's parameters were there at the first read, also on the first Max
+  device after a relaunch.
   Their names are the short names, which can repeat within a device. Live lists the visible
   (automated) parameters after "Device On" sorted by long name, which
   `parameterIndices()` uses to map long names to indices. Stored Only parameters are not

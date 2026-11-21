@@ -346,8 +346,11 @@ class Live {
   // A Max for Live device lists only Device On until its parameters arrive seconds after it
   // appears, so its count must also exceed 1. A plug-in with more parameters than Live
   // populates lists only Device On until they are configured, so its count may stay at 1;
-  // it settles once the count has held for `pluginHoldMs`.
-  async loadDevice(track, root, itemPath, { settleMs = 10000, readyMs = 500, pluginHoldMs = 1000 } = {}) {
+  // it settles once the count has held for `pluginHoldMs`. A Max device with no parameters
+  // also lists only Device On, and nothing else the LOM shows changes once it has loaded, so
+  // its caller says so: `parameters`, if given, is how many the device lists after Device
+  // On, and it settles once the count is that.
+  async loadDevice(track, root, itemPath, { settleMs = 10000, readyMs = 500, pluginHoldMs = 1000, parameters } = {}) {
     const [, device] = await this.query("/live/browser/load", track, root, itemPath);
     if (device < 0) throw new LiveError(`Loading ${itemPath} added no device to track ${track}`);
     // AuPluginDevice for an Audio Unit, PluginDevice for a VST.
@@ -360,12 +363,16 @@ class Live {
         since = Date.now();
         continue;
       }
-      if (plugin ? count >= 1 && Date.now() - since >= pluginHoldMs : count > 1) {
+      const settled = parameters !== undefined ? count === parameters + 1
+        : plugin ? count >= 1 && Date.now() - since >= pluginHoldMs : count > 1;
+      if (settled) {
         await sleep(readyMs);
         return device;
       }
     }
-    throw new LiveError(`The parameters of ${itemPath} did not settle within ${settleMs} ms`);
+    const hint = !plugin && parameters === undefined && last === 1
+      ? ": it lists only Device On; for a device with no parameters, pass { parameters: 0 }" : "";
+    throw new LiveError(`The parameters of ${itemPath} did not settle within ${settleMs} ms${hint}`);
   }
 
   // Waits until the parameter count of every device in the set has stopped changing, e.g.

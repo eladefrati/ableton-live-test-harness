@@ -369,10 +369,23 @@ test("loadDevice settles a plug-in listing only Device On once the count has hel
 test("loadDevice waits past Device On for a Max for Live device's parameters", async () => {
   await withFake(loadingDevice("MxDeviceMidiEffect", [1]), async (live) => {
     await assert.rejects(live.loadDevice(0, "*", "Device", { settleMs: 1000, readyMs: 0 }),
-      /The parameters of Device did not settle within 1000 ms/);
+      /The parameters of Device did not settle within 1000 ms: it lists only Device On; for a device with no parameters, pass \{ parameters: 0 \}/);
   });
   await withFake(loadingDevice("MxDeviceMidiEffect", [1, 1, 1, 5]), async (live) => {
     assert.equal(await live.loadDevice(0, "*", "Device", { readyMs: 0 }), 0);
+  });
+});
+
+test("loadDevice settles a device listing only Device On when told it has no parameters, and waits for the count it is told", async () => {
+  await withFake(loadingDevice("MxDeviceAudioEffect", [1]), async (live) => {
+    assert.equal(await live.loadDevice(0, "*", "Device", { parameters: 0, readyMs: 0 }), 0);
+  });
+  await withFake(loadingDevice("MxDeviceAudioEffect", [1, 1, 5]), async (live) => {
+    await assert.rejects(live.loadDevice(0, "*", "Device", { parameters: 2, settleMs: 1000, readyMs: 0 }),
+      /did not settle within 1000 ms$/);
+  });
+  await withFake(loadingDevice("MxDeviceAudioEffect", [1, 1, 3]), async (live) => {
+    assert.equal(await live.loadDevice(0, "*", "Device", { parameters: 2, readyMs: 0 }), 0);
   });
 });
 
