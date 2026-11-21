@@ -762,6 +762,12 @@ unexpected.
   move the marker, Stop while stopped puts it back at 0, and turning `record_mode` on while
   stopped starts Play at once, so the marker goes first. Don't reach a start through a cue
   point: in some sets a cue point added while stopped snaps to the bar.
+- `start_playing` while Live plays restarts Play from the start marker (beat 1.516 jumped
+  back to 0.186). `recordArrangement()` used to send it right after `record_mode`, and when
+  an audio buffer ran between the two, the take recorded that buffer, then the restart:
+  from sample 129 on it sat one buffer (128 samples) late against its file (3 takes of 200,
+  on both Macs, Live 12.4.25b2, 2026-11-20). It now sends `start_playing` only if
+  `record_mode` didn't start Play.
 - While any track's Session clip is active (`playing_slot_index` 0 or more, even with the
   transport stopped), Live starts Play from the bar at or before the start marker: bars of
   4 x numerator / denominator beats from beat 0 (time signature changes in the Arrangement

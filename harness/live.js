@@ -581,9 +581,17 @@ class Live {
       if (automationArm) this.set("song", "session_automation_record", 0);
       // the marker first: turning record_mode on while stopped starts Play by itself
       await this.startTimeTo(start);
+      // start_playing while Live plays restarts Play from the marker, and an audio buffer
+      // run between record_mode and start_playing was recorded before the restart: the take
+      // sat that buffer late against its file from its end on (seen in 3 takes of 200, at
+      // 128-sample buffers). So start_playing goes out only if record_mode didn't start Play,
+      // as with Live's Start Playback with Record off.
       this.set("song", "record_mode", 1);
-      this.send("/live/song/start_playing");
       await this.sync();
+      if (!(await this.get("song", "is_playing"))) {
+        this.send("/live/song/start_playing");
+        await this.sync();
+      }
       const started = await this.get("song", "current_song_time");
       if (started < start - 1e-6) {
         throw new LiveError(`Live started at beat ${started.toFixed(3)}, not ${start}; recording stopped`);

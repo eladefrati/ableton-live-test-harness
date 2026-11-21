@@ -171,8 +171,12 @@ test("test-hook reports are collected and awaited by topic and device", async ()
 
 // A song that plays at 120 BPM from start_playing on, for recordArrangement. As measured in
 // Live: Play starts from the start marker, which setting start_time or a cue point jump
-// moves; Stop while stopped puts it back at 0; setting the song time while stopped leaves it.
+// moves; Stop while stopped puts it back at 0; setting the song time while stopped leaves it;
+// turning record_mode on while stopped starts Play (unless song.noPlayWithRecord, as with
+// Start Playback with Record off); start_playing while playing restarts it from the marker,
+// counted in song.restarts.
 function playingSong(song = { cues: [] }) {
+  song.restarts = 0;
   let startedAt = null;
   let marker = 0;
   let stoppedAt = 0;
@@ -182,7 +186,16 @@ function playingSong(song = { cues: [] }) {
   return {
     "/live/song/get/track_data": () => [["/live/song/get/track_data"]],
     "/live/song/get/tempo": () => [["/live/song/get/tempo", 120]],
-    "/live/song/start_playing": () => { startedAt = Date.now(); return []; },
+    "/live/song/start_playing": () => {
+      if (startedAt !== null) song.restarts++;
+      startedAt = Date.now();
+      return [];
+    },
+    "/live/song/set/record_mode": ([on]) => {
+      if (on && startedAt === null && !song.noPlayWithRecord) startedAt = Date.now();
+      return [];
+    },
+    "/live/song/get/is_playing": () => [["/live/song/get/is_playing", startedAt !== null]],
     "/live/song/stop_playing": () => {
       if (startedAt === null) marker = 0;
       else [stoppedAt, startedAt] = [now(), null];
@@ -295,6 +308,17 @@ test("recordArrangement stops and fails when Live starts before its start", () =
     await assert.rejects(live.recordArrangement({ start: 2, length: 0.25, tracks: [] }), /Live started at beat 0\.\d+, not 2/);
     assert.deepEqual(song.cues, []);
   });
+});
+
+test("recordArrangement doesn't restart the Play that record_mode starts, and starts Play itself when record_mode doesn't", async () => {
+  for (const noPlayWithRecord of [false, true]) {
+    const song = { cues: [], noPlayWithRecord };
+    await withFake(playingSong(song), async (live) => {
+      const [first] = await live.recordArrangement({ length: 0.25, tracks: [], during: [{ beat: 0.1, action: async () => {} }] });
+      assert.ok(first.before >= 0.1 && first.before < 0.2, JSON.stringify(first));
+      assert.equal(song.restarts, 0);
+    });
+  }
 });
 
 test("recordArrangement turns Automation Arm off while it records and back on after", () => {
