@@ -34,7 +34,17 @@ unexpected.
 
 - Live's Save panel counts as an open dialog over the LOM (no message, no buttons), and
   some requests fail while it is open (a fresh track's input routing reads ""). `saveSetAs()`
-  closes the panel if it fails.
+  closes the panel with Escape if it fails, and says so in its error if the panel stays
+  open: Accessibility can't press its Cancel.
+- A click in another app just after File > Save Live Set As... can bring that app forward
+  after Live has come to the front (measured 2026-11-20: 200 ms after the click, the other
+  app was in front once `activate` had seen Live there). Keys typed then go to that app, and
+  a save failed so, waiting for Go to Folder. `typeInLive` looks for Live in front in the
+  script that types.
+- With the app that was in front put back right after File > Save Live Set As... and Live
+  brought forward again to type, the panel lost the typed name and folder in about one run
+  of three, though it took Command-A, Go to Folder and Return (2026-11-20). `saveSetAs`
+  keeps Live in front from the click until the file is written.
 - Live's Save panel takes keys about a second after it appears, and Go to Folder's
   highlighted suggestion lags the typed path: Return half a second after typing went to
   the previous temp folder. `saveSetAs` waits for both. Go to Folder lists the folder that

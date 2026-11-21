@@ -617,8 +617,10 @@ must stay off there: waking doesn't reliably dismiss it.
   12.4 does (seen in 12.4.25b1; earlier versions not tried). Without it the window isn't
   opened, and the error says what it didn't find.
 - Live in front while `saveSetAs()` types into it: keystrokes go to the frontmost app. It
-  brings Live forward itself, types nothing if Live doesn't come, and puts the app that was
-  in front back afterwards. Don't type in another app meanwhile. Menu commands
+  brings Live forward itself and types only from a script that finds Live in front; if
+  another app comes forward, it brings Live back, up to three times, then fails having typed
+  nothing. It puts the app that was in front back afterwards. Don't click or type in another
+  app meanwhile: the save fails. Menu commands
   (`clickMenu`: `saveSet`, Key and MIDI Map Mode) bring Live forward for the click and put
   it back too. A plug-in window's `press` and `capture` bring Live forward, since Live shows
   the window only then; `capture` puts the app back. Nothing else brings Live forward.

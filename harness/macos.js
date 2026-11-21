@@ -95,13 +95,27 @@ async function activate({ timeoutMs = 3000, refuse } = {}) {
 
 // Sends keystrokes (System Events `keystroke` and `key code` lines) to Live. They go to the
 // frontmost app, whatever process the tell block names, so Live is brought to the front
-// first, and if it can't be, nothing is typed. A click elsewhere between the check and the
-// keys still takes them. `refuse`, if given, is called before Live is told to activate, as
-// activate does, and again just before the keys are typed: it throws if they must not be.
-async function typeInLive(body, { refuse } = {}) {
-  await activate({ refuse });
-  if (refuse) refuse();
-  await osascript(inLive(body));
+// first, and the script that types looks first that Live is still there. An app clicked
+// meanwhile can come forward after activate has seen Live in front (measured: a click away
+// 200 ms after File > Save Live Set As...), and would take the keys. If Live has lost the
+// front, it is activated again, up to `tries` times; then nothing is typed and it throws.
+// `refuse`, if given, is called before Live is told to activate, as activate does, and again
+// just before the keys are typed: it throws if they must not be.
+async function typeInLive(body, { refuse, tries = 3 } = {}) {
+  for (let attempt = 0; attempt < tries; attempt++) {
+    await activate({ refuse });
+    if (refuse) refuse();
+    const typed = await osascript(`tell application "System Events"
+if frontmost of process "Live" then
+tell process "Live"
+${body}
+end tell
+return "typed"
+end if
+end tell`);
+    if (typed === "typed") return;
+  }
+  throw new MacError(`Live didn't stay in front after ${tries} tries, so nothing was typed`);
 }
 
 // Waits until no modifier key (Shift, Control, Option, Command) is held, for up to
@@ -166,10 +180,12 @@ return out as text`);
 // unsaved changes, Live's "Save changes?" dialog can't be read or pressed through the LOM
 // (no message, no buttons; measured): saveSetAs into a temp folder
 // first, so Live doesn't ask.
-async function clickMenu(menu, item) {
+// With `giveBack` false, Live stays in front after the click, for a caller that types into
+// what the click opens and puts the app back itself.
+async function clickMenu(menu, item, { giveBack = true } = {}) {
   // Woken first: with the display asleep there is no frontmost app to put back.
   await wakeDisplay();
-  const before = await frontmostApp().catch(() => null);
+  const before = giveBack ? await frontmostApp().catch(() => null) : null;
   await activate();
   try {
     await osascript(inLive(`click menu item ${quote(item)} of menu ${quote(menu)} of menu bar 1`));
@@ -308,7 +324,10 @@ async function saveSetAs(folder, name, { timeoutMs = 10000 } = {}) {
   await wakeDisplay();
   const before = await frontmostApp().catch(() => null);
   try {
-    await clickMenu("File", "Save Live Set As...");
+    // Live stays in front from the click on: with the app that was in front put back
+    // meanwhile, the panel lost the typed name and folder though it took Command-A, Go to
+    // Folder and Return (measured 2026-11-20).
+    await clickMenu("File", "Save Live Set As...", { giveBack: false });
     await waitFor(panelOpen, "the Save dialog", timeoutMs);
     // The panel exists a moment before it takes keys, so it waits first.
     await sleep(1000);
@@ -331,10 +350,13 @@ async function saveSetAs(folder, name, { timeoutMs = 10000 } = {}) {
   } catch (error) {
     if (path.dirname(folder) === HARNESS_TEMP) fs.rmSync(folder, { recursive: true, force: true });
     // Don't leave the panel open: it blocks what the caller does next. It may still be
-    // on its way, so give it a moment to appear.
+    // on its way, so give it a moment to appear. If Escape doesn't close it, the error says
+    // so: Accessibility can't press its Cancel.
     for (let tries = 0; tries < 10; tries++) {
       if (await panelOpen().catch(() => false)) {
         await typeInLive("key code 53").catch(() => {});
+        const closed = await waitFor(async () => !(await panelOpen()), "the Save panel to close", 3000).then(() => true, () => false);
+        if (!closed) error.message += "; Live's Save panel is still open: press its Cancel";
         break;
       }
       await sleep(200);

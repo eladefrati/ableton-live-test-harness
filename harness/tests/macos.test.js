@@ -116,13 +116,24 @@ function macOver(answer, jxa = () => "") {
 }
 
 // System Events as the scripts of macos.js find it, with Live in front or behind another app.
-// `did` lists the scripts that act, in order: every one but those that only look.
-function fakeSystemEvents({ front = false } = {}) {
+// `did` lists the scripts that act, in order: every one but those that only look. The first
+// `lostFront` scripts that look for Live in front and type find another app there, as when
+// the user clicks away after Live has come forward.
+function fakeSystemEvents({ front = false, lostFront = 0 } = {}) {
   const did = [];
   const answer = (script) => {
     if (/ get frontmost of process "Live"$/.test(script)) return String(front);
     if (/ get bundle identifier of process "Live"$/.test(script)) return "com.example.live";
     if (/ get bundle identifier of first process whose frontmost is true$/.test(script)) return front ? "com.example.live" : "com.example.terminal";
+    if (/^tell application "System Events"\nif frontmost of process "Live" then\n/.test(script)) {
+      if (lostFront > 0) {
+        lostFront--;
+        front = false;
+        return "";
+      }
+      did.push(script);
+      return front ? "typed" : "";
+    }
     did.push(script);
     if (script === 'tell application id "com.example.live" to activate') front = true;
     return "";
@@ -160,6 +171,18 @@ test("typeInLive calls the function it is given before Live is activated and aga
   const inFront = fakeSystemEvents({ front: true });
   await assert.rejects(macOver(inFront.answer).typeInLive("key code 53", { refuse: () => { throw new Error("stopped"); } }), /^Error: stopped$/);
   assert.deepEqual(inFront.did, []);
+});
+
+test("typeInLive types only in the script that finds Live in front, activating it again if another app came forward", async () => {
+  const events = fakeSystemEvents({ lostFront: 1 });
+  await macOver(events.answer).typeInLive("key code 53");
+  assert.equal(events.did.length, 3);
+  assert.deepEqual(events.did.slice(0, 2), [ACTIVATE, ACTIVATE]);
+  assert.match(events.did[2], /key code 53/);
+
+  const lost = fakeSystemEvents({ lostFront: 3 });
+  await assert.rejects(macOver(lost.answer).typeInLive("key code 53"), /Live didn't stay in front after 3 tries, so nothing was typed/);
+  assert.deepEqual(lost.did, [ACTIVATE, ACTIVATE, ACTIVATE]);
 });
 
 test("typeIfLiveInFront looks for Live in front and types in one script, and activates nothing", async () => {
