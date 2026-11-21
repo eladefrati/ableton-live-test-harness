@@ -720,6 +720,13 @@ unexpected.
   tracks so recorded those tracks. `setInputRouting()` refuses a name two other tracks hold,
   so `signalTracks` fails in such a set: delete the old tracks first.
 - Loading a device from the browser selects its track.
+- A MIDI source the harness makes (`midi.js`) was a MIDI input within 2 s, Track on by
+  default. With Remote turned on for it once, Live keeps that after the port closes and
+  reopens and after a relaunch (Live 12.4.25b2, remote Mac, 2026-11-21).
+- `device-ui.js` presses work in MIDI Map and Key Map Mode: the Info View still names the
+  control. A press then a CC maps the control; a press then a key, typed with Live in front,
+  maps it to the key, and the key toggles the parameter between its ends (Auto Filter, same
+  version).
 - `-EnableArmOnSelection` is an optional Options.txt entry; without it, none of this
   applies. With it, the arm follows the selection: while a track is armed, selecting another
   moves the arm to it; with no track armed, selecting a track arms nothing (Live 12.4.16,

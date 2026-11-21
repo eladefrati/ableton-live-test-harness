@@ -93,6 +93,13 @@ Node 18 or later. See [ADR-0001](../docs/adr/0001-fork-abletonosc.md) for the de
   string picks a menu item by name), `moveDevice(track, device, target, position)`
   (keeps the instance and its state), `createAudioTrack(name)` and
   `arrangementAudioFiles(track)`.
+- `midi.js`: MIDI into Live as from a controller (ADR-0018). `openMidiPort()` opens the
+  harness's own MIDI input port, `Harness`, and resolves with `cc(channel, controller,
+  value)`, `noteOn(channel, pitch, velocity)`, `noteOff(channel, pitch)` (channels 1-16,
+  each resolving once the message is sent) and `close()`. With MIDI Map Mode on
+  (`setMidiMapMode`, `macos.js`), a press on a control (`device-ui.js`) and a CC map the
+  control to that CC; with it off, the CC sets it. A key is mapped the same way in Key Map
+  Mode, and pressed with `typeInLive`. Needs Remote on for the port ("What Live needs").
 - `macos.js`: what the LOM can't do, through Live's menus with AppleScript: save, save as,
   open a set (`openSetAndWait(live, file)`: behind other windows, stopping the transport first, answering "Save changes?" and "This action
   will stop audio?", and resolving once the set has loaded), Key Map and MIDI Map Mode, and the name of the step Edit > Undo would
@@ -520,6 +527,7 @@ node harness/checks/plugin-set.js <name>  # a plug-in's built set against Live's
 node harness/checks/pointer-guards.js     # what the click helper posts and refuses (Live not needed; on the click host only)
 node harness/checks/editor-guards.js      # what the click helper refuses in a plug-in's editor, on AUDelay (on the click host only)
 node harness/checks/video-record.js       # video recordings of Live, and their frames
+node harness/checks/midi-map.js           # MIDI and key mapping through the Harness port, on Auto Filter (on the click host)
 node ~/dev/<repo>/tests/live/<check>.js              # a project's checks
 node ~/dev/<repo>/tests/live/<check>.js --keep       # leave its test tracks
 node ~/dev/<repo>/tests/live/<check>.js --tempo 97   # at another tempo (left so)
@@ -626,6 +634,9 @@ must stay off there: waking doesn't reliably dismiss it.
   (`clickMenu`: `saveSet`, Key and MIDI Map Mode) bring Live forward for the click and put
   it back too. A plug-in window's `press` and `capture` bring Live forward, since Live shows
   the window only then; `capture` puts the app back. Nothing else brings Live forward.
+- For `midi.js`: Remote on for the MIDI input `Harness` in Live's Settings > Link, Tempo &
+  MIDI, and Track on for notes into a track, set once per Mac while `node harness/cli.js
+  midi-port` holds the port open. Live keeps it after the port closes and after a relaunch.
 - Count-In off: "Installation" in the main README.
 - Recording uses the Arrangement: `recordArrangement()` turns the loop off and sets Record
   Quantization to None, and leaves them that way.
