@@ -330,6 +330,24 @@ test("recordArrangement turns Automation Arm off while it records and back on af
   });
 });
 
+test("recordArrangement with automation turns Automation Arm on while it records and back off after", () => {
+  const song = { cues: [], automationArm: false };
+  return withFake(playingSong(song), async (live) => {
+    let during;
+    await live.recordArrangement({ length: 0.25, tracks: [], automation: true, during: [{ beat: 0, action: async () => { during = song.automationArm; } }] });
+    assert.deepEqual([during, song.automationArm], [true, false]);
+  });
+});
+
+test("recordArrangement with automation leaves Automation Arm on when it was on", () => {
+  const song = { cues: [], automationArm: true };
+  return withFake(playingSong(song), async (live) => {
+    let during;
+    await live.recordArrangement({ length: 0.25, tracks: [], automation: true, during: [{ beat: 0, action: async () => { during = song.automationArm; } }] });
+    assert.deepEqual([during, song.automationArm], [true, true]);
+  });
+});
+
 test("recordArrangement starts a later recording at its start, leaving cue points alone", () => {
   // snap: a cue add would land on the bar, so an off-bar start through a cue would fail
   const song = { cues: [1], snap: true };

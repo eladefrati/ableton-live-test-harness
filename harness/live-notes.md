@@ -785,7 +785,9 @@ unexpected.
   `recordArrangement()` sends before Play doesn't change this.
 - With Automation Arm on, a parameter changed while Live records (a `during` action) is
   written as automation on the device's track and replays later. `recordArrangement()`
-  turns Automation Arm off while it records and back on afterwards.
+  turns Automation Arm off while it records, or on with `automation: true`, to write
+  automation, and puts it back as it was afterwards. Live writes it with no track armed
+  (`checks/automation-record.js`, on the remote Mac, Live 12.4.25b2, 2026-11-21).
 - Live records audio as WAV at the record bit depth (see "Record bit depth" in `README.md`) and the
   audio device's rate, into the set's `Samples/Recorded`, named
   `<track> 0001 [<date> <time>].wav`; `file_path` of the

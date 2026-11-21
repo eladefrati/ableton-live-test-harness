@@ -520,6 +520,7 @@ From the repo root, with Live open and AbletonOSC selected:
 
 ```sh
 node harness/checks/record-roundtrip.js   # the harness's own recording path
+node harness/checks/automation-record.js  # recordArrangement's automation option, on Auto Filter
 node harness/checks/example-device-check.js  # a template for a project's check
 node harness/checks/example-transpose-check.js  # the same on device-checks.js (needs harness/devices in Places)
 node harness/checks/plugin-record.js      # the plug-in path, on AUDelay (replaces a set the harness opened)
@@ -639,7 +640,8 @@ must stay off there: waking doesn't reliably dismiss it.
   midi-port` holds the port open. Live keeps it after the port closes and after a relaunch.
 - Count-In off: "Installation" in the main README.
 - Recording uses the Arrangement: `recordArrangement()` turns the loop off and sets Record
-  Quantization to None, and leaves them that way.
+  Quantization to None, and leaves them that way. It turns Automation Arm off while it
+  records, or on with `automation: true` to write automation, and puts it back after.
 - The record bit depth a check needs, if it needs one (see "Record bit depth").
 
 ## Record bit depth

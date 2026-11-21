@@ -88,7 +88,7 @@ async function main() {
     const armed = tracks.filter(([, arm]) => arm).map(([name]) => name);
     line(armed.length === 0, armed.length ? `Armed tracks (recording checks will refuse): ${armed.join(", ")}` : "No armed tracks");
     if (await live.get("song", "session_automation_record")) {
-      console.log("warn Automation Arm is on: recordArrangement turns it off while it records, but a parameter "
+      console.log("warn Automation Arm is on: recordArrangement turns it off while it records unless asked to write automation, but a parameter "
         + "changed during any other recording is written as automation");
     }
     console.log(`info ${names.length} tracks: ${names.join(", ")}`);

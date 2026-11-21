@@ -548,7 +548,10 @@ class Live {
   // to a tick after its beat (measured in Live: windows of 100-120 ms, 4-65 ms late). Within
   // 2 x pollMs of an action's beat, polling every `finePollMs` reads every tick, so the
   // action goes out at the first tick past its beat rather than up to a poll later.
-  async recordArrangement({ start = 0, length, tracks, pollMs = 50, finePollMs = 2, during = [] }) {
+  //
+  // `automation`: Automation Arm while it records. Off by default, so a `during` action that
+  // changes a parameter writes no automation; true to write it. Put back as it was after.
+  async recordArrangement({ start = 0, length, tracks, pollMs = 50, finePollMs = 2, during = [], automation = false }) {
     if (!Array.isArray(tracks)) throw new LiveError("recordArrangement needs the tracks the caller armed");
     const states = await this.trackData("arm", "can_be_armed", "playing_slot_index");
     // A property that doesn't apply to a track reads null. No arm on a track that can't be
@@ -576,9 +579,10 @@ class Live {
     const windows = [];
     // With Automation Arm on, a parameter changed while it records (a `during` action) is
     // written as automation on the device's track, and replays later (measured in Live).
-    const automationArm = await this.get("song", "session_automation_record");
+    const automationArm = Boolean(await this.get("song", "session_automation_record"));
+    const switched = automationArm !== Boolean(automation);
     try {
-      if (automationArm) this.set("song", "session_automation_record", 0);
+      if (switched) this.set("song", "session_automation_record", automation ? 1 : 0);
       // the marker first: turning record_mode on while stopped starts Play by itself
       await this.startTimeTo(start);
       // start_playing while Live plays restarts Play from the marker, and an audio buffer
@@ -611,7 +615,7 @@ class Live {
     } finally {
       this.send("/live/song/stop_playing");
       this.set("song", "record_mode", 0);
-      if (automationArm) this.set("song", "session_automation_record", 1);
+      if (switched) this.set("song", "session_automation_record", automationArm ? 1 : 0);
       await this.sync();
     }
   }
