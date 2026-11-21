@@ -420,9 +420,16 @@ class Live {
 
   // Sets a track's MIDI/audio From, and optionally its channel ("Pre FX", "Post FX").
   // Live's routing lists follow a track rename or a type change a tick later, and the
-  // setters only log a warning for an unknown name, so this waits, sets, and checks.
+  // setters only log a warning for an unknown name, so this waits, sets, and checks. A From
+  // is picked by name, and the type read back is that name whichever track it came from, so
+  // a name two other tracks hold is refused: the input could be either's.
   async setInputRouting(track, typeName, channelName = null) {
     await this.sync();
+    const named = (await this.query("/live/song/get/track_names"))
+      .map((name, index) => (name === typeName && index !== track ? index : -1)).filter((index) => index >= 0);
+    if (named.length > 1) {
+      throw new LiveError(`Tracks ${named.join(", ")} are all named ${typeName}, so track ${track}'s input can't be set to one of them by name`);
+    }
     this.send("/live/track/set/input_routing_type", track, typeName);
     const [, type] = await this.query("/live/track/get/input_routing_type", track);
     if (type !== typeName) throw new LiveError(`Track ${track} input is "${type}", not ${typeName}${await this.dialogNote()}`);

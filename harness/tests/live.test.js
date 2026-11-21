@@ -389,6 +389,25 @@ test("loadDevice settles a device listing only Device On when told it has no par
   });
 });
 
+test("setInputRouting refuses a From that two other tracks are named, setting nothing, and sets one that only one is", async () => {
+  const sets = [];
+  let type = "";
+  const handlers = (names) => ({
+    "/live/test": () => [["/live/test", "ok"]],
+    "/live/song/get/track_names": () => [["/live/song/get/track_names", ...names]],
+    "/live/track/set/input_routing_type": ([track, name]) => { sets.push([track, name]); type = name; return []; },
+    "/live/track/get/input_routing_type": ([track]) => [["/live/track/get/input_routing_type", track, type]],
+  });
+  await withFake(handlers(["Source", "Other", "Source", "Target"]), async (live) => {
+    await assert.rejects(live.setInputRouting(3, "Source"), /Tracks 0, 2 are all named Source, so track 3's input can't be set to one of them by name/);
+  });
+  assert.deepEqual(sets, []);
+  await withFake(handlers(["Source", "Other", "Target"]), async (live) => {
+    await live.setInputRouting(2, "Source");
+  });
+  assert.deepEqual(sets, [[2, "Source"]]);
+});
+
 test("findDevice refuses a name on two tracks, naming both", () => withFake({
   "/live/song/get/num_tracks": () => [["/live/song/get/num_tracks", 2]],
   "/live/track/get/devices/name": ([track]) => [["/live/track/get/devices/name", track, "Plugin"]],

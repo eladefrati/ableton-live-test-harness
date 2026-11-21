@@ -76,7 +76,9 @@ Node 18 or later. See [ADR-0001](../docs/adr/0001-fork-abletonosc.md) for the de
   `instrument` names another `[root, item]`) playing `notes` in the Arrangement, moves the
   effect onto an audio track of its own (`harness-plugin`) fed by it, and adds
   `harness-dry` and `harness-wet` to record the signal and the effect's Post FX output; its
-  `restore()` moves the effect back to where it was and deletes the four tracks.
+  `restore()` moves the effect back to where it was and deletes the four tracks. It refuses
+  in a set that already holds a `harness-signal` or `harness-plugin` track, as one saved
+  with a rig in it does.
   `recordSignal(live, rig, {start, length, during})` records both (through
   `recordArrangement`, so `during` actions work) and resolves with `{dry, wet,
   sampleRate, files, windows}`, one `Float32Array` per channel; sample 0 is the recording's

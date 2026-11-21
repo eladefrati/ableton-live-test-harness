@@ -715,6 +715,10 @@ unexpected.
   in question cannot be armed!"): delete the recording track before its source.
 - Live's input routing list follows a track rename a tick later, and the routing setter
   only logs an unknown name; use `setInputRouting()`, which waits and checks.
+- A From is picked by track name, and reads back as that name whichever of two tracks so
+  named it came from (Live 12.4.25b2, 2026-11-20). A set still holding an earlier rig's
+  tracks so recorded those tracks. `setInputRouting()` refuses a name two other tracks hold,
+  so `signalTracks` fails in such a set: delete the old tracks first.
 - Loading a device from the browser selects its track.
 - `-EnableArmOnSelection` is an optional Options.txt entry; without it, none of this
   applies. With it, the arm follows the selection: while a track is armed, selecting another
