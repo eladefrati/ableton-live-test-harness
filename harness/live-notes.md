@@ -727,6 +727,14 @@ unexpected.
   control. A press then a CC maps the control; a press then a key, typed with Live in front,
   maps it to the key, and the key toggles the parameter between its ends (Auto Filter, same
   version).
+- The text recognizer, run over Live's whole window, can miss the Info View's title or read
+  it wrong while Live shows it plainly. After a Max device's checks had loaded it, saved a
+  preset and so on in one Live session, "Rate" over a knob of it read as nothing with MIDI
+  Map Mode off and as "nate", its top 4.5 points below the device title's, with it on; after a
+  relaunch it read "Rate". Read from a crop of the Info View's title row only, it read
+  "Rate" in both modes, every time (remote Mac, Live 12.4.25b2, 2026-11-21). `device-ui.js`
+  reads the Info View from that crop after its hover; it still finds the device's title over
+  the whole window.
 - `-EnableArmOnSelection` is an optional Options.txt entry; without it, none of this
   applies. With it, the arm follows the selection: while a track is armed, selecting another
   moves the arm to it; with no track armed, selecting a track arms nothing (Live 12.4.16,

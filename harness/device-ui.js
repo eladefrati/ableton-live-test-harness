@@ -62,7 +62,11 @@ const isPlugin = (className) => /PluginDevice$/.test(className); // AuPluginDevi
 // The Info View's title is on the same row as the device titles, left of them. The Info View
 // and the browser's lists are left of this; the device titles right of it.
 const INFO_VIEW_RIGHT = 240; // points from the window's left edge
-const ROW_TOLERANCE = 4; // points
+// The Info View's title row, read on its own after a hover: from this far above the top of
+// the device's title, this tall: to 14 points below that top. The Info View's text below
+// its title starts 20 points below it (measured on the remote Mac).
+const INFO_ROW_ABOVE = 4; // points
+const INFO_ROW_HEIGHT = 18; // points
 // Live's status bar, along the window's bottom edge, shows the selected track's and device's
 // names, so a device name short enough to fit there is on screen twice. The device titles are
 // above it. Its height in points, from the window's bottom edge (measured on the remote Mac,
@@ -209,10 +213,9 @@ function findTitle(lines, title, fromX = 0, toY = Infinity) {
   return found[0];
 }
 
-function infoTitle(lines, title, scale) {
-  const row = lines
-    .filter((line) => Math.abs(line.y - title.y) <= ROW_TOLERANCE * scale && line.x < INFO_VIEW_RIGHT * scale)
-    .sort((a, b) => a.x - b.x);
+// The Info View's title among the lines read from its title row: the leftmost.
+function infoTitle(lines) {
+  const row = [...lines].sort((a, b) => a.x - b.x);
   return row.length ? row[0].text : "";
 }
 
@@ -509,12 +512,17 @@ const machine = {
   window: async () => JSON.parse(await helper("window")),
   windows: async () => JSON.parse(await helper("windows")),
   capture: (windowId, file) => exec("screencapture", ["-x", "-o", "-l", windowId, file]),
-  async read(windowId) {
+  // The text in Live's window; with `crop`, { width, rect } as for captureRect, the text in
+  // that part of it only, with its places from the part's corner.
+  async read(windowId, crop) {
     const folder = mac.tempFolder("device-ui-");
     try {
       const image = path.join(folder, "window.png");
       await machine.capture(windowId, image);
-      return JSON.parse(await helper("text", image));
+      if (!crop) return JSON.parse(await helper("text", image));
+      const part = path.join(folder, "part.png");
+      await helper("crop", image, crop.width, ...crop.rect, part);
+      return JSON.parse(await helper("text", part));
     } finally {
       fs.rmSync(folder, { recursive: true, force: true });
     }
@@ -837,13 +845,16 @@ class DeviceUi {
 
     await this.system.permit();
     await this.system.focus();
-    const read = (id) => readUnlessStopped(this.system, () => this.system.read(id));
+    const read = (id, crop) => readUnlessStopped(this.system, () => this.system.read(id, crop));
     const at = await this.locate(read);
     const [x, y] = [at.x + ux, at.y + uy];
     await this.system.hover(at.window.id, x, y);
     await sleep(this.system.settleMs ?? INFO_VIEW_SETTLE_MS);
-    const { lines } = await read(at.window.id);
-    const shown = infoTitle(lines, at.title, at.scale);
+    // Only the Info View's title row is read: over the whole window the text recognizer
+    // missed a short title there, or read it wrong, in some states of Live's window.
+    const rect = [0, Math.max(0, at.title.y / at.scale - INFO_ROW_ABOVE), INFO_VIEW_RIGHT, INFO_ROW_HEIGHT];
+    const { lines } = await read(at.window.id, { width: at.window.w, rect });
+    const shown = infoTitle(lines);
     if (normalized(shown) !== normalized(control.info)) {
       throw new DeviceUiError(`The Info View reads "${shown}" over ${name}, expected "${control.info}" (is it visible?). Not clicked`);
     }

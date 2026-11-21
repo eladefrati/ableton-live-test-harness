@@ -197,10 +197,22 @@ test("findTitle skips a match from the given top down, as the status bar's", () 
   assert.throws(() => findTitle(lines, TITLE), /2 times/);
 });
 
-test("infoTitle reads the leftmost text on the titles' row, left of the devices", () => {
-  const title = { x: 1830, y: 1400 };
-  assert.equal(infoTitle([line(TITLE, 1800, 1400), line("Tab", 26, 1401), line("Other", 26, 1600)], title, 2), "Tab");
-  assert.equal(infoTitle([line("Drum Rack", 562, 1400)], title, 2), "");
+test("infoTitle reads the leftmost text read from the Info View's title row", () => {
+  assert.equal(infoTitle([line("Icon", 470, 4), line("Tab", 26, 6)]), "Tab");
+  assert.equal(infoTitle([]), "");
+});
+
+test("a press reads the Info View from its title row only, left of the devices", async () => {
+  const system = fakeMachine();
+  const read = system.read;
+  const crops = [];
+  system.read = (id, crop) => { crops.push(crop); return read(id, crop); };
+  const ui = await open(system);
+  crops.length = 0;
+  await ui.press("Button");
+  // the device's title is read from the whole window, then the Info View's row: its top at
+  // 1400 px, 700 points, in a window 1440 points wide
+  assert.deepEqual(crops, [undefined, { width: 1440, rect: [0, 696, 240, 18] }]);
 });
 
 test("a press clicks the control at the point worked out from the title, last, after a second focus", async () => {
