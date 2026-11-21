@@ -37,6 +37,11 @@
 //                                         saves the frame the video shows at that time, to see
 //                                         what it shows; prints the frame's time and size, and
 //                                         the video's length
+//   node harness/cli.js midi-port [--seconds <n>]
+//                                         opens the harness's MIDI input port (midi.js) and
+//                                         holds it open until Ctrl-C or the length given, so
+//                                         Remote (and Track) can be turned on for it in Live's
+//                                         Settings > Link, Tempo & MIDI; needs no OSC either
 //
 // A capture given no file goes to the captures folder (captures.js), under the time; each
 // command prints the file's path.
@@ -49,6 +54,7 @@ const { maxMessages } = require("./log.js");
 const { captureWindow, liveWindows, openPluginWindow } = require("./device-ui.js");
 const { saveCapture } = require("./captures.js");
 const { parseVideoArgs, runVideoCommand, parseFrameArgs, videoFrame } = require("./video.js");
+const { openMidiPort } = require("./midi.js");
 
 function parseArg(text) {
   if (text === "true") return true;
@@ -61,7 +67,7 @@ function parseArg(text) {
 const USAGE = "usage: cli.js ping | reload | query <address> [args] | send <address> [args] | "
   + "notes <track> <clip> [--arrangement] | song-notes <track> | max-log [since] | windows | capture [<png>] [--window <id>] | "
   + "plugin-window <track> <device> [<png>] | video [<file.mov>] [--seconds <n>] [--window <id> | --screen] [-- <command...>] | "
-  + "video-frame <file.mov> <seconds> [<png>]";
+  + "video-frame <file.mov> <seconds> [<png>] | midi-port [--seconds <n>]";
 
 async function run(argv) {
   const [command, ...rest] = argv;
@@ -69,6 +75,23 @@ async function run(argv) {
     const result = await runVideoCommand(parseVideoArgs(rest));
     if (result.status) process.exitCode = result.status;
     return result;
+  }
+  if (command === "midi-port") {
+    const at = rest.indexOf("--seconds");
+    const seconds = at === -1 ? Infinity : Number(rest[at + 1]);
+    if (rest.length !== (at === -1 ? 0 : 2) || !(seconds > 0)) throw new Error(USAGE);
+    const port = await openMidiPort();
+    console.error(`MIDI port ${port.name} is open${seconds === Infinity ? " until Ctrl-C" : ` for ${seconds} s`}`);
+    let timer;
+    await new Promise((resolve) => {
+      process.once("SIGINT", resolve);
+      process.once("SIGTERM", resolve);
+      if (seconds !== Infinity) timer = setTimeout(resolve, seconds * 1000);
+    });
+    // A pending timer would keep the run alive after a signal.
+    clearTimeout(timer);
+    await port.close();
+    return { port: port.name, closed: true };
   }
   if (command === "video-frame") {
     const { file, at, png } = parseFrameArgs(rest);
