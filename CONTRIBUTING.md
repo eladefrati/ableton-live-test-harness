@@ -32,6 +32,10 @@ stand-ins for `ssh` and `rsync`); also run it once against the remote with a com
 leaves a capture there, `harness/remote.sh ableton-live-test-harness node harness/cli.js
 capture` with the remote's Live open, and check that it brings the capture back and names
 it: only that run uses ssh and the remote's shell.
+Before a commit that changes `harness/midi.swift`, `harness/midi.js` or
+`harness/checks/midi-map.js`, also run `node harness/checks/midi-map.js` on the click host,
+with Live open and Remote on for the Harness input: the unit tests run `midi.js` on a
+stand-in for its helper, so only this check sends MIDI into Live.
 A commit that changes how Live behaves
 under the harness, or what the harness refuses, adds it to `harness/live-notes.md` in the same commit: the next reader reads that file, not
 code comments or commit messages.
