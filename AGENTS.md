@@ -11,6 +11,9 @@ projects that run in Live. Built on AbletonOSC. macOS only.
 
 ## Where to go
 
+- **On a new clone:** "Installation" in `README.md` (the Remote Script link, Live's settings,
+  permissions, `harness/local.json`), then `node harness/doctor.js`, which names what is
+  still missing.
 - **Before any run in Live, or to write a check:** `skills/verify-ableton/SKILL.md`. Live is
   shared, and checks change the open set.
 - **Before a commit, or after changing `abletonosc/`:** `CONTRIBUTING.md`, for what to reload
