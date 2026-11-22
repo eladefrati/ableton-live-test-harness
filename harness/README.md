@@ -561,9 +561,12 @@ harness/remote.sh <repo> node tests/live/<check>.js --tempo 97
 The repos are the folders beside this clone (`~/dev` for a clone at
 `~/dev/ableton-live-test-harness`), which must be under your home folder; on the remote they
 are the folder at the same path under its user's home. `<repo>` is a git repo there or one
-level down (`product/repo`, for a folder that holds a repo per format); `remote.sh` refuses any
-other path, and a folder that isn't a repo, so it never syncs, or deletes in, a parent of a
-repo on the remote. It copies the working copies of this clone and of `<repo>` to the same
+level down (`product/repo`, for a folder that holds a repo per format), or a git worktree of
+such a repo at any depth there (`project/.worktrees/branch`); `remote.sh` refuses any other
+path, and a folder that isn't a repo, so it never syncs, or deletes in, a parent of a repo on
+the remote. For a worktree it copies its repo's `.git` too and points the remote's copy of the
+worktree's `.git` file at it, so git, and the commit in a check's log, work there; the rest of
+the repo's working copy isn't copied. It copies the working copies of this clone and of `<repo>` to the same
 paths in the remote's home (uncommitted changes included; the remote can't fetch from this
 Mac), runs the command in `<repo>` there, with `LIVE_HARNESS` set to the remote's copy of
 `harness/`, and exits with its status. The remote is the host named
@@ -572,9 +575,11 @@ keys); `LIVE_REMOTE` names another for one run. `clickHost` in the same file is 
 of the one machine `device-ui.js` clicks on without asking. A click takes that machine's pointer, so
 name your own only if the agent may take it from you (ADR-0005); any other machine asks first (ADR-0006). `remote.sh` copies the file with the rest, so both machines read
 the same values. The remote's own `.venv`, `node_modules` and `__pycache__` are not copied or deleted: a
-project that needs them installs them there over ssh. A check's logs are not copied or
-deleted either: `remote.sh` moves them to this Mac after the command, after a failure too,
-and logs it can't move come back after the next run. Stills, videos and frames taken on the
+project that needs them installs them there over ssh. A check's logs (`tests/live/logs/`, at
+any depth, so a worktree's inside a repo too) are not copied or deleted either: `remote.sh`
+moves those of `<repo>` to this Mac after the command, after a failure too, and logs it can't
+move come back after the next run. A worktree's logs come back when the run names the
+worktree, not its repo. Stills, videos and frames taken on the
 remote with no path come back too, from its captures folder to this Mac's (`captures.js`):
 only finished ones, not a video still being recorded, and none whose name this Mac's folder
 has already, which stays on the remote and is said so; `remote.sh` names each one it brings
@@ -600,7 +605,12 @@ Count-In, any Options.txt entries). A project's builds folder must be in the rem
 (`<repo>/builds` there): with Live quit there,
 `harness/remote.sh <repo> node ../ableton-live-test-harness/harness/add-place.js builds`
 (`../../ableton-live-test-harness` for a repo one level down; the clone's folder name if it
-has another).
+has another). A worktree's builds folder isn't in Places unless added the same way, and a
+build is found by its file name in every Places folder (`device-checks.js`): a worktree's
+build named as the repo's is refused as being in two Places. Either give the worktree's builds
+names of their own and add its builds folder to Places, or copy the build into the repo's
+builds folder there before the check (a run that names the worktree doesn't replace the
+repo's working copy; one that names the repo does).
 `macos.js` there runs under sshd, so give
 `/usr/libexec/sshd-keygen-wrapper` Accessibility (System Settings > Privacy & Security);
 System Events then needs no separate Automation approval. A command run

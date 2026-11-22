@@ -137,7 +137,7 @@ test("remote.sh run from a clone outside the home folder refuses, and touches no
   assert.deepEqual(fs.readdirSync(mac.at("there")), []);
 });
 
-test("remote.sh refuses anything but a git repo in ~/dev or one level down, and touches nothing on the remote", (t) => {
+test("remote.sh refuses anything but a git repo in ~/dev or one level down, or a worktree, and touches nothing on the remote", (t) => {
   const mac = macs(t);
   mac.repo("product", "format");
   mac.repo("a", "b", "c");
@@ -153,6 +153,75 @@ test("remote.sh refuses anything but a git repo in ~/dev or one level down, and 
   }
   assert.deepEqual(fs.readdirSync(mac.at("there", "dev")), ["keep.txt"]);
   assert.ok(!fs.existsSync(mac.at("there", "ran.txt")));
+});
+
+// A real git repo beside the clone with one commit, and a worktree of it at `worktree` (path
+// parts from the repos' folder), on a branch of its own. Resolves with the worktree's commit.
+function gitRepoWithWorktree(mac, repo, worktree) {
+  const git = (cwd, ...args) => {
+    const done = spawnSync("git", ["-C", cwd, ...args], { encoding: "utf8" });
+    assert.equal(done.status, 0, done.stderr);
+    return done.stdout.trim();
+  };
+  const here = mac.at("here", "dev", repo);
+  mac.write(path.join(here, "file.txt"), "main");
+  git(here, "init", "-q", "-b", "main");
+  git(here, "-c", "user.name=Test", "-c", "user.email=test@example.invalid", "add", ".");
+  git(here, "-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "-q", "-m", "first");
+  git(here, "worktree", "add", "-q", "-b", "branch", mac.at("here", "dev", ...worktree));
+  return git(mac.at("here", "dev", ...worktree), "rev-parse", "--short", "HEAD");
+}
+
+test("remote.sh runs a worktree of a repo, with git working in the remote's copy, and brings the worktree's logs back", (t) => {
+  const mac = macs(t);
+  const commit = gitRepoWithWorktree(mac, "project", ["project", ".worktrees", "branch"]);
+  mac.write(mac.at("here", "dev", "project", ".worktrees", "branch", "file.txt"), "worktree");
+  const ran = run(mac, "project/.worktrees/branch", "sh", "-c",
+    "cat file.txt > ran.txt; git rev-parse --short HEAD > commit.txt; git status --porcelain -- file.txt > status.txt; "
+    + "mkdir -p tests/live/logs; echo log > tests/live/logs/run.log");
+  assert.equal(ran.status, 0, ran.stderr);
+  const there = mac.at("there", "dev", "project", ".worktrees", "branch");
+  // The stand-in remote shares this disk, where this Mac's path would resolve too: the remote's
+  // .git must name the remote's copy.
+  assert.equal(read(path.join(there, ".git")), `gitdir: ${mac.at("there", "dev", "project", ".git", "worktrees", "branch")}\n`);
+  assert.equal(read(path.join(there, "ran.txt")), "worktree");
+  assert.equal(read(path.join(there, "commit.txt")), `${commit}\n`);
+  assert.equal(read(path.join(there, "status.txt")), " M file.txt\n", "the uncommitted change is seen there");
+  assert.equal(read(mac.at("here", "dev", "project", ".worktrees", "branch", "tests", "live", "logs", "run.log")), "log\n");
+  assert.ok(!fs.existsSync(path.join(there, "tests", "live", "logs", "run.log")), "moved, not copied");
+  // This Mac's worktree still names its git folder by this Mac's path.
+  assert.match(read(mac.at("here", "dev", "project", ".worktrees", "branch", ".git")), new RegExp(`gitdir: ${mac.at("here")}`));
+});
+
+test("remote.sh runs a worktree beside the clone, its repo's .git copied with it", (t) => {
+  const mac = macs(t);
+  const commit = gitRepoWithWorktree(mac, "project", ["project-branch"]);
+  const ran = run(mac, "project-branch", "sh", "-c", "git rev-parse --short HEAD > commit.txt");
+  assert.equal(ran.status, 0, ran.stderr);
+  assert.equal(read(mac.at("there", "dev", "project-branch", "commit.txt")), `${commit}\n`);
+  assert.equal(read(mac.at("there", "dev", "project-branch", ".git")), `gitdir: ${mac.at("there", "dev", "project", ".git", "worktrees", "project-branch")}\n`);
+});
+
+test("remote.sh's sync of a repo leaves the logs of a worktree inside it on the remote", (t) => {
+  const mac = macs(t);
+  mac.repo("project");
+  const log = mac.at("there", "dev", "project", ".worktrees", "branch", "tests", "live", "logs", "run.log");
+  mac.write(log, "log there");
+  const ran = run(mac, "project", "true");
+  assert.equal(ran.status, 0, ran.stderr);
+  assert.equal(read(log), "log there");
+});
+
+test("remote.sh refuses a worktree whose repo isn't beside the clone, and touches nothing on the remote", (t) => {
+  const mac = macs(t);
+  gitRepoWithWorktree(mac, "project", ["project", ".worktrees", "branch"]);
+  fs.renameSync(mac.at("here", "dev", "project"), mac.at("here", "elsewhere"));
+  fs.mkdirSync(mac.at("here", "dev", "lone"));
+  fs.writeFileSync(mac.at("here", "dev", "lone", ".git"), `gitdir: ${mac.at("here", "elsewhere", ".git", "worktrees", "branch")}\n`);
+  const ran = run(mac, "lone", "touch", "ran.txt");
+  assert.equal(ran.status, 2, ran.stderr);
+  assert.match(ran.stderr, /^remote\.sh: .*is a worktree whose repo isn't a git repo in/);
+  assert.deepEqual(fs.readdirSync(mac.at("there")), []);
 });
 
 test("remote.sh brings the remote's finished captures back to this Mac's captures folder, leaving unfinished ones and names already here", (t) => {

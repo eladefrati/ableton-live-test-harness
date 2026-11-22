@@ -218,7 +218,8 @@ any command there from this Mac:
 ~/dev/ableton-live-test-harness/harness/remote.sh <repo> node tests/live/<check>.js
 ```
 
-`<repo>` is a git repo beside the harness clone, or one level down (`product/repo`); the
+`<repo>` is a git repo beside the harness clone, or one level down (`product/repo`), or a
+git worktree of one (`project/.worktrees/branch`), whose repo's git comes with it; the
 remote has them at the same path under its home. It copies the working copies of the harness and `<repo>` to the remote first, replacing what's there, then runs the
 command in `<repo>` there, with `LIVE_HARNESS` set; its exit status is the command's. Stills, videos and frames
 taken there with no path come back to this Mac's captures folder, and `remote.sh` names each
@@ -227,4 +228,4 @@ remote: the run there goes on to its end, and its logs and captures come back af
 run. A build made on the
 remote (a plug-in's, say) goes outside `<repo>`, which the next run replaces; delete
 it when the work is done. The project's builds folder
-must be in the remote's Places (see "Running on a second Mac" in `harness/README.md`).
+must be in the remote's Places, a worktree's too (see "Running on a second Mac" in `harness/README.md`).
