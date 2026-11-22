@@ -157,6 +157,12 @@ Node 18 or later. See [ADR-0001](../docs/adr/0001-fork-abletonosc.md) for the de
   (ADR-0013; a fraction of a point throws `DeviceUiError`; Auto Filter's knobs turn one of
   their 126 steps per point up, and a Max for Live number box in 2-point steps, with the
   distances to drag it by, `live-notes.md`),
+  `ui.drag(name, {up, right}, {hold, then: {up, right}})` keeps the button down and the
+  pointer still for `hold` ms (whole, 1 to 2000) after that move, then moves `then` further
+  before the release, for a view that acts on what happens while the button is down (ADR-0021;
+  the second drag event goes to the press point plus both moves; Stop during the hold brings
+  the button up at once with no second move, its error saying `done`; a knob of one of Live's
+  devices counts both events from the press point, so it turns further than both moves),
   `ui.choose(name, item)` opens the menu a control opens (a chooser) and clicks the one row
   that reads `item`, closing the menu with Escape if none or two do or anything else fails once the menu's control was clicked (ADR-0014; after Stop, once no modifier key is held, waiting 2 s at most and leaving the menu open with a warning if one still is, since the stop key's may be: ADR-0017), and `ui.text([x, y, w, h])`
   resolves with the lines shown in that part of the panel, in device units. A press looks
@@ -183,7 +189,8 @@ Node 18 or later. See [ADR-0001](../docs/adr/0001-fork-abletonosc.md) for the de
   `openPluginWindow(live, {track, device, size, controls})` selects the device and opens the
   window if it isn't open (through Accessibility, no pointer), and resolves with an object
   whose `press(name)` clicks a control, `drag(name, {up, right})` turns one (ADR-0013; mainly
-  what dragging is for, as Live's own devices are set over OSC), `capture(file)` saves a PNG of the editor without
+  what dragging is for, as Live's own devices are set over OSC; one move only, a held drag
+  throws), `capture(file)` saves a PNG of the editor without
   Live's title bar, and `close()` closes the window. `size` is the editor's `[w, h]` and
   `controls` is `{name: {x, y}}`, each control's centre, both in points from the editor's top
   left. Live shows the window only while it is in front with the display on, so `press` and
@@ -382,7 +389,14 @@ Node 18 or later. See [ADR-0001](../docs/adr/0001-fork-abletonosc.md) for the de
   of a point, or one that would end off the screen, is refused before the pointer moves; a
   drag is one
   button-down at the point, one drag event at its end with the whole distance in its delta
-  fields, and one button-up, where the pointer then is; a helper started after Stop, which
+  fields, and one button-up, where the pointer then is; a held drag (ADR-0021) is that with
+  a second drag event, at the press point plus both moves with the second in its delta
+  fields, reaching the window the hold apart from the first, give or take 50 ms, also when
+  the window moves the pointer back at each drag event, and one whose second move would end
+  off the screen is refused before the pointer moves; Stop, the signal of Stop's last resort
+  or SIGTERM at its first drag event brings the button up within a quarter of the hold, with
+  no second drag event, the helper exiting 4, saying that the first move had happened, or
+  dying by SIGTERM; a helper started after Stop, which
   removes the token, posts nothing, for a click or for a drag, and so does one whose token's
   folder is gone, for a drag too, or can't be
   written to, or whose token can't be read, each saying which; one whose run had ended
