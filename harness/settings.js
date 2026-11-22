@@ -171,7 +171,7 @@ function parseSampleRate(text) {
 }
 
 async function sampleRate({ file } = {}) {
-  // Required here, not at the top: log.js requires this file.
+  // Required here, not at the top, since log.js requires this file.
   file = file || (await require("./log.js").liveLogFile());
   return { rate: parseSampleRate(fs.readFileSync(file, "utf8")), file };
 }

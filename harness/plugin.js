@@ -12,12 +12,12 @@
 //
 // The harness writes such a set itself rather than saving one through Live, whose Save
 // panel takes keystrokes only with Live in front (ADR-0003). buildPluginSet fills a fixture,
-// sets/au-plugin.als, whose one device is a stateless AUDelay with every slot free: it puts
+// sets/au-plugin.als, whose one device is a stateless AUDelay with every slot free. It puts
 // in the target plug-in's component codes and names from its Info.plist, and its
 // parameters (ID, name, kind, default) from the AU itself (au-parameters.swift) into their
 // pairs; `auval -v` only validates the plug-in. relaunch.js
 // --plugin starts Live on that set; exposePluginParameters opens it in a running Live.
-// VST3 plug-ins are not covered: their parameter IDs need a VST3 host to read.
+// VST3 plug-ins are not covered, since their parameter IDs need a VST3 host to read.
 
 const fs = require("node:fs");
 const os = require("node:os");
@@ -52,8 +52,8 @@ const EFFECT_TYPES = ["aufx", "aumf"];
 // float.
 const UNIT_INDEXED = 1;
 const UNIT_BOOLEAN = 2;
-// How far a raw enum value may sit from a whole number: a plug-in framework can compute an enum's
-// default as a float32 product (default * max), which needn't be exact.
+// How far a raw enum value may sit from a whole number, since a plug-in framework can compute
+// an enum's default as a float32 product (default * max), which needn't be exact.
 const ENUM_TOLERANCE = 1e-3;
 // AudioUnitParameterOptions' display scale: the bits that say how a host shows a float's
 // range. Live normalizes a Display Logarithmic float on a log scale: AUDelay's Lowpass
@@ -170,7 +170,7 @@ async function mapLimited(items, limit, fn) {
 }
 
 // The installed effect named `name`, from the AudioComponents of the components in
-// `folders`. Refuses unless exactly one matches: a set naming a component that isn't
+// `folders`. Refuses unless exactly one matches, since a set naming a component that isn't
 // installed opens without a word, as a device listing every parameter in the file.
 async function findComponent(name, folders = COMPONENT_FOLDERS) {
   const bundles = folders.filter((f) => fs.existsSync(f)).flatMap((folder) =>
@@ -242,7 +242,7 @@ const SLOT_PAIRS = 128;
 // place in Live's list. Filling floats and enums into the first free slots of their kind
 // instead put a float and an enum in one pair; both read back in Live, but some floats
 // never reached the plug-in (with one plug-in, one float did not while another did). The
-// block keeps AUDelay's bus counts, which didn't matter: it ran a plug-in with a different
+// block keeps AUDelay's bus counts, which didn't matter. It ran a plug-in with a different
 // bus count. Values go in through replacer
 // functions, so a "$" in a name is written as it is.
 function fillPluginSet(template, component, params) {
@@ -272,7 +272,7 @@ function fillPluginSet(template, component, params) {
       .replace(/<ParameterId Value="-1" \/>/, () => `<ParameterId Value="${p.id}" />`)
       .replace(/<VisualIndex Value="\d+" \/>/, () => `<VisualIndex Value="${i}" />`)
       .replace(/<Manual Value="[^"]*" \/>/, () => `<Manual Value="${manual}" />`)
-      // An enum slot's item count, which Live keeps from the set: left at 1, every
+      // An enum slot's item count, which Live keeps from the set. Left at 1, every
       // value read back as 0.
       .replace(/<LastItemCount Value="\d+" \/>/, () => `<LastItemCount Value="${p.max + 1}" />`);
   });
@@ -319,7 +319,7 @@ async function checkPluginLoaded(live, name, parameters) {
 // can set it by name, and resolves with { track, device, parameters, file } (file: the set
 // now open; recordings go to the Temp Project Live makes for it). If the open set already
 // holds the plug-in that way, that is all. Otherwise it opens a set holding only the
-// plug-in (buildPluginSet), behind other windows: the song is the fixture's, at 120 BPM,
+// plug-in (buildPluginSet), behind other windows. The song is the fixture's, at 120 BPM,
 // whatever the open set had. It refuses to replace a set the harness didn't make, since
 // opening answers "Save changes?" with Don't Save; after a relaunch, `relaunch.js --plugin
 // <name>` starts Live on the set instead. `reopen` opens a freshly built set even if the
@@ -334,7 +334,7 @@ async function exposePluginParameters(live, name, { reopen = false } = {}) {
       // Not there, or not every parameter, or a stand-in: replace the set.
     }
   }
-  // Checked last, just before the open: building takes seconds, in which the user could
+  // Checked last, just before the open, since building takes seconds, in which the user could
   // open a set of their own.
   const open = await live.get("song", "file_path");
   if (!inHarnessTemp(open)) {

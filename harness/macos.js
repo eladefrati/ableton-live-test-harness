@@ -58,7 +58,7 @@ async function wakeDisplay({ timeoutMs = 3000 } = {}) {
 }
 
 // Wakes the display and keeps it on until stop() is called, or until this process exits. A
-// Live started while the display slept never redrew its window: captures, on the screen as
+// Live started while the display slept never redrew its window. Captures, on the screen as
 // well as of the window, kept showing the set as it opened, and neither waking the display
 // nor bringing Live to the front nor resizing its window changed that. `wake`
 // and `hold` are replaceable for tests.
@@ -78,11 +78,11 @@ async function keepDisplayOn({ wake = wakeDisplay, hold: start = holdDisplay } =
 }
 
 // Brings Live to the front and waits until it is there; throws if it doesn't come. System
-// Events' "set frontmost of process", sent once and not checked, wasn't enough: started
+// Events' "set frontmost of process", sent once and not checked, wasn't enough. Started
 // with another app in front, save-reopen.js failed in 1 of 2 runs, and 0 of 6 with this.
 // Live is addressed by its bundle id, which Suite and Beta don't share.
 // `refuse`, if given, is called just before Live is told to activate, and throws if Live
-// must no longer be: what its caller looked at may have changed while the display woke.
+// must no longer be, since what its caller looked at may have changed while the display woke.
 async function activate({ timeoutMs = 3000, refuse } = {}) {
   if (await isFrontmost()) return;
   await wakeDisplay();
@@ -99,7 +99,7 @@ async function activate({ timeoutMs = 3000, refuse } = {}) {
 // 200 ms after File > Save Live Set As...), and would take the keys. If Live has lost the
 // front, it is activated again, up to `tries` times; then nothing is typed and it throws.
 // `refuse`, if given, is called before Live is told to activate, as activate does, and again
-// just before the keys are typed: it throws if they must not be.
+// just before the keys are typed. It throws if they must not be.
 async function typeInLive(body, { refuse, tries = 3 } = {}) {
   for (let attempt = 0; attempt < tries; attempt++) {
     await activate({ refuse });
@@ -177,12 +177,12 @@ return out as text`);
 
 // Clicks a menu item: clickMenu("File", "Save Live Set"). After File > New Live Set with
 // unsaved changes, Live's "Save changes?" dialog can't be read or pressed through the LOM
-// (no message, no buttons; measured): saveSetAs into a temp folder
+// (no message, no buttons; measured). Call saveSetAs into a temp folder
 // first, so Live doesn't ask.
 // With `giveBack` false, Live stays in front after the click, for a caller that types into
 // what the click opens and puts the app back itself.
 async function clickMenu(menu, item, { giveBack = true } = {}) {
-  // Woken first: with the display asleep there is no frontmost app to put back.
+  // Woken first, since with the display asleep there is no frontmost app to put back.
   await wakeDisplay();
   const before = giveBack ? await frontmostApp().catch(() => null) : null;
   await activate();
@@ -204,8 +204,8 @@ async function undoName() {
   return first.startsWith("Undo ") ? first.slice(5) : null;
 }
 
-// Sets a toggle menu item and waits for its check mark to follow: Live updates its menus'
-// marks about a second after the change.
+// Sets a toggle menu item and waits for its check mark to follow, since Live updates its
+// menus' marks about a second after the change.
 async function setToggle(menu, item, on, { timeoutMs = 3000 } = {}) {
   if ((await isChecked(menu, item)) === on) return;
   await clickMenu(menu, item);
@@ -242,9 +242,9 @@ function sameFile(a, b) {
 const mtime = (file) => (fs.existsSync(file) ? fs.statSync(file).mtimeMs : 0);
 
 // The folder that holds every temp folder the harness makes (sets saved as, the sets
-// relaunch.js starts Live on, plug-in sets). Its own folder, not the system temp folder itself: Go to Folder lists the
-// parent of the path typed into it, and with 15,857 entries in the system temp folder it
-// was still loading when saveSetAs pressed Return. relaunch.js
+// relaunch.js starts Live on, plug-in sets). Its own folder, not the system temp folder itself,
+// because Go to Folder lists the parent of the path typed into it, and with 15,857 entries in
+// the system temp folder it was still loading when saveSetAs pressed Return. relaunch.js
 // empties it once Live has quit.
 const HARNESS_TEMP = path.join(os.tmpdir(), "ableton-harness");
 
@@ -286,8 +286,9 @@ async function livePids(find = () => tools.run("pgrep", ["-x", "Live"])) {
 }
 
 // Saves the set to its file, `file`, and resolves once the file has been rewritten. A set
-// never saved opens the Save dialog instead: use saveSetAs. Only after saveSetAs into a
-// temp folder: never overwrite the file the user's set was opened from.
+// never saved opens the Save dialog instead, so use saveSetAs for one. Call saveSet only after
+// saveSetAs into a temp folder, so that it never overwrites the file the user's set was opened
+// from.
 async function saveSet(file, { timeoutMs = 10000 } = {}) {
   const before = mtime(file);
   await clickMenu("File", "Save Live Set");
@@ -319,11 +320,11 @@ async function saveSetAs(folder, name, { timeoutMs = 10000 } = {}) {
   // text, no "Loading...", no button names.
   const panelOpen = async () => (await osascript(inLive(`exists window "Save"`))) === "true";
   const sheetOpen = async () => (await osascript(inLive(`count of sheets of window "Save"`))) !== "0";
-  // Woken first: with the display asleep there is no frontmost app to put back.
+  // Woken first, since with the display asleep there is no frontmost app to put back.
   await wakeDisplay();
   const before = await frontmostApp().catch(() => null);
   try {
-    // Live stays in front from the click on: with the app that was in front put back
+    // Live stays in front from the click on, because with the app that was in front put back
     // meanwhile, the panel lost the typed name and folder though it took Command-A, Go to
     // Folder and Return.
     await clickMenu("File", "Save Live Set As...", { giveBack: false });
@@ -336,7 +337,7 @@ async function saveSetAs(folder, name, { timeoutMs = 10000 } = {}) {
       keystroke "g" using {command down, shift down}`);
     await waitFor(sheetOpen, "the Go to Folder sheet", timeoutMs);
     // Go to Folder's highlighted suggestion lags the typed path, and Return takes the
-    // suggestion: half a second after typing it still named the previous temp folder.
+    // suggestion. Half a second after typing it still named the previous temp folder.
     await typeInLive(`keystroke ${quote(folder)}\ndelay 2`);
     // A Return pressed while the sheet is still loading the path is lost, so Return is
     // pressed again until the sheet closes, then (Save) until the file is written; never
@@ -347,9 +348,9 @@ async function saveSetAs(folder, name, { timeoutMs = 10000 } = {}) {
       async () => !fs.existsSync(file) && (await panelOpen()) && !(await sheetOpen()), `${file} to be written`, timeoutMs);
   } catch (error) {
     if (path.dirname(folder) === HARNESS_TEMP) fs.rmSync(folder, { recursive: true, force: true });
-    // Don't leave the panel open: it blocks what the caller does next. It may still be
+    // Don't leave the panel open, since it blocks what the caller does next. It may still be
     // on its way, so give it a moment to appear. If Escape doesn't close it, the error says
-    // so: Accessibility can't press its Cancel.
+    // so, since Accessibility can't press its Cancel.
     for (let tries = 0; tries < 10; tries++) {
       if (await panelOpen().catch(() => false)) {
         await typeInLive("key code 53").catch(() => {});
@@ -369,8 +370,8 @@ async function saveSetAs(folder, name, { timeoutMs = 10000 } = {}) {
 // Opens `file` with the app at `app`, starting the app if it isn't running, without
 // bringing it to the front (ADR-0003): NSWorkspace with activation off, through JXA. Live
 // came forward with `open -a` and with `open -g -a`. The request is asynchronous, so the
-// script waits for its completion handler: exiting at once dropped the open in 3 of 3
-// tries. Rejects with Launch Services' error, e.g. while the app is quitting.
+// script waits for its completion handler. Exiting at once dropped the open in 3 of 3
+// tries. Rejects with Launch Services' error, for example while the app is quitting.
 const OPEN_IN_BACKGROUND = `ObjC.import("AppKit");
 function run(argv) {
   const config = $.NSWorkspaceOpenConfiguration.configuration;

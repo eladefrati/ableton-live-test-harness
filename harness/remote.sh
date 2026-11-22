@@ -15,12 +15,12 @@
 # it only by this push; working copies, not commits, because checks prove builds before they
 # are committed. The remote's own build products (.venv,
 # node_modules, __pycache__) and AbletonOSC's logs (/logs/, written by the remote's Live)
-# are left alone: excluded files are neither copied nor deleted, so a project that needs
+# are left alone. Excluded files are neither copied nor deleted, so a project that needs
 # them installs them on the remote by hand. A check's logs (tests/live/logs/ at any depth, see
 # run-log.js) are excluded too, and those of <repo> moved back to this Mac after the command,
 # and so are the stills and
 # videos taken there without a path (harness/captures.js), from the remote's captures folder
-# to this Mac's. There is no lock: two runs
+# to this Mac's. There is no lock. Two runs
 # at once can replace files under a running check, so the slot rule in harness/README.md is
 # the guard.
 #
@@ -50,7 +50,7 @@ remote_root=${root#$HOME/}
 
 # local.json is not in git (see local.example.json). It is read from the copy this script
 # syncs, so the remote gets the file these values came from. plutil fails on a missing
-# file, a missing key or bad JSON: all three read as not set.
+# file, a missing key or bad JSON. All three read as not set.
 host=${LIVE_REMOTE:-$(plutil -extract remote raw -o - "$clone/harness/local.json" 2>/dev/null || true)}
 if [[ -z $host ]]; then
   print -u2 "remote.sh: no remote host: set \"remote\" in harness/local.json (see harness/local.example.json) or LIVE_REMOTE"
@@ -107,7 +107,7 @@ sync $harness
 [[ $repo == $harness ]] || sync $repo
 if [[ -n $main ]]; then
   # The repo's .git, which holds the worktree's commits, index and HEAD. The worktree's .git
-  # names its git folder by this Mac's path, which the remote doesn't have: it is pointed at
+  # names its git folder by this Mac's path, which the remote doesn't have, so it is pointed at
   # the remote's copy, after every sync, as the sync puts this Mac's back.
   sync $main/.git
   ssh "$host" "printf 'gitdir: %s\\n' \"\$HOME\"/${(q)remote_root}/${(q)gitdir} > ${(q)remote_root}/${(q)repo}/.git"
@@ -146,10 +146,10 @@ bring_back_captures() {
   local there=$lines[1]
   local -a names=("${(@)lines[2,-1]}")
   (( $#names )) || return 0
-  # This Mac's captures folder, as captures.js finds it: os.tmpdir() is TMPDIR without its
-  # last slash, or /tmp.
+  # This Mac's captures folder, as captures.js finds it. os.tmpdir() is TMPDIR without its last
+  # slash, or /tmp.
   local here=${${TMPDIR:-/tmp}%/}/ableton-harness-captures
-  # A name already here is left on the remote and said so: openrsync deletes the source of a
+  # A name already here is left on the remote and said so. openrsync deletes the source of a
   # file --ignore-existing skips, so such a name is never handed to rsync.
   local name
   local -a send
@@ -164,9 +164,9 @@ bring_back_captures() {
   local list moved rsync_status=0
   list=$(mktemp -t remote-captures) || return 0
   print -rl -- $send > $list
-  # Each file rsync names it has copied is named here, also when it then fails on another: a
-  # failed openrsync left what it had copied on the remote too, where a later run finds the
-  # name already here.
+  # Each file rsync names it has copied is named here, also when it then fails on another,
+  # because a failed openrsync left what it had copied on the remote too, where a later run
+  # finds the name already here.
   if mkdir -p "$here"; then
     moved=$(rsync -a --ignore-existing --remove-source-files --files-from="$list" --out-format="%n" \
       "$host:$there/" "$here/") || rsync_status=$?

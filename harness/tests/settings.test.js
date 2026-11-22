@@ -39,7 +39,7 @@ test("requireSampleRate refuses another sample rate, saying what to ask for", as
 });
 
 // A Preferences.cfg laid out as Live 12.4.25b1 writes one (see settings.js), cut down to a
-// few classes. A real file can't be a fixture: it holds the account's email and tokens.
+// few classes. A real file can't be a fixture, since it holds the account's email and tokens.
 const u8 = (v) => Buffer.from([v]);
 const i32 = (v) => { const b = Buffer.alloc(4); b.writeInt32LE(v); return b; };
 const ascii = (s) => Buffer.concat([u8(s.length), Buffer.from(s, "latin1")]);

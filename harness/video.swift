@@ -12,8 +12,8 @@
 // It stops after <seconds>, on SIGINT, SIGTERM or SIGHUP, when the process that started it
 // ends, or when nothing reads the run's output any more (fd 3, below), and finishes the file
 // each time. A file it was writing when it was killed is whole up to then, at <out.mov>, not
-// renamed: SCRecordingOutput writes it as it goes (a recorder killed 5 s in left 5 s). While
-// it records the display is kept on: a display that sleeps leaves the video on its last
+// renamed. SCRecordingOutput writes it as it goes (a recorder killed 5 s in left 5 s). While
+// it records the display is kept on. A display that sleeps leaves the video on its last
 // picture.
 //
 // frame saves the frame shown at <seconds> and prints {"at", "w", "h", "seconds"}: the time of
@@ -28,11 +28,11 @@ import ScreenCaptureKit
 
 // How long a stopped recording may take to finish its file.
 let FINISH_SECONDS = 10.0
-// The process that started this one, taken first: the recording stops when it ends.
+// The process that started this one, taken first. The recording stops when it ends.
 let PARENT = getppid()
 
-// fputs, not FileHandle: with SIGPIPE ignored, FileHandle's write raises an exception, which
-// aborts this, when nothing reads stderr any more.
+// fputs, not FileHandle, because with SIGPIPE ignored, FileHandle's write raises an exception,
+// which aborts this, when nothing reads stderr any more.
 func complain(_ message: String) {
     fputs(message + "\n", stderr)
 }
@@ -111,7 +111,7 @@ final class Recorder: NSObject, SCStreamDelegate, SCStreamOutput, SCRecordingOut
 
     func stream(_ stream: SCStream, didOutputSampleBuffer buffer: CMSampleBuffer, of type: SCStreamOutputType) {}
 
-    // A window that closes ends the stream: the file is finished as on a stop, and the result
+    // A window that closes ends the stream. The file is finished as on a stop, and the result
     // says why it ended early.
     func stream(_ stream: SCStream, didStopWithError error: Error) {
         complain("The recording stopped: \(error.localizedDescription)")
@@ -136,7 +136,7 @@ final class Recorder: NSObject, SCStreamDelegate, SCStreamOutput, SCRecordingOut
         fail("The recording failed: \(error.localizedDescription)")
     }
 
-    // The length is read from the file: recordedDuration came in whole seconds.
+    // The length is read from the file, since recordedDuration came in whole seconds.
     func recordingOutputDidFinishRecording(_ output: SCRecordingOutput) {
         let file = self.file
         let finished = self.finished
@@ -184,7 +184,7 @@ func stopOnSignalsAndParent(_ stop: @escaping () -> Void) {
 }
 
 // fd 3, when given, is the run's own stderr. Over ssh it is a pipe or socket to sshd, and an ssh
-// session that ends (Ctrl-C on remote.sh) closes its other end and sends no signal: the run
+// session that ends (Ctrl-C on remote.sh) closes its other end and sends no signal. The run
 // goes on, so its recording stops here. A terminal or a file is left alone.
 func stopWhenRunOutputCloses(_ stop: @escaping () -> Void) {
     var info = stat()
@@ -274,7 +274,7 @@ let USAGE = "usage: video record <out.mov> window <id> | screen <seconds> [then 
 let arguments = CommandLine.arguments
 // ScreenCaptureKit needs a connection to the window server, which this makes.
 _ = NSApplication.shared
-// The run may be gone, with its end of the pipes: a write to them must not end this before
+// The run may be gone, with its end of the pipes, so a write to them must not end this before
 // the file is finished.
 signal(SIGPIPE, SIG_IGN)
 

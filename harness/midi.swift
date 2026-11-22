@@ -1,5 +1,5 @@
 // A MIDI source of the harness's own, which Live sees as a MIDI input port while this runs
-// (ADR-0018): a check sends it messages, and Live takes them as from a controller.
+// (ADR-0018). A check sends it messages, and Live takes them as from a controller.
 //
 //   midi <name>
 //

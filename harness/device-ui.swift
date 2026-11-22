@@ -49,10 +49,10 @@
 // button this helper holds, and exit 3 saying so. The run counts as stopped unless the helper
 // can tell that it wasn't: the click token named in HARNESS_COMPUTER_USE_TOKEN can be read,
 // and its folder written to. A run that has ended counts as stopped too, whatever became of
-// its token: the helper posts only while the process that started it is still its parent.
+// its token, since the helper posts only while the process that started it is still its parent.
 // So does a run that Stop signalled because it couldn't remove the token: the run passes the
 // signal, SIGUSR2, on to this helper, which handles it from its start, whatever its command. A
-// click or a drag with only that release left has happened: the helper posts it and exits 4,
+// click or a drag with only that release left has happened. The helper posts it and exits 4,
 // saying that too; so does a double-click stopped after its first click, which happened, and a
 // held drag stopped during its hold, which releases the button at once, its first move
 // having happened (ADR-0021). A
@@ -63,9 +63,9 @@ import ApplicationServices
 import Foundation
 import Vision
 
-// Stop's last resort (ADR-0012): a Stop that can't remove the click token sends the run
+// Stop's last resort (ADR-0012). A Stop that can't remove the click token sends the run
 // SIGUSR2, and the run passes it on to the helpers it has running. Handled before anything
-// else, whatever the command: the signal ends a program that doesn't handle it.
+// else, whatever the command, since the signal ends a program that doesn't handle it.
 var stopSignalled: sig_atomic_t = 0
 signal(SIGUSR2) { _ in stopSignalled = 1 }
 
@@ -114,12 +114,12 @@ func stopped() -> String? {
 // down, when failing to make it leaves nothing held, so that whatever fails with the button
 // down has the event to release it with.
 var held: CGEvent? = nil
-// Whether this helper holds Shift down, for a Shift-click: a posted key event leaves its key
+// Whether this helper holds Shift down, for a Shift-click. A posted key event leaves its key
 // held until its release is posted (live-notes.md), so every way out releases it (release).
 var shiftHeld = false
 let SHIFT_KEY: CGKeyCode = 56
 // A signal that would end the helper, as Ctrl-C on the run does, is held back once the button
-// goes down: the helper releases the button first, then ends by that signal (obeySignal).
+// goes down. The helper releases the button first, then ends by that signal (obeySignal).
 let ENDING_SIGNALS = [SIGINT, SIGQUIT, SIGTERM, SIGHUP]
 var signalled: sig_atomic_t = 0
 
@@ -278,7 +278,7 @@ func text(in path: String) {
         guard let candidate = result.topCandidates(1).first else { return nil }
         let string = candidate.string
         let box = result.boundingBox // normalized, origin at the bottom left
-        // Each word's own left edge: a line's box takes in icons read as characters.
+        // Each word's own left edge, since a line's box takes in icons read as characters.
         let words = string.split(separator: " ").map { word -> [String: Any] in
             let edge = (try? candidate.boundingBox(for: word.startIndex..<word.endIndex))?.boundingBox.minX ?? box.minX
             return ["text": String(word), "x": edge * w]
@@ -291,12 +291,12 @@ func text(in path: String) {
 
 // Saves the rectangle `rect` of an image as a PNG: in points of an image `width` points
 // wide, as a capture of a window is of its window. Each edge is rounded to a pixel by
-// itself, so that a rectangle inside the image in points is inside it in pixels: its size
+// itself, so that a rectangle inside the image in points is inside it in pixels. Its size
 // rounded by itself could end it a pixel past the edge. The PNG is given the image's
-// resolution, which a capture carries (144 dpi on a display of 2 pixels per point): a PNG
+// resolution, which a capture carries (144 dpi on a display of 2 pixels per point). A PNG
 // that gives none reads as 72 dpi, twice the size.
-// sips can't do this: it leaves an image whole, with no error, when the rectangle starts
-// below the top and reaches the bottom edge, as a plug-in's editor does in its window
+// sips can't do this, because it leaves an image whole, with no error, when the rectangle
+// starts below the top and reaches the bottom edge, as a plug-in's editor does in its window
 // (sips-316, macOS 26).
 func crop(_ path: String, width: Double, _ rect: CGRect, to out: String) {
     guard let source = CGImageSourceCreateWithURL(URL(fileURLWithPath: path) as CFURL, nil),
@@ -330,7 +330,7 @@ func requireUnlocked() {
 // cursor's layer up, as the cursor is a window too and sits on the point after a hover. Nor
 // harness-computer-use's own overlay (computer-use-overlay.swift, ADR-0012), which covers the
 // screen and lets every click through: its title, and its program's name, cut short as macOS
-// reports it. A window that reports no layer counts as a normal one (layer 0): left out, it
+// reports it. A window that reports no layer counts as a normal one (layer 0). Left out, it
 // could cover the point unseen.
 func clickableWindows() -> [[String: Any]] {
     let cursor = Int(CGWindowLevelForKey(.cursorWindow))
@@ -394,7 +394,7 @@ func emit(_ type: CGEventType, _ point: CGPoint, moved: CGVector? = nil, clicks:
     event.post(tap: .cghidEventTap)
 }
 
-// The button up, for a click, a drag and a release alike, and then a wait: a mouse event
+// The button up, for a click, a drag and a release alike, and then a wait, since a mouse event
 // posted as the last thing a program does is lost (live-notes.md).
 func buttonUp(_ point: CGPoint) {
     guard let up = held else { return }
@@ -406,8 +406,8 @@ func buttonUp(_ point: CGPoint) {
     while nanosleep(&wait, &left) != 0 && errno == EINTR { wait = left }
 }
 
-// Shift's key up, if this helper holds it, and then a wait, as after a button up: an event
-// posted as the last thing a program does is lost.
+// Shift's key up, if this helper holds it, and then a wait, as after a button up, since an
+// event posted as the last thing a program does is lost.
 func releaseShift() {
     guard shiftHeld else { return }
     guard let up = CGEvent(keyboardEventSource: CGEventSource(stateID: .hidSystemState), virtualKey: SHIFT_KEY, keyDown: false)
@@ -418,7 +418,7 @@ func releaseShift() {
     usleep(100_000)
 }
 
-// Holds Shift down, as a person does before a Shift-click: the mouse events made after it
+// Holds Shift down, as a person does before a Shift-click. The mouse events made after it
 // from the keyboard's state carry it. Ending signals are held back from here on, as once the
 // button is down, so that Shift is released before the helper ends.
 func pressShift() {
@@ -489,10 +489,10 @@ func post(_ type: CGEventType, _ point: CGPoint, moved: CGVector? = nil, clicks:
     }
 }
 
-// The button-up that completes a click or a drag, posted whether or not the run is stopped:
-// the click or the drag has happened by then. A helper stopped by then ends as stopped all
-// the same, with a status of its own and saying what happened, so that the run can clear up
-// what the click did (ADR-0012). A signal held back comes first.
+// The button-up that completes a click or a drag, posted whether or not the run is stopped,
+// since the click or the drag has happened by then. A helper stopped by then ends as stopped
+// all the same, with a status of its own and saying what happened, so that the run can clear
+// up what the click did (ADR-0012). A signal held back comes first.
 func complete(_ gesture: String, at point: CGPoint) {
     buttonUp(point)
     releaseShift()
@@ -507,7 +507,7 @@ let MAX_DRAG = 400.0
 
 // Refuses a drag from `point` by `delta`, before any event is posted, unless it moves whole
 // points, at least 1 on its longer axis and at most MAX_DRAG on either, and ends on a screen.
-// Whole points, because a knob of one of Live's devices reads positions in whole points: what
+// Whole points, because a knob of one of Live's devices reads positions in whole points. What
 // a fraction of a point turned would depend on the fraction the press point happens to have.
 func requireDrag(_ point: CGPoint, _ delta: CGVector) {
     guard delta.dx == delta.dx.rounded(), delta.dy == delta.dy.rounded(),
@@ -518,7 +518,7 @@ func requireDrag(_ point: CGPoint, _ delta: CGVector) {
     guard CGGetDisplaysWithPoint(end, 0, nil, &count) == .success, count > 0 else { fail("A drag to \(end) ends off screen") }
 }
 
-// The longest hold of a held drag, in ms (ADR-0021): it holds the person's mouse.
+// The longest hold of a held drag, in ms (ADR-0021). It holds the person's mouse.
 let MAX_HOLD_MS = 2000.0
 
 // Refuses a hold, before any event is posted, unless it is whole ms from 1 to MAX_HOLD_MS.
@@ -534,7 +534,7 @@ struct Hold {
 }
 
 // Button down at `point`, one drag event at the end of `delta`, button up where the pointer
-// then is. One event, not a path of steps: for every drag event, a knob of one of Live's
+// then is. One event, not a path of steps. For every drag event, a knob of one of Live's
 // devices adds how far that event is from the press point and, when the event has a vertical
 // part, moves the pointer back there, so a path measured from the press point is counted
 // again at each step (live-notes.md). A control that reads where the pointer is ends at the
@@ -566,7 +566,7 @@ let HOLD_POLL_US: UInt64 = 10_000
 
 // Posts nothing for `ms`, with the button down, on the system's uptime clock. Stop or an
 // ending signal held back ends the hold within HOLD_POLL_US, the button released where the
-// pointer is: a signal cuts a sleep short, so the wait is to a deadline, not a count of sleeps.
+// pointer is. A signal cuts a sleep short, so the wait is to a deadline, not a count of sleeps.
 func holdStill(_ ms: Double) {
     let deadline = DispatchTime.now().uptimeNanoseconds + UInt64(ms * 1_000_000)
     while true {
@@ -578,7 +578,7 @@ func holdStill(_ ms: Double) {
     }
 }
 
-// Ends a held drag that Stop caught after its first move, before its second: the button comes
+// Ends a held drag that Stop caught after its first move, before its second. The button comes
 // up where the pointer is, and the helper exits as a gesture that had happened, since what
 // the first move did happened (ADR-0021).
 func stoppedInHold(_ why: String) -> Never {
@@ -606,7 +606,7 @@ func press(_ point: CGPoint, double: Bool = false) {
     complete("double-click", at: point)
 }
 
-// Within this of a size counts as that size: Accessibility reports whole points.
+// Within this of a size counts as that size, since Accessibility reports whole points.
 let SIZE_TOLERANCE = 0.5
 
 // The plug-in window's id and the screen point of <x> <y> in its editor, if the editor is
@@ -622,8 +622,8 @@ func editorPoint(_ title: String, _ x: Double, _ y: Double, _ size: CGSize) -> (
     return (id, CGPoint(x: editor.minX + x, y: editor.minY + y))
 }
 
-// To the point, checked on top before and after the hover: a window can come over the point
-// while the pointer travels, and Live hides a plug-in's window when it leaves the front.
+// To the point, checked on top before and after the hover, since a window can come over the
+// point while the pointer travels, and Live hides a plug-in's window when it leaves the front.
 func aim(_ id: Int, _ point: CGPoint) {
     requireOnTop(id, point)
     hover(point)
@@ -631,8 +631,8 @@ func aim(_ id: Int, _ point: CGPoint) {
 }
 
 // Two moves, because the Info View updates when the pointer moves, not when it arrives. The
-// first is off the control: after Escape closed a menu, the Info View stayed blank while the
-// pointer moved within the control that opened it.
+// first is off the control, because after Escape closed a menu, the Info View stayed blank
+// while the pointer moved within the control that opened it.
 func hover(_ point: CGPoint) {
     post(.mouseMoved, CGPoint(x: point.x - 15, y: point.y - 10))
     usleep(120_000)

@@ -93,7 +93,7 @@ function stoppable(system) {
 const happened = () => Object.assign(new DeviceUiError(STOPPED), { done: true });
 const isHappened = (error) => error instanceof DeviceUiError && error.done === true && /stopped from its pill/.test(error.message);
 
-// Runs `body` and resolves with what the harness warned meanwhile: its lines start "warn".
+// Runs `body` and resolves with what the harness warned meanwhile. Its lines start "warn".
 async function warningsOf(body) {
   const error = console.error;
   const warnings = [];
@@ -466,7 +466,7 @@ test("the run's click token exists from when it is first asked for, and is never
     assert.equal(fs.existsSync(token), false);
     assert.equal(stopped(), STOPPED);
   } finally {
-    // The test's own repair, for the tests after it: a run never does this.
+    // The test's own repair, for the tests after it. A run never does this.
     fs.writeFileSync(token, "");
   }
 });
@@ -700,7 +700,7 @@ test("with neither build nor controls, a device the harness hasn't measured is r
 // A device whose panel's corner is `x` - 30, `y` pixels into the window's capture (where its
 // title's first word was read, before ADR-0020), and where its frame then starts, in points
 // from the window's top. The device the other tests press is too low in the window for a
-// capture: its frame, 192 points high, ends 11 points below the window.
+// capture, since its frame, 192 points high, ends 11 points below the window.
 const titleAt = (x, y) => ({ device: async () => ({ x: (x + 30) / 2 - 17 - 3, y: 25 + y / 2 + 14 - 18, w: 300, h: 190 }) });
 const frameTop = (y) => y / 2 + 14 - 20;
 
@@ -873,7 +873,7 @@ async function withMachine(activate, body) {
 test("the machine hands the function that refuses once the run is stopped on to the activation of Live", async () => {
   const token = clickToken();
   let activated = false;
-  // As macos.js does: it calls the function just before it tells Live to activate. Here Stop
+  // As in macos.js, which calls the function just before it tells Live to activate. Here Stop
   // has come by then.
   const activate = async ({ refuse }) => {
     fs.rmSync(token);
@@ -1151,7 +1151,7 @@ test("after Stop, the Escape that closes choose's menu waits until no modifier k
 test("Stop that comes while Live is brought forward for the Escape that closes choose's menu leaves the closing to that one call", async () => {
   const system = menuMachine(MENU_ROWS);
   const stop = stoppable(system);
-  // As the machine does: it calls the function it is handed before it activates Live or types.
+  // As on the machine, which calls the function it is handed before it activates Live or types.
   system.escape = async (refuse) => { stop(); refuse(); system.calls.push("escape"); };
   const warnings = await warningsOf(async () => {
     await assert.rejects((await openMenu(system)).choose("Menu", "Triangle"), /0 items reading "Triangle"/);
@@ -1257,7 +1257,7 @@ test("buildComputerUse rejects when the helper can't be built", async () => {
 
 // A stand-in for the overlay: a shell script of `lines`, run with the overlay's arguments,
 // that first writes its pid beside itself. Returns its path. Each is a link to one program,
-// made and run once for the file, which runs the lines saved beside the link: macOS scans a
+// made and run once for the file, which runs the lines saved beside the link. macOS scans a
 // new program the first time it runs, which took about 0.6 s on an Intel Mac, longer than
 // the 500 ms a border is given below, and a link to a program it has run started in 0.02 s.
 const STAND_INS = fs.mkdtempSync(path.join(os.tmpdir(), "device-ui-test-"));
@@ -1282,8 +1282,8 @@ async function until(done) {
     if (Date.now() > deadline) throw new Error("Not within 3 s");
   }
 }
-// Whether the stand-in at `file` has ended. One that never started fails the test as that: it
-// shows nothing of how a stand-in is ended.
+// Whether the stand-in at `file` has ended. One that never started fails the test as that,
+// since it shows nothing of how a stand-in is ended.
 const gone = (file) => {
   if (!fs.existsSync(`${file}.pid`)) throw new Error(`The stand-in ${path.basename(file)} never started`);
   const pid = Number(fs.readFileSync(`${file}.pid`, "utf8"));
@@ -1593,7 +1593,7 @@ const hasDeveloperTools = (() => {
 })();
 
 // The border's program, built with swiftc if it isn't cached, says its stop key without a
-// window server: the dialog asks it before the border shows (ADR-0017).
+// window server. The dialog asks it before the border shows (ADR-0017).
 test("the border's program gives its stop key, Control-Option-Command-Space, as the key the check presses and as the dialog's and the pill's words", { skip: !hasDeveloperTools && "no developer tools", timeout: 300000 }, async () => {
   const overlay = await tools.helperBinary(path.join(__dirname, "..", "computer-use-overlay.swift"));
   assert.deepEqual(JSON.parse(await tools.run(overlay, ["--stop-key"])),

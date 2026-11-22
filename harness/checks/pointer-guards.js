@@ -2,15 +2,15 @@
 "use strict";
 
 // Checks what device-ui.swift posts and what it refuses, and what Stop on the pill of
-// computer-use-overlay.swift does, with real mouse events and no Live: each case shows a
+// computer-use-overlay.swift does, with real mouse events and no Live. Each case shows a
 // window of its own (pointer-target.swift), runs the helper against it, and compares how the
 // helper ended with the mouse events the window received. First it starts the overlay with
 // the process ids it must refuse for a run, and last over a run that has ended and that
 // nothing has waited for. Stop is also pressed by its key (ADR-0017), posted as a keyboard's
 // events, and last the key is pressed with another app in front, which must not get it while
 // the overlay is up and must once it has gone. The helper's click and drag at a window are run. Its click-editor
-// and drag-editor aren't: they take only a window of Live's, whose editor they read from
-// Live through Accessibility. Nor is any command run with the screen locked. It takes the
+// and drag-editor aren't, because they take only a window of Live's, whose editor they read
+// from Live through Accessibility. Nor is any command run with the screen locked. It takes the
 // pointer, so it
 // refuses, posting nothing, anywhere but on the click host ("clickHost" in
 // harness/local.json). Exits 1 on failure.
@@ -64,7 +64,7 @@ const TOKEN = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "pointer-guards-")
 const FOLDER = path.dirname(TOKEN);
 process.on("exit", () => fs.rmSync(FOLDER, { recursive: true, force: true }));
 
-// Undoes what a case did to the token and its folder, so that neither stays locked: the next
+// Undoes what a case did to the token and its folder, so that neither stays locked. The next
 // case makes them anew, and the folder is removed as the check ends.
 function unlockToken() {
   if (!fs.existsSync(FOLDER)) return;
@@ -74,7 +74,7 @@ function unlockToken() {
   fs.chmodSync(TOKEN, 0o600);
 }
 
-// When the token went, if it has and its folder hasn't: removing a file sets its folder's
+// When the token went, if it has and its folder hasn't. Removing a file sets its folder's
 // modification time, on the clock the target's events carry.
 const tokenWentAt = () => (fs.existsSync(FOLDER) && !fs.existsSync(TOKEN) ? fs.statSync(FOLDER).mtimeMs : undefined);
 
@@ -91,7 +91,7 @@ const tokenUnreadable = () => fs.chmodSync(TOKEN, 0o000);
 const stopPressed = (the) => the.press();
 const stopPressedUnwritable = (the) => { folderUnwritable(); return the.press(); };
 const stopPressedAtRunEnd = (the) => the.press(the.run.pid);
-// The losses that press Stop: each case with one of them has a twin that presses the key.
+// The losses that press Stop. Each case with one of them has a twin that presses the key.
 const PRESSES = new Set([stopPressed, stopPressedUnwritable, stopPressedAtRunEnd]);
 const helperSignalled = (the) => the.run.signalHelper("SIGUSR2");
 const runKilled = (the) => process.kill(the.run.pid, "SIGTERM");
@@ -123,7 +123,7 @@ const SAID_STILL_RUNNING = new RegExp(`^Stopped: ${RUN_NAME} won't click again, 
 const SAID_RUN_ENDED = new RegExp(`^${RUN_NAME} has ended: the mouse is yours again\\.$`);
 const SAID_ENDED_RUN = new RegExp(`^${RUN_NAME} was ended: its click token couldn't be removed\\. The mouse is yours\\.$`);
 
-// The process ids the overlay must refuse for its run: Stop's last resort signals the run and
+// The process ids the overlay must refuse for its run. Stop's last resort signals the run and
 // may kill it, and to kill, 0 is the caller's own process group and -1 every process the user
 // may signal.
 const NO_RUNS = [0, -1];
@@ -153,11 +153,11 @@ const heldDragBy = (dx, dy) => (window, x, y) => ["drag", window, x, y, 30, -20,
 const heldDrag = heldDragBy(10, 10);
 const heldEvents = (x, y) => [{ type: "down", x, y }, { ...DRAGGED, x: x + 30, y: y - 20 },
   { type: "drag", dx: 10, dy: 10, x: x + 40, y: y - 10 }];
-// How far from PAUSE_MS apart the held drag's two drag events may reach the target: each
+// How far from PAUSE_MS apart the held drag's two drag events may reach the target. Each
 // reaches it a little after it is posted, by an amount that varies.
 const PAUSE_SLACK_MS = 50;
 // How soon after the first drag event the button-up must reach the target when Stop or a
-// signal comes at that event: the helper looks for both every 10 ms during the hold, so well
+// signal comes at that event. The helper looks for both every 10 ms during the hold, so well
 // before the hold would have ended.
 const PAUSE_STOP_MS = PAUSE_MS / 4;
 
@@ -167,7 +167,7 @@ const PAUSE_STOP_MS = PAUSE_MS / 4;
 // how long after, and by what if not by the token's removal, and the helper's command, if a helper
 // runs, given the target's window and its centre, and whether a process that has ended
 // starts it, not the check's run. A target that freezes the helper says when
-// itself: the run is stopped once it has, and the helper goes on once the token is gone. Then
+// itself. The run is stopped once it has, and the helper goes on once the token is gone. Then
 // what must come of it: the helper's
 // exit status (the signal, if one ended it), its error, how soon it ended, the button events
 // the target's windows received, by the fields named, and the pointer's moves where a case
@@ -181,7 +181,7 @@ const PAUSE_STOP_MS = PAUSE_MS / 4;
 // every case, once the run is stopped the target must receive no event but a
 // button-up, not a pointer's move either. A helper that says its click or drag had happened
 // reads Stop after its release, so it says the same whether Stop came during its hold or just
-// after: such a case also says how long after the token went the button-up must reach the
+// after. Such a case also says how long after the token went the button-up must reach the
 // target: half the hold where the target removes the token, which leaves a loaded machine
 // room, and not before it where the helper is frozen with the button down until the token has
 // gone. Under that, the token may have gone after the helper posted its release, and the case
@@ -221,7 +221,7 @@ const CASES = [
     status: 0,
     events: (x, y) => [{ type: "down", x, y }, { type: "up", x, y }],
   },
-  // What a click is refused for, a drag is too: each command calls the helper's guards
+  // What a click is refused for, a drag is too. Each command calls the helper's guards
   // itself (device-ui.swift), so each is run against them.
   {
     name: "a window that comes over the point during a drag's hover gets no button event, and the helper names it",
@@ -493,7 +493,7 @@ const CASES = [
     run: "SIGTERM",
   },
   // Last, the cases that end under a notification's cover, the check's own or the one the
-  // overlay posts as it ends: the cover outlasts the case by a few seconds, and the target of
+  // overlay posts as it ends. The cover outlasts the case by a few seconds, and the target of
   // the next case waits for it to go. Without Stop the helper waits for the cover to go,
   // 4.9 s in one run.
   {
@@ -664,7 +664,7 @@ const CASES = [
     says: SAID_STOPPED,
     afterRun: true,
   },
-  // No helper runs here: one that waits under a notification's cover gives up after 10 s, as
+  // No helper runs here. One that waits under a notification's cover gives up after 10 s, as
   // long as the run is given, and a helper whose run is killed is the case further up.
   {
     name: "Stop on the pill when the token can't be removed and the run ignores the signal: the border stays up and the pill reads "
@@ -722,13 +722,13 @@ const CASES = [
   },
 ];
 
-// Each case that presses Stop on the pill again with the stop key in its place: the key does
+// Each case that presses Stop on the pill again with the stop key in its place. The key does
 // what Stop on the pill does, through the button's action (ADR-0017), so every one of them
 // must end as it does with Stop on the pill.
 const KEY_CASES = CASES.filter((test) => PRESSES.has(test.loss))
   .map((test) => ({ ...test, by: "key", name: `${test.name} (the stop key in place of Stop on the pill)` }));
 
-// The overlay over a run that has ended and that its parent hasn't waited for: such a run
+// The overlay over a run that has ended and that its parent hasn't waited for. Such a run
 // stays in the process table, where it still answers signal 0. The run ends by a signal of
 // the check's own or, in Stop's last resort, by the signal Stop sends it. Each case: whether
 // Stop is pressed on the pill with a token that can't be removed, and all that the overlay
@@ -793,12 +793,12 @@ async function showTarget(binary, options) {
 }
 
 // A run of the check's own, which starts the helper as a run does, with the token named in
-// the helper's environment, and which the overlay is given as its run: Stop's last resort
+// the helper's environment, and which the overlay is given as its run. Stop's last resort
 // signals the run, and kills one that doesn't end, so the check itself is never the run. For
 // each line of arguments it reads it starts the helper, prints the helper's pid and, once the
 // helper ends, how: its exit status (the signal, if one ended it) and what it wrote to
 // stderr. It ends when its input does. On the signal of Stop's last resort (SIGUSR2) it does
-// as a run does: it passes the signal on to its helper and ends by itself once the helper
+// as a run does. It passes the signal on to its helper and ends by itself once the helper
 // has. Given a third argument, it ignores the signal.
 const RUN = `
   const { execFile } = require("node:child_process");
@@ -930,7 +930,7 @@ async function showOverlay(binary, pid, token = TOKEN) {
 // Starts the overlay over the process id `pid` and resolves with what differed from a refusal:
 // nothing said, its usage on stderr and exit status 1. One still up after REFUSAL_WAIT_MS is
 // ended by its own process id, never by its Stop, which signals `pid` if it can't remove the
-// token: it is given a token that isn't there, which no Stop can fail to remove.
+// token. It is given a token that isn't there, which no Stop can fail to remove.
 async function unrefused(binary, pid) {
   fs.rmSync(TOKEN, { force: true });
   const child = spawn(binary, [String(pid), TOKEN, path.basename(__filename)], { stdio: ["ignore", "pipe", "pipe"] });
@@ -952,7 +952,7 @@ async function unrefused(binary, pid) {
 }
 
 // Starts a process that ends at the first signal, as the child of one that never waits for
-// it: { pid, state, end }. `state` is what ps says of it: it starts with Z once the process
+// it: { pid, state, end }. `state` is what ps says of it, which starts with Z once the process
 // has ended and stays unreaped ("Z+" when the check runs in a terminal's foreground), and is
 // empty once it is gone. `end` ends it and the process that started it.
 async function startUnreaped() {
@@ -1081,7 +1081,7 @@ async function showKeyTarget(binary) {
 }
 
 // The stop key pressed as soon as the overlay has claimed it, before it says that its windows
-// are on screen: the overlay must take it as an early Stop on the pill (live-notes.md), saying
+// are on screen. The overlay must take it as an early Stop on the pill (live-notes.md), saying
 // "stopping" first, then "shown" once the pill is listed, with the border left out and the
 // pill reading Stopping. The presses that come before the claim go to key-target, in front,
 // and none may reach it once the overlay has said "stopping".
@@ -1161,8 +1161,8 @@ async function keyTargetFailures(binaries, { killed = false } = {}) {
     await sleep(EVENT_WAIT_MS);
     const whileUp = stopKeys();
     const tokenLeft = fs.existsSync(TOKEN);
-    // The key once the overlay has said its last words, while it waits for its notification:
-    // it gives the key up first, so the app in front must get this press.
+    // The key once the overlay has said its last words, while it waits for its notification.
+    // It gives the key up first, so the app in front must get this press.
     await run.end();
     await overlay.ending();
     await pressStopKey(binaries);
@@ -1196,7 +1196,7 @@ const HOLD_MS = 1000;
 const GESTURE_INTO_HOLD_MS = 200;
 
 // A gesture the helper posts (`command`, a click or a drag at the target) while a person holds
-// the modifier keys `held`, as one holds the stop key's before its key (ADR-0017): the helper
+// the modifier keys `held`, as one holds the stop key's before its key (ADR-0017). The helper
 // builds its events from the keyboard's state, so its button events carry the modifiers held
 // then, and the keyboard's state must still read them held as each event arrives. This
 // measures a cost ADR-0017 accepts: an event posted with its modifiers cleared lets go of the
@@ -1242,7 +1242,7 @@ async function heldModifiersFailures(binaries, held, command) {
   }
 }
 
-// Two runs, each with its overlay and its own token: the first overlay holds the stop key, so
+// Two runs, each with its overlay and its own token. The first overlay holds the stop key, so
 // the second's exclusive claim is refused (ADR-0017). The second must say so before it shows,
 // show no key on its pill and still stop its run from its pill's Stop; one press of the key
 // must stop only the first run.
@@ -1296,7 +1296,7 @@ async function failures(test, binaries) {
   let overlay = null;
   try {
     if (test.overlay) overlay = await showOverlay(binaries.overlay, run.pid);
-    // Why Stop couldn't be pressed, if it couldn't: an overlay that is ending shows no pill.
+    // Why Stop couldn't be pressed, if it couldn't. An overlay that is ending shows no pill.
     let unpressed = "";
     // When the run was stopped, on the clock the target's events carry. For Stop pressed on
     // the pill, when the token went. Where it stays, in Stop's last resort, when the press
@@ -1307,7 +1307,7 @@ async function failures(test, binaries) {
       await tools.run(binaries.press, [overlay.pid, ...after]).catch((error) => { unpressed = `: ${error.message}`; });
       stoppedAt = tokenWentAt() ?? stoppedAt;
     };
-    // The key, as press-stop presses the pill's Stop: given the run, press-key ends it and
+    // The key, as press-stop presses the pill's Stop. Given the run, press-key ends it and
     // presses as soon as it has gone. Otherwise the press counts once the overlay has said
     // that it is stopping, as press-stop returns once the button's action has run.
     const pressKey = async (ended) => {
@@ -1332,8 +1332,8 @@ async function failures(test, binaries) {
     };
     const target = await showTarget(binaries.target, test.target);
     const [x, y] = [target.x + target.w / 2, target.y + target.h / 2];
-    // A run stopped before its helper starts is stopped once the target shows, not before:
-    // the target waits for a notification's cover to go, which can take longer than the
+    // A run stopped before its helper starts is stopped once the target shows, not before.
+    // The target waits for a notification's cover to go, which can take longer than the
     // overlay stays up after Stop (ADR-0015), and that wait is no part of what a case times.
     if (test.stopped) await lose();
     // Stop pressed a second time: when the press returned, or why it couldn't be made.
@@ -1342,7 +1342,7 @@ async function failures(test, binaries) {
       && sleep(test.againAfterMs).then(() => (test.by === "key" ? pressStopKey(binaries) : tools.run(binaries.press, [overlay.pid])))
         .then(() => { againAt = Date.now(); }, (error) => { unpressedAgain = error.message; });
     // The helper the target froze. The run is stopped then, and the helper goes on once the
-    // token is gone, or STOP_WAIT_MS later: whatever fails, it isn't left frozen.
+    // token is gone, or STOP_WAIT_MS later, so whatever fails, it isn't left frozen.
     let frozen = null;
     target.froze.then(async (pid) => {
       frozen = pid;
@@ -1373,7 +1373,7 @@ async function failures(test, binaries) {
     await lost;
     const stopping = test.stopping ? await stoppingFailures(test.stopping, overlay, binaries.state, binaries.stopKey) : [];
     // A run stopped by its token's removal goes on until it ends by itself, and the overlay
-    // stays up until it has: the check ends the run, unless the case is of a run that goes
+    // stays up until it has, so the check ends the run, unless the case is of a run that goes
     // on, which the overlay must leave (`leavesMs`). In Stop's last resort the run ends at
     // the signal, or the overlay ends it.
     if (test.stopping === "pill" && !test.leavesMs) await run.end();
@@ -1381,7 +1381,7 @@ async function failures(test, binaries) {
     // Whether the run was still going once the overlay had gone.
     const outlived = run.endedAt() === null;
     await again;
-    // The overlay's notification covers the screen a moment after it is posted: the next
+    // The overlay's notification covers the screen a moment after it is posted. The next
     // case's target is to find the cover there, and wait for it to go.
     if (said?.text) await sleep(BANNER_WAIT_MS);
     const ran = await run.end();
@@ -1399,7 +1399,7 @@ async function failures(test, binaries) {
     const upAfterDrag = seen.find((event) => event.type === "up")?.at - drags[0]?.at;
     const killed = run.endedAt() - stoppedAt;
     // How long after Stop the overlay went. When it went is read as a whole millisecond, up
-    // to one before the moment itself, and the token went at a fraction of one: the lower
+    // to one before the moment itself, and the token went at a fraction of one, so the lower
     // bound gets that millisecond.
     const left = said?.at - stoppedAt;
     return [
@@ -1431,7 +1431,7 @@ async function failures(test, binaries) {
       ran !== (test.run ?? 0) && `the run ended with ${ran}, not ${test.run ?? 0}`,
     ].filter(Boolean);
   } finally {
-    // The overlay before the run: one that saw its run end would notify.
+    // The overlay before the run, since one that saw its run end would notify.
     if (overlay) await overlay.end();
     await run.end();
     unlockToken();
@@ -1452,7 +1452,7 @@ async function main() {
   }
   // The key the overlay claims, from the one place that holds it.
   binaries.stopKey = JSON.parse(await tools.run(binaries.overlay, ["--stop-key"]));
-  // The helper refuses while the display sleeps: the session reports the screen locked.
+  // The helper refuses while the display sleeps, since the session reports the screen locked.
   const display = await mac.keepDisplayOn();
   const report = (name, failed) => {
     console.log(failed.length ? `FAIL: ${name}: ${failed.join("; ")}` : `PASS: ${name}`);

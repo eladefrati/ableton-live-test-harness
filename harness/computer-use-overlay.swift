@@ -3,12 +3,12 @@
 // notification that the mouse is free again. The pill's Stop removes the file <click-token>,
 // without which the run and its helper post nothing but the release of a button the helper
 // holds, and takes the glow down. If the token is still there after that, Stop signals the
-// run instead: the run stops clicking and goes on to its clean-up, and the glow stays up.
+// run instead. The run stops clicking and goes on to its clean-up, and the glow stays up.
 // Either way the pill stays, its button reading Stopping with a light going round it, until
 // the run has ended. A run still going END_SECONDS after Stop is left running if its token
 // is gone, and the overlay ends; one that was signalled is killed, and the overlay ends once
 // it has gone (ADR-0015).
-// The stop key, STOP_KEY, is Stop on the pill while this program runs (ADR-0017): a press
+// The stop key, STOP_KEY, is Stop on the pill while this program runs (ADR-0017). A press
 // is sent as the pill's button sends a click, through its action to its target. The key is
 // claimed exclusively, so no app gets it meanwhile, and it is given up first as the program
 // ends. The pill shows the key beside its Stop.
@@ -22,14 +22,14 @@
 // the dialog shown before the border and for the check that presses it. It needs no window
 // server.
 //
-// A <pid> of 0 or below is refused with the usage, as one that is no number is: Stop's last
+// A <pid> of 0 or below is refused with the usage, as one that is no number is. Stop's last
 // resort signals <pid> and kills it if it stays, and to kill, 0 is this program's own
 // process group and -1 every process the user may signal.
 //
 // Prints "no stop key: <why>" first if it couldn't claim the stop key, as when another
 // program holds it, which the pill then doesn't show; "shown" once the window server lists its windows, "stopping" once Stop is pressed
 // and has removed the token or signalled the run, and, as it ends, the message it notifies.
-// A Stop that removes the token before "shown" takes the glow down: "shown" then follows
+// A Stop that removes the token before "shown" takes the glow down, and "shown" then follows
 // "stopping", once the pill is listed.
 // If its windows can't show (no desktop session, no screen, or not listed within
 // SHOWN_SECONDS), it says why on stderr and exits 1, so the run can warn that it clicks with
@@ -66,8 +66,8 @@ struct Modifier {
 let CONTROL = Modifier(mask: controlKey, name: "control", word: "Control", symbol: "\u{2303}")
 let OPTION = Modifier(mask: optionKey, name: "option", word: "Option", symbol: "\u{2325}")
 let COMMAND = Modifier(mask: cmdKey, name: "command", word: "Command", symbol: "\u{2318}")
-// The key that stops the run as Stop on the pill does (ADR-0017). A choice, not a constraint:
-// changed here alone, it changes the pill's hint, the dialog's words and the key that
+// The key that stops the run as Stop on the pill does (ADR-0017). A choice, not a constraint.
+// Changed here alone, it changes the pill's hint, the dialog's words and the key that
 // checks/pointer-guards.js presses. Space is in one place on every keyboard layout, and
 // nothing in Live's shortcut list uses these modifiers together. The modifiers go in the
 // order macOS names them.
@@ -119,10 +119,10 @@ func breathe(_ layer: CALayer?, from: Double, to: Double, seconds: Double) {
     layer?.add(animation, forKey: "breathe")
 }
 
-// Waits for the notification without running the run loop, as waitUntilExit would: the timer
+// Waits for the notification without running the run loop, as waitUntilExit would. The timer
 // that watches the run would fire meanwhile and say a second time that the run has ended.
 // @Sendable, which the compiler asks of a function that finish, isolated to the main actor,
-// calls: it captures nothing.
+// calls. It captures nothing.
 @Sendable func notify(_ message: String) {
     let script = Process()
     script.executableURL = URL(fileURLWithPath: "/usr/bin/osascript")
@@ -137,7 +137,7 @@ func breathe(_ layer: CALayer?, from: Double, to: Double, seconds: Double) {
 // Ends the overlay with a notification saying why, printed first for a program that reads
 // this one's output.
 @MainActor func finish(_ message: String) -> Never {
-    // The key first: the notification below may take a while, and the key would stay
+    // The key first, because the notification below may take a while, and the key would stay
     // swallowed with no pill to show it.
     if let stopKeyClaim { UnregisterEventHotKey(stopKeyClaim) }
     NSApp.windows.forEach { $0.orderOut(nil) }
@@ -171,8 +171,8 @@ let STOPPING_TITLE = NSAttributedString(string: "Stopping", attributes: [
 let ROUND_SECONDS = 1.1
 
 // The pill's button once Stop is pressed (ADR-0015): it reads Stopping, and a light goes
-// round its edge until the overlay ends. The stop key's hint beside it goes: the key does
-// nothing more. The light is drawn in a view of its own over the
+// round its edge until the overlay ends. The stop key's hint beside it goes, since the key
+// does nothing more. The light is drawn in a view of its own over the
 // button, whose layer is AppKit's to draw in: a bright head and a fainter, longer tail, two
 // dashes of the button's outline that start with their leading ends together.
 @MainActor func showStopping(_ button: NSButton) {
@@ -216,17 +216,17 @@ final class Stopper: NSObject {
     @objc func stop(_ button: NSButton) {
         // Pressed again: the run is stopping already.
         guard pressed == nil else { return }
-        // The token first, before the pill shows anything: once it is gone the run's helper
-        // posts nothing but a release. It is gone if this removed it, or if it or its folder
-        // had gone already. Whether the run can read it doesn't count: with a folder that
-        // can't be written to the run reads as stopped, but what made it so may pass, and
+        // The token first, before the pill shows anything, because once it is gone the run's
+        // helper posts nothing but a release. It is gone if this removed it, or if it or its
+        // folder had gone already. Whether the run can read it doesn't count. With a folder
+        // that can't be written to the run reads as stopped, but what made it so may pass, and
         // the token would let the run click again.
         removed = unlink(token) == 0 || errno == ENOENT
         MainActor.assumeIsolated {
-            // A run that has ended has nothing left to stop, whatever became of its token: it
+            // A run that has ended has nothing left to stop, whatever became of its token. It
             // removes the token's folder a moment before this program notices it has gone.
             if ended(target) { finish(RUN_ENDED) }
-            // Stop's last resort (ADR-0012), for a token that is still there: the run is sent
+            // Stop's last resort (ADR-0012), for a token that is still there. The run is sent
             // SIGUSR2, on which it counts itself stopped, stops its helpers and goes on to
             // its clean-up.
             if !removed { kill(target, SIGUSR2) }
@@ -243,17 +243,17 @@ final class Stopper: NSObject {
                 }
             }
             showStopping(button)
-            // The run's end is looked for more often from now on: the pill goes with it.
+            // The run's end is looked for more often from now on, since the pill goes with it.
             Timer.scheduledTimer(withTimeInterval: 0.05, repeats: true) { _ in MainActor.assumeIsolated { stopper.watch() } }
         }
     }
 
     // Ends the overlay once the run has ended, saying what became of it; until then, after
-    // Stop, the pill stays (ADR-0015). Nothing here waits: a timer calls it again. A run
-    // still going END_SECONDS after Stop, whose token is gone, can't click: the overlay ends
-    // and leaves it running, saying so. In Stop's last resort such a run can click, and is
-    // killed: its helpers stop because their run has gone, and the overlay ends once it has,
-    // KILLED_SECONDS later at the latest.
+    // Stop, the pill stays (ADR-0015). Nothing here waits. A timer calls it again. A run
+    // still going END_SECONDS after Stop, whose token is gone, can't click, so the overlay
+    // ends and leaves it running, saying so. In Stop's last resort such a run can click, and
+    // is killed. Its helpers stop because their run has gone, and the overlay ends once it
+    // has, KILLED_SECONDS later at the latest.
     @MainActor func watch() {
         let stopped = "Stopped: \(name.isEmpty ? "the run" : name) won't click again"
         let wasEnded = "\(name.isEmpty ? "The run" : name) was ended: its click token couldn't be removed. The mouse is yours."
@@ -265,7 +265,7 @@ final class Stopper: NSObject {
         if let killed {
             if Date() > killed.addingTimeInterval(KILLED_SECONDS) { finish(wasEnded) }
         } else if Date() > pressed.addingTimeInterval(END_SECONDS) {
-            // A guard, which can't fall through: a run whose token is gone is never killed.
+            // A guard, which can't fall through. A run whose token is gone is never killed.
             guard !removed else { finish("\(stopped), and is still running. The mouse is yours.") }
             kill(target, SIGKILL)
             killed = Date()
@@ -278,7 +278,7 @@ let stopper = Stopper(target: pid, token: token, name: run)
 var stopKeyClaim: EventHotKeyRef?
 
 // Claims the stop key for `button`, the pill's Stop, as a system hot key, which needs no
-// permission (ADR-0017). The claim is exclusive: it fails if another program holds the key,
+// permission (ADR-0017). The claim is exclusive. It fails if another program holds the key,
 // and while this program holds it, the key goes to no other. A press is sent as the button
 // sends a click, through its action to its target; once Stop is pressed, that does nothing
 // more. Returns why it couldn't claim the key, or nil once it has.
@@ -326,8 +326,8 @@ func pill(on screen: NSScreen, showsKey: Bool) -> (panel: NSPanel, stop: NSButto
         return line
     }())
     text.sizeToFit()
-    // Drawn by hand, white on a faint capsule: AppKit greys a control in a window that never
-    // becomes key, as this one doesn't.
+    // Drawn by hand, white on a faint capsule, because AppKit greys a control in a window that
+    // never becomes key, as this one doesn't.
     let stop = NSButton(title: "", target: stopper, action: #selector(Stopper.stop(_:)))
     stop.isBordered = false
     stop.image = NSImage(systemSymbolName: "stop.fill", accessibilityDescription: nil)?
@@ -366,8 +366,8 @@ func pill(on screen: NSScreen, showsKey: Bool) -> (panel: NSPanel, stop: NSButto
     panel.collectionBehavior = [.canJoinAllSpaces, .stationary, .fullScreenAuxiliary, .ignoresCycle]
     panel.hidesOnDeactivate = false
     let view = NSView(frame: NSRect(origin: .zero, size: panel.frame.size))
-    // The frosted background is a sibling under the dot and the text, not their parent: the
-    // frosted view tints what it holds, which turned the dot grey.
+    // The frosted background is a sibling under the dot and the text, not their parent,
+    // because the frosted view tints what it holds, which turned the dot grey.
     let frost = NSVisualEffectView(frame: view.bounds)
     frost.material = .hudWindow
     frost.blendingMode = .behindWindow
@@ -438,8 +438,8 @@ windows.forEach { $0.orderFrontRegardless() }
 
 // Says "shown" once the window server lists every window that is to be up: all of them, but
 // for the glow once a Stop that came before this has removed the token and so taken it
-// down. The window server is asked, not the windows: NSWindow.isVisible is true even with
-// no window server, and false for a window that anything has taken off the screen.
+// down. The window server is asked, not the windows, because NSWindow.isVisible is true even
+// with no window server, and false for a window that anything has taken off the screen.
 let SHOWN_SECONDS = 2.0
 let started = Date()
 Timer.scheduledTimer(withTimeInterval: 0.05, repeats: true) { timer in

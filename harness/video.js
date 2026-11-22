@@ -14,7 +14,7 @@
 //   await videoFrame(file, 2.5, "/path/to/frame.png");     // what the video shows at 2.5 s
 //
 // The recording stops after `seconds` (10 minutes if not given), on stop(), or when this
-// process ends, however it ends: the helper then finishes the file. A run that doesn't wait
+// process ends, however it ends. The helper then finishes the file. A run that doesn't wait
 // for the recording can exit while it goes on.
 
 const fs = require("node:fs");
@@ -34,7 +34,7 @@ const MAX_SECONDS = 600;
 // The helper said "recording" 0.3 to 0.5 s after it started, measured; a first build takes
 // longer, but comes before this wait.
 const STARTED_MS = 15000;
-// macOS 15 is Darwin 24: SCRecordingOutput, which writes the file, came with it.
+// macOS 15 is Darwin 24. SCRecordingOutput, which writes the file, came with it.
 const FIRST_DARWIN = 24;
 
 const USAGE = "usage: cli.js video [<file.mov>] [--seconds <n>] [--window <id> | --screen] [-- <command...>]";
@@ -96,11 +96,11 @@ async function recordVideo(file, { window, screen = false, seconds = MAX_SECONDS
   if (screen && window !== undefined) throw new VideoError("Record a window or the screen, not both");
   if (file !== undefined && path.extname(file) !== ".mov") throw new VideoError(`A video is saved as a .mov, not ${path.basename(file)}`);
   if (!(seconds > 0)) throw new VideoError(`A recording lasts more than 0 s, not ${seconds}`);
-  // Built first: a first build can take most of a minute, long enough for the display to
-  // sleep again, and a recording started with it asleep makes no file.
+  // Built first, because a first build can take most of a minute, long enough for the display
+  // to sleep again, and a recording started with it asleep makes no file.
   const binary = await system.binary();
   // Waking waits for System Events to name the frontmost app, and gives up the same way whether
-  // the display stayed asleep or System Events refused the terminal app: asked again, it says
+  // the display stayed asleep or System Events refused the terminal app. Asked again, it says
   // which.
   await system.wake().catch(async (error) => {
     const refused = await system.frontmost().then(() => null, (e) => (/-1743|Not authorized to send Apple events/.test(e.message) ? e : null));
@@ -131,9 +131,9 @@ async function recordVideo(file, { window, screen = false, seconds = MAX_SECONDS
   file = capture.file;
   fs.rmSync(file, { force: true });
   const moves = capture.writing !== file;
-  // A process group of its own: Ctrl-C in a terminal signals the run's whole group, and the
+  // A process group of its own. Ctrl-C in a terminal signals the run's whole group, and the
   // recording must end when the run says, after a command it wraps has ended. The run's stderr
-  // goes as fd 3, which the helper watches: over ssh, a session that ends closes it.
+  // goes as fd 3, which the helper watches. Over ssh, a session that ends closes it.
   const child = system.spawn(binary, ["record", capture.writing, ...target, String(seconds), ...(moves ? ["then", file] : [])],
     { stdio: ["ignore", "pipe", "pipe", 2], detached: true });
   let [said, complained] = ["", ""];
@@ -194,7 +194,7 @@ async function recordVideo(file, { window, screen = false, seconds = MAX_SECONDS
 // `cli.js video`: says "recording <file>" on stderr once it records, then records until
 // `command` ends, if one is given (its exit status is returned as `status`), or until the
 // length given, Ctrl-C or SIGTERM. The command runs in a process
-// group of its own, with no input: each Ctrl-C, SIGTERM, SIGHUP or SIGQUIT the run gets reaches
+// group of its own, with no input. Each Ctrl-C, SIGTERM, SIGHUP or SIGQUIT the run gets reaches
 // that whole group once, from here, as a terminal's would, and the recording goes on until the
 // command has ended. What the command leaves running in its group is sent SIGTERM as the
 // command ends, or as the run exits first, on its own or on an uncaught error; a run ended by
@@ -216,10 +216,11 @@ async function runVideoCommand({ file, seconds, window, screen, command = [] }, 
     }
   }
   let child;
-  // Once the command has ended, its group is signalled no more: with nothing left in it, its
-  // number is free for another process's group.
+  // Once the command has ended, its group is signalled no more, since with nothing left in it,
+  // its number is free for another process's group.
   let ended = false;
-  // The command leads its group: a shell or a runner it starts has processes of its own.
+  // The command leads its group, and the signal goes to the whole group, since a shell or a
+  // runner it starts has processes of its own.
   const pass = (signal) => {
     try {
       if (child?.pid && !ended) process.kill(-child.pid, signal);
@@ -244,7 +245,7 @@ async function runVideoCommand({ file, seconds, window, screen, command = [] }, 
       child.on("exit", end);
       child.on("close", (code, signal) => resolve(code ?? 128 + os.constants.signals[signal]));
     });
-    // The command's status is the run's result: a recording that fails as it stops (its
+    // The command's status is the run's result. A recording that fails as it stops (its
     // window closed, say) doesn't replace it.
     try {
       return { ...(await video.stop()), status };

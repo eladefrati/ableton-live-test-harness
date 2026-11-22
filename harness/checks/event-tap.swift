@@ -45,7 +45,7 @@ func report(_ type: CGEventType, _ event: CGEvent) {
     printJSON(["type": name, "x": event.location.x, "y": event.location.y,
                "dx": event.getIntegerValueField(.mouseEventDeltaX), "dy": event.getIntegerValueField(.mouseEventDeltaY),
                "pid": Int(poster), "at": Date().timeIntervalSince1970 * 1000])
-    // Never 0, which the events of a real mouse carry: it would suspend this program's own
+    // Never 0, which the events of a real mouse carry. It would suspend this program's own
     // process group.
     if armed, type == .mouseMoved, poster > 0, parent(of: poster) == CHECK, kill(poster, SIGSTOP) == 0 {
         armed = false
@@ -98,7 +98,7 @@ signal(SIGTERM, SIG_IGN)
 let terminate = DispatchSource.makeSignalSource(signal: SIGTERM, queue: .main)
 terminate.setEventHandler { finish() }
 terminate.resume()
-// A check that was killed can't end its tap: launchd is then the parent.
+// A check that was killed can't end its tap. launchd is then its parent, which is looked for here.
 Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { _ in if getppid() == 1 { finish() } }
 printJSON(["ready": true])
 CFRunLoopRun()

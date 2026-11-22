@@ -171,7 +171,7 @@ if let freezeAt, !["move", "down"].contains(freezeAt) { fail("--freeze takes mov
 var frozen: pid_t = 0
 func freeze(_ posted: CGEvent) {
     let poster = pid_t(posted.getIntegerValueField(.eventSourceUnixProcessID))
-    // Never 0, which the events of a real mouse carry: it would suspend this program's own
+    // Never 0, which the events of a real mouse carry. It would suspend this program's own
     // process group.
     guard frozen == 0, poster > 0, kill(poster, SIGSTOP) == 0 else { return }
     frozen = poster
@@ -252,6 +252,6 @@ signal(SIGTERM, SIG_IGN)
 let terminate = DispatchSource.makeSignalSource(signal: SIGTERM, queue: .main)
 terminate.setEventHandler { finish() }
 terminate.resume()
-// A check that was killed can't end its target: launchd is then the parent.
+// A check that was killed can't end its target. launchd is then its parent, which is looked for here.
 Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { _ in if getppid() == 1 { finish() } }
 app.run()

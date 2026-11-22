@@ -1,14 +1,14 @@
 #!/usr/bin/env node
 "use strict";
 
-// Checks the harness's MIDI input (midi.js, ADR-0018) and its map modes on Auto Filter: opens
-// the Harness port, MIDI-maps Frequency to a CC in MIDI Map Mode (a press through device-ui.js
-// and a CC), and checks that CCs then move Frequency to its ends and between; then maps
-// Resonance to a key in Key Map Mode and checks that pressing the key toggles it. Needs Remote
-// on for the Harness input in Live's Settings > Link, Tempo & MIDI (open the port with
-// `cli.js midi-port` to set it), and what device-ui.js needs (README, "What Live needs"); run
-// it on the click host. Brings Live to the front for the key. The track and its mappings are
-// deleted afterwards. Exits 1 on failure.
+// Checks the harness's MIDI input (midi.js, ADR-0018) and its map modes on Auto Filter. It
+// opens the Harness port, MIDI-maps Frequency to a CC in MIDI Map Mode (a press through
+// device-ui.js and a CC), and checks that CCs then move Frequency to its ends and between;
+// then maps Resonance to a key in Key Map Mode and checks that pressing the key toggles it.
+// Needs Remote on for the Harness input in Live's Settings > Link, Tempo & MIDI (open the port
+// with `cli.js midi-port` to set it), and what device-ui.js needs (README, "What Live needs");
+// run it on the click host. Brings Live to the front for the key. The track and its mappings
+// are deleted afterwards. Exits 1 on failure.
 
 const { connect } = require("../live.js");
 const mac = require("../macos.js");

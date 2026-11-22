@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 "use strict";
 
-// A template for a project's check, runnable as it stands: it loads Live's stock Pitch
+// A template for a project's check, runnable as it stands. It loads Live's stock Pitch
 // device onto a new track, places a known clip in the Arrangement there, and for each case
 // sets the device, records its output (Post FX) on a second new track and compares that
 // with what the case expects. Both tracks are deleted afterwards. Exits 1 if any case fails.
@@ -58,10 +58,10 @@ async function main() {
       await live.deleteArrangementClips(recordTrack);
     }
   } finally {
-    // An error in cleanup must not keep the sockets open: Node would never exit.
+    // An error in cleanup must not keep the sockets open, or Node would never exit.
     try {
-      // deleteTracks goes from the last track, so the recording goes before its source: a
-      // track whose MIDI source is gone can't be disarmed.
+      // deleteTracks goes from the last track, so the recording goes before its source, since
+      // a track whose MIDI source is gone can't be disarmed.
       if (first !== undefined) await live.deleteTracks([DEVICE_TRACK, RECORD_TRACK], first);
     } finally {
       live.close();

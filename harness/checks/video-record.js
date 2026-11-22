@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 "use strict";
 
-// Checks video.js and its helper in Live (ADR-0016): with Live playing, so its window
+// Checks video.js and its helper in Live (ADR-0016). With Live playing, so its window
 // changes, it records Live's main window and, with Live in front, the main display for a
 // length of time, a video around a command, one around a command given Ctrl-C, one that
 // cli.js video stops on SIGTERM, one whose run's stderr closes, as an ssh session's does, one
@@ -68,7 +68,7 @@ async function retry(fn, ms) {
 }
 
 // Saves the frames at `times` and says what they are. Live plays while the check records, and
-// its position changes many times a second, so each frame differs from the one before: two
+// its position changes many times a second, so each frame differs from the one before. Two
 // the same are a video that froze between them, as one does while the display sleeps.
 // `still` is for a video of something that doesn't move.
 async function frames(file, times, { still = false } = {}) {
@@ -130,7 +130,7 @@ const CASES = [
     async run(folder) {
       const file = path.join(folder, "screen.mov");
       fs.rmSync(file, { force: true });
-      // What moves on the display is Live playing: another app over it could leave a still
+      // What moves on the display is Live playing. Another app over it could leave a still
       // picture, which would fail the frames below.
       const front = await mac.frontmostApp().catch(() => null);
       await mac.activate();
@@ -169,7 +169,7 @@ const CASES = [
         let n = 0; process.on("SIGINT", () => { if (n++ === 0) setTimeout(() => {
         require("node:fs").writeFileSync(${JSON.stringify(counted)}, JSON.stringify(n)); process.exit(5); }, 1000); });
         setInterval(() => {}, 1000);`;
-      // A group of its own, as a terminal's foreground job: Ctrl-C signals the whole group.
+      // A group of its own, as a terminal's foreground job. Ctrl-C signals the whole group.
       const { child, ended } = await node([CLI, "video", file, "--", process.execPath, "-e", command], "recording ", { detached: true });
       let out;
       try {
@@ -271,7 +271,7 @@ const CASES = [
   {
     name: "a window that closes 2 s into its recording",
     async run(folder) {
-      // A window of the check's own, which it can close: the helper records any window by id.
+      // A window of the check's own, which it can close. The helper records any window by id.
       const file = path.join(folder, "closed.mov");
       fs.rmSync(file, { force: true });
       const target = spawn(await tools.helperBinary(TARGET), ["200", "200", "300", "200"], { stdio: ["ignore", "pipe", "pipe"] });
@@ -315,7 +315,7 @@ const CASES = [
         .then((video) => { console.log("recording " + video.pid); setInterval(() => {}, 1000); })`], "recording ");
       await sleep(3000);
       child.kill("SIGKILL");
-      // Not once its output closes: the helper holds its stderr until it ends.
+      // Not once its output closes, because the helper holds its stderr until it ends.
       const helper = Number((await exited).out.match(/recording (\d+)/)[1]);
       // The helper finishes the file once it sees the run gone, and ends; one that doesn't is
       // stopped here, so it doesn't record on for 10 minutes.
@@ -330,7 +330,7 @@ const CASES = [
         process.kill(helper, "SIGINT");
         throw error;
       });
-      // Killed 3 s after it said it recorded: the video holds those 3 s.
+      // Killed 3 s after it said it recorded, so the video holds those 3 s.
       const { seconds } = await videoFrame(file, 1, path.join(folder, "killed-1s.png"));
       if (!near(seconds, 3)) throw new Error(`The video is ${seconds} s long`);
       return `${seconds.toFixed(2)} s; ${await frames(file, timesIn(seconds))}`;

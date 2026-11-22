@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 "use strict";
 
-// Checks recordArrangement's `automation` option on Auto Filter, with no track armed: a pass
+// Checks recordArrangement's `automation` option on Auto Filter, with no track armed. A pass
 // sets Frequency to 0.8 at beat 1 and to 0.3 at beat 3, and must leave it at 0.3; a second
 // pass, with nothing set, reads Frequency at beat 2. Without the option Live writes no
 // automation, so the second pass reads 0.3, the value last set; with it Live writes

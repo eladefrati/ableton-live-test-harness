@@ -2,7 +2,7 @@
 "use strict";
 
 // Starts Live, quitting the running one first, and answers its dialogs so the run never
-// stops at one: the open set is a test set, so unsaved changes and recordings are discarded.
+// stops at one. The open set is a test set, so unsaved changes and recordings are discarded.
 // Live starts, behind other windows, on a fresh copy of sets/empty.als (one MIDI track,
 // unarmed, no devices, no returns, nothing on Main, Main at -inf dB so runs are silent;
 // recordings take tracks' Post FX, before Main), not the user's template, which can
@@ -22,20 +22,20 @@
 //                                     <name>, every parameter listed (plugin.js, ADR-0003)
 //
 // On quitting, "Save changes?" gets Don't Save and "delete the temporary files?" gets
-// Delete. Any other dialog stops the run with Live left as it is: answering it needs a
+// Delete. Any other dialog stops the run with Live left as it is, since answering it needs a
 // person. If Live is still running 10 s after the quit or the last answer (a plug-in can
-// hang it), it is killed. Once it has exited, the Temp Projects it made are deleted: a
+// hang it), it is killed. Once it has exited, the Temp Projects it made are deleted. A
 // set outside a Live project, as the copy is, records into one, and Live asks about
 // deleting it only for a set never saved (measured in Live 12.4.25b1).
 //
 // After a kill, Live would start at "Live unexpectedly quit... recover your work?", which
 // isn't a LOM dialog and takes no keys unless Live is the frontmost app. Live asks because
 // its recovery data is still in its preferences folder (CrashRecoveryInfo.cfg, Undo,
-// BaseFiles): moved into the folder's Crash folder, where Live keeps earlier ones, Live
-// starts without asking (measured in Live 12.4.25b1), as if answered No. CrashDetection.cfg
-// there exists only while Live runs and after it crashed or was killed (a clean quit
-// deletes it), so with no Live running it says the recovery data must go, whoever stopped
-// that Live.
+// BaseFiles). With that data moved into the folder's Crash folder, where Live keeps earlier
+// ones, Live starts without asking (measured in Live 12.4.25b1), as if answered No.
+// CrashDetection.cfg there exists only while Live runs and after it crashed or was killed (a
+// clean quit deletes it), so with no Live running it says the recovery data must go, whoever
+// stopped that Live.
 
 const fs = require("node:fs");
 const os = require("node:os");
@@ -101,7 +101,7 @@ function answerFor(message) {
   return null;
 }
 
-// The Temp Projects among folder names that a Live started at `started` (ms) made: Live
+// The Temp Projects among folder names that a Live started at `started` (ms) made. Live
 // names one "YYYY-MM-DD HHMMSS Temp Project", in local time, some seconds after it starts.
 function tempProjectsSince(names, started) {
   const from = Math.floor(started / 1000) * 1000;
@@ -147,9 +147,9 @@ async function quit(live, app, pid, say) {
       say("info stopped the transport");
     }
   } catch {
-    // no answer: quit anyway
+    // no answer, so quit anyway
   }
-  // ignoring application responses: Live replies to quit only once its dialogs are
+  // ignoring application responses, because Live replies to quit only once its dialogs are
   // answered, and osascript would wait for that.
   await osascript(`ignoring application responses
 tell application ${JSON.stringify(path.basename(app, ".app"))} to quit
@@ -229,7 +229,7 @@ function freshSet(say, plugin) {
 
 // The options: { kill, suite, plugin, app } (plugin: the name after --plugin, or null; app:
 // the path after --app, or null). Refuses anything else, and --suite with --app, since a
-// relaunch discards the running Live's set: a mistyped option must not restart Live on the
+// relaunch discards the running Live's set. A mistyped option must not restart Live on the
 // wrong set.
 function parseArgs(argv) {
   const options = { kill: false, suite: false, plugin: null, app: null };
@@ -312,7 +312,7 @@ async function stop(live, pid, forceKill, say) {
     await kill(pid, say);
   }
   discardRecovery(await preferencesFolder(old), say);
-  // Without its start time, which Temp Projects were this Live's isn't known: none is deleted.
+  // Without its start time, which Temp Projects were this Live's isn't known. None is deleted.
   if (started === null) say("info Live's start time couldn't be read, so its Temp Projects are left");
   else deleteTempProjects(started, say);
 }
@@ -324,7 +324,7 @@ async function main(argv) {
   if (pids.length > 1) throw new Error("More than one Live is running: the harness can't tell them apart");
   const running = pids.length === 1 ? await liveApp().catch(() => null) : null;
   const app = chooseLive({ app: chosen, suite }, { local: readApp(), running, installed: installedLives() });
-  // Before anything else: stopping Live discards its unsaved work.
+  // Before anything else, since stopping Live discards its unsaved work.
   if (!fs.existsSync(app)) throw new Error(`${app} isn't installed: name the Live to start with --app <path>`);
   // Holding UDP 11001 across the relaunch also keeps other clients out until Live is back.
   const live = await connect({ timeout: 1000 });
@@ -335,8 +335,8 @@ async function main(argv) {
     else say("info Live is not running");
     discardRecovery(await preferencesFolder(app), say);
     const file = freshSet(say, plugin);
-    // The display stays on until Live is up: a Live started while it slept never redraws its
-    // window (keepDisplayOn). Checks that don't read the screen still run without it.
+    // The display stays on until Live is up, since a Live started while it slept never redraws
+    // its window (keepDisplayOn). Checks that don't read the screen still run without it.
     const display = await keepDisplayOn().catch((error) => {
       say(`warn the display didn't wake (${error.message}): this Live may never redraw its window`);
       return null;

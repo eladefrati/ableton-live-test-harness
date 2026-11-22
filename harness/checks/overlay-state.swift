@@ -7,7 +7,7 @@
 // window server lists them, the label of the pill's button and the pill's texts, such as its
 // stop key, as Accessibility gives them. The label is null if the overlay shows no button,
 // and the texts are empty if it shows none; both are so if it doesn't answer within
-// ANSWER_SECONDS: a program answers Accessibility on its main thread, so one whose main
+// ANSWER_SECONDS. A program answers Accessibility on its main thread, so one whose main
 // thread is held up gives none.
 
 import ApplicationServices

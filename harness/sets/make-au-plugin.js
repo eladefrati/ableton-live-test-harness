@@ -2,7 +2,7 @@
 "use strict";
 
 // Remakes au-plugin.als, the fixture plugin.js builds plug-in sets from (ADR-0003), for
-// when Live's set format changes: in the running Live, on a set the harness made, it loads
+// when Live's set format changes. In the running Live, on a set the harness made, it loads
 // Apple's AUDelay on track 0, saves the set (saveSetAs, which brings Live to the front),
 // and writes empty.als with AUDelay's device block on its MIDI track, cleared of the
 // plug-in's state (Preset), its preset references (which name the user's home folder) and

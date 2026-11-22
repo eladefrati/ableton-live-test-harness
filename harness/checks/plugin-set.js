@@ -8,7 +8,7 @@
 //   - the built device lists every parameter the AU publishes, in the AU's order;
 //   - Live's own list is the built list with at most some parameters left out (Live leaves
 //     out Not Real Time ones, as AUDelay's Delay Time), in the same order;
-//   - each parameter Live lists has the same value on both devices: the built one's comes
+//   - each parameter Live lists has the same value on both devices. The built one's comes
 //     from the file (its Manual), the fresh one's from the plug-in.
 // Live populates a plug-in itself only up to 64 parameters, so a larger one is refused.
 // The new track is deleted afterwards (--keep leaves it). Exits 1 on failure.

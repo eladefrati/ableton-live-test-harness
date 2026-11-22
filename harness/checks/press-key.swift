@@ -5,12 +5,12 @@
 //   press-key <code> <modifier>... [--until-gone <file> | --after-end <pid> | --hold <ms> | --release]
 //
 // The modifiers are control, option, shift and command. The key goes down and up carrying
-// them as its flags, with no modifier pressed on its own: the hot key takes that as the key.
+// them as its flags, with no modifier pressed on its own. The hot key takes that as the key.
 // Such an event leaves its modifiers held until their release is posted (live-notes.md), so
 // it posts their release however it ends but SIGKILL: when it is done, when it fails, and on
 // SIGINT, SIGTERM or SIGHUP. With --until-gone it presses the key every 20 ms until <file> is
 // gone, for up to UNTIL_SECONDS, for a press that must come as soon as the overlay has
-// claimed the key, and exits 1 if the file is still there: the whole chord every 10 ms, 800
+// claimed the key, and exits 1 if the file is still there. The whole chord every 10 ms, 800
 // events a second, held up the overlay's start by more than 3 s. With --after-end it ends
 // the process <pid> (SIGTERM) and presses as soon as it has gone, as press-stop does with its
 // <run>. With --hold it presses the modifiers on their own first, as a person does, and holds
@@ -101,7 +101,7 @@ func pressModifiers() {
     heldLock.unlock()
     if !made { fail("The key event couldn't be made") }
 }
-// The key down and up, carrying the modifiers as its flags, which leaves them held: they are
+// The key down and up, carrying the modifiers as its flags, which leaves them held. They are
 // counted as held from just before, so that every way out lets them go.
 func tapKey() {
     heldLock.lock()

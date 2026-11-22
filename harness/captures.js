@@ -10,11 +10,11 @@
 // the caller gives outside this folder is used as given, and nothing here deletes it.
 //
 // A capture is written here under a hidden name, `.unfinished/<name>`, and moved to its own
-// once it is finished, whether it was given no path or a path here (startCapture): a file in
+// once it is finished, whether it was given no path or a path here (startCapture), so a file in
 // the folder itself is whole, and remote.sh may bring it back.
 // A video's helper moves it, so a run that ends while it records still leaves a finished video.
-// A hidden folder rather than a hidden file name: screencapture refuses to write a file whose
-// name starts with a dot, saying so but exiting 0 (macOS 26).
+// A hidden folder rather than a hidden file name, because screencapture refuses to write a file
+// whose name starts with a dot, saying so but exiting 0 (macOS 26).
 //
 //   node harness/captures.js finished    the folder, then the name of each finished capture in
 //                                        it, one a line (for remote.sh)
@@ -51,7 +51,7 @@ const real = (file) => {
 const writingHere = new Set();
 
 // A path for a capture given no path, by capturePath, that no capture in the folder has and
-// none is being written under in this process: two of the same thing in one millisecond get
+// none is being written under in this process, so two of the same thing in one millisecond get
 // "-2", "-3" after the name.
 function freePath(name, ext, { root, now }) {
   for (let n = 1; ; n++) {
@@ -61,13 +61,13 @@ function freePath(name, ext, { root, now }) {
   }
 }
 
-// Starts a capture: every still, frame and video the harness saves goes through here. Its path
+// Starts a capture. Every still, frame and video the harness saves goes through here. Its path
 // is `file`, the caller's, its folder made if it is missing, or with none a new one in the
 // folder (freePath, by `name` and `ext`). Returns { file, writing, finish(), finished(),
 // abandon() }. `writing` is where the capture is to be written: in the folder, however the path
 // names it, its hidden name, cleared of what a writer killed before left there; elsewhere
 // `file` itself, as given. finish() moves what was written to `file` and returns the capture's
-// path: one given a path replaces a file there, one given none replaces nothing and takes the
+// path. One given a path replaces a file there; one given none replaces nothing and takes the
 // next free name if another process's capture has taken its own meanwhile. finished() is for a
 // writer that moves it itself, as a video's helper does, which replaces nothing. Either then
 // prunes the folder, if the capture is in it. abandon() deletes what a failed writer left under
@@ -145,7 +145,7 @@ async function saveCapture(file, options, write) {
 }
 
 // Deletes what is in `root` older than KEEP_DAYS by its modification time, and what is in its
-// unfinished folder: a capture being written there has a recent one (a video's is the time of
+// unfinished folder. A capture being written there has a recent one (a video's is the time of
 // its last frame, written as it records), so one that old is one whose writer was killed, or a
 // recording asked to last longer than KEEP_DAYS. Best effort: what can't be read or deleted is
 // left.

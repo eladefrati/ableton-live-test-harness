@@ -41,7 +41,7 @@ const channelOf = (channel) => {
 
 // Opens the port and resolves once it exists, with { name, cc, noteOn, noteOff, close }; a
 // value out of range rejects and sends nothing.
-// The port goes when close() is called or the run ends. One port of a name at a time: a
+// The port goes when close() is called or the run ends. One port of a name at a time, since a
 // second opened beside it is a second input of the same name, which Live can't tell apart.
 async function openMidiPort({ name = PORT, readyMs = READY_MS } = {}, system = machine) {
   const binary = await system.binary();

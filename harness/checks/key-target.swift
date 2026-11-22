@@ -39,6 +39,6 @@ signal(SIGTERM, SIG_IGN)
 let terminate = DispatchSource.makeSignalSource(signal: SIGTERM, queue: .main)
 terminate.setEventHandler { exit(0) }
 terminate.resume()
-// A check that was killed can't end its target: launchd is then the parent.
+// A check that was killed can't end its target. launchd is then its parent, which is looked for here.
 Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { _ in if getppid() == 1 { exit(0) } }
 app.run()

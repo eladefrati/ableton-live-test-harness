@@ -14,8 +14,8 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 class LiveError extends Error {}
 
-// A flat reply of `width` values per item, as rows. Refuses a reply that isn't whole rows:
-// read by position, a short one would put values under the wrong names.
+// A flat reply of `width` values per item, as rows. Refuses a reply that isn't whole rows.
+// Read by position, a short one would put values under the wrong names.
 function rows(values, width) {
   if (values.length % width) throw new LiveError(`A reply of ${values.length} values isn't rows of ${width}`);
   const out = [];
@@ -276,7 +276,7 @@ class Live {
     return index;
   }
 
-  // Finds the device named `name` (its name in the chain, e.g. a plug-in's name) on any
+  // Finds the device named `name` (its name in the chain, such as a plug-in's name) on any
   // track's top-level chain; devices inside racks are not searched. Refuses unless exactly
   // one device has the name. Resolves with { track, device }.
   async findDevice(name) {
@@ -293,8 +293,8 @@ class Live {
     return found[0];
   }
 
-  // Moves a device to position `position` in another track's chain, keeping the instance:
-  // its state and parameters go with it. Resolves with its new index.
+  // Moves a device to position `position` in another track's chain, keeping the instance.
+  // Its state and parameters go with it. Resolves with its new index.
   async moveDevice(track, device, target, position) {
     const [index] = await this.query("/live/song/move_device", track, device, target, position);
     return index;
@@ -375,7 +375,7 @@ class Live {
     throw new LiveError(`The parameters of ${itemPath} did not settle within ${settleMs} ms${hint}`);
   }
 
-  // Waits until the parameter count of every device in the set has stopped changing, e.g.
+  // Waits until the parameter count of every device in the set has stopped changing, for example
   // after opening a set, whose Max for Live devices load after it.
   async settleDevices({ timeoutMs = 20000, readyMs = 500 } = {}) {
     const counts = async () => (await this.query("/live/song/get/device_parameter_counts")).join(",");
@@ -422,7 +422,7 @@ class Live {
   // Live's routing lists follow a track rename or a type change a tick later, and the
   // setters only log a warning for an unknown name, so this waits, sets, and checks. A From
   // is picked by name, and the type read back is that name whichever track it came from, so
-  // a name two other tracks hold is refused: the input could be either's.
+  // a name two other tracks hold is refused, since the input could be either's.
   async setInputRouting(track, typeName, channelName = null) {
     await this.sync();
     const named = (await this.query("/live/song/get/track_names"))
@@ -539,7 +539,7 @@ class Live {
   // not seen. Cue points are left alone. Any start that reads earlier than `start` stops
   // and fails rather than record from the wrong place.
   //
-  // `during`: [{beat, action}], actions to take while it records, e.g. pressing a button
+  // `during`: [{beat, action}], actions to take while it records, such as pressing a button
   // mid-play. Each action runs once the song time has passed its beat, and resolves with
   // [{beat, before, after}] in `during`'s order: the song time read just before the action
   // and just after it returned. Live can't schedule a change from outside, so a check
@@ -583,10 +583,10 @@ class Live {
     const switched = automationArm !== Boolean(automation);
     try {
       if (switched) this.set("song", "session_automation_record", automation ? 1 : 0);
-      // the marker first: turning record_mode on while stopped starts Play by itself
+      // the marker first, since turning record_mode on while stopped starts Play by itself
       await this.startTimeTo(start);
       // start_playing while Live plays restarts Play from the marker, and an audio buffer
-      // run between record_mode and start_playing was recorded before the restart: the take
+      // run between record_mode and start_playing was recorded before the restart, so the take
       // sat that buffer late against its file from its end on (seen in 3 takes of 200, at
       // 128-sample buffers). So start_playing goes out only if record_mode didn't start Play,
       // as with Live's Start Playback with Record off.
@@ -601,7 +601,7 @@ class Live {
         throw new LiveError(`Live started at beat ${started.toFixed(3)}, not ${start}; recording stopped`);
       }
       // Live turns Record off when the song is relocated (current_song_time set, jump_by), and
-      // Play goes on: the take ends there (live-notes.md). Record is read
+      // Play goes on, so the take ends there (live-notes.md). Record is read
       // after each batch of actions, which may relocate, and at the end, not on every poll,
       // which would slow the fine polling by a tick.
       const recording = async (beat) => {

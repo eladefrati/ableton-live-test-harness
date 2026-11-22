@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 "use strict";
 
-// Checks the harness's own recording path: places a clip of off-grid notes in the
+// Checks the harness's own recording path. It places a clip of off-grid notes in the
 // Arrangement on one new track, records its MIDI output into a second new track, and
 // compares both the clip's notes read back and the recording with the notes the clip plays.
 // Then it reads the notes of the Session clip the Arrangement clip was copied from, and
@@ -26,7 +26,7 @@ function testNotes() {
     notes.push({ pitch: 60 + (i * 7) % 24, start: i * 0.6 + 0.013 * (i % 5), duration: 0.3, velocity: 90 + i });
   }
   notes.push({ pitch: 0, start: 14.5, duration: 0.3, velocity: 100 }, { pitch: 127, start: 15, duration: 0.3, velocity: 100 });
-  // Outside the clip, so not played: only the Session read and removal see them.
+  // Outside the clip, so not played. Only the Session read and removal see them.
   notes.push({ pitch: 61, start: -9000, duration: 0.5, velocity: 100 }, { pitch: 62, start: 9000, duration: 0.5, velocity: 100 });
   return notes;
 }
@@ -65,7 +65,7 @@ async function main() {
       process.exitCode = 1;
     }
   } finally {
-    // An error in cleanup must not keep the sockets open: Node would never exit.
+    // An error in cleanup must not keep the sockets open, or Node would never exit.
     try {
       if (first !== undefined) await live.deleteTracks([SOURCE, RECORD], first);
     } finally {

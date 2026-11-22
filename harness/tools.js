@@ -27,11 +27,11 @@ function run(cmd, args = [], { env, started } = {}) {
 }
 
 // Compiled helpers, by source hash. Not in the harness's temp folder (HARNESS_TEMP in
-// macos.js), which relaunch.js empties after building a plug-in's set: the first build with
+// macos.js), which relaunch.js empties after building a plug-in's set. The first build with
 // an empty module cache took 53 s on an Intel Mac.
 const HELPER_CACHE = path.join(os.tmpdir(), "ableton-harness-tools");
 // How long a build stays in the cache unused. A build's last use is the later of its access
-// and modification times: this module sets both when a process first finds the build, and an
+// and modification times. This module sets both when a process first finds the build, and an
 // older checkout of the harness, which sets neither, still updates the access time by
 // running it. An unchanged source keeps its hash, and its build, for weeks. An older
 // checkout's build that it has found but not yet run can still be deleted under it, which
@@ -44,7 +44,7 @@ const marked = new Set();
 // version of the source hasn't been. It is built under a name of its own and renamed into
 // place, so a run never finds half a binary. After a build, the call deletes the same
 // helper's other builds in `cache` that no process has used for UNUSED_DAYS. Marking and
-// deleting are best effort: neither fails the call.
+// deleting are best effort. Neither fails the call.
 async function helperBinary(source, cache = HELPER_CACHE) {
   const hash = crypto.createHash("sha256").update(fs.readFileSync(source)).digest("hex").slice(0, 16);
   const name = path.basename(source, ".swift");
@@ -68,7 +68,7 @@ async function helperBinary(source, cache = HELPER_CACHE) {
 }
 
 // Sets the build's access and modification times to now, on this process's first lookup, and
-// says whether the build is there: one that is gone, as one another process has just pruned,
+// says whether the build is there. One that is gone, as one another process has just pruned,
 // is built again. Times it can't set are left as they are.
 function markUsed(binary) {
   const now = new Date();

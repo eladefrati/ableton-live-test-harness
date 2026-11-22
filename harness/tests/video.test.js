@@ -10,8 +10,8 @@ const { VideoError, parseVideoArgs, recordVideo, runVideoCommand, parseFrameArgs
 
 // A stand-in for the video helper: a Node script that saves its arguments to `args.json` beside
 // itself and then does what `body` says. It is run by Node (`runByNode`), never as a program
-// of its own: macOS scans each new program the first time it runs, and with the other test
-// files' new programs that queue of scans held up their starts past their tests' times.
+// of its own, because macOS scans each new program the first time it runs, and with the other
+// test files' new programs that queue of scans held up their starts past their tests' times.
 function fakeHelper(t, body) {
   const folder = fs.mkdtempSync(path.join(os.tmpdir(), "video-test-"));
   t.after(() => fs.rmSync(folder, { recursive: true, force: true }));
@@ -248,7 +248,7 @@ const system = { startedMs: 5000, release: () => "25.6.0", wake: async () => {},
 runVideoCommand({ file: ${JSON.stringify(at("video.mov"))}, screen: true, command: [process.execPath, ${JSON.stringify(at("command.js"))}] }, system)
   .then((result) => { process.exitCode = result.status; });
 `);
-  // A group of its own, as a terminal's foreground job is: Ctrl-C signals the whole group.
+  // A group of its own, as a terminal's foreground job is. Ctrl-C signals the whole group.
   const run = spawn(process.execPath, [at("run.js")], { detached: true, stdio: "ignore" });
   const ended = new Promise((resolve) => run.on("exit", (code) => resolve(code)));
   t.after(() => { try { process.kill(-run.pid, "SIGKILL"); } catch {} });
@@ -272,7 +272,7 @@ runVideoCommand({ file: ${JSON.stringify(at("video.mov"))}, screen: true, comman
   .then((result) => { process.exitCode = result.status; });
 ${then}
 `);
-  // A group of its own, as a terminal's foreground job is: Ctrl-C signals the whole group.
+  // A group of its own, as a terminal's foreground job is. Ctrl-C signals the whole group.
   const run = spawn(process.execPath, [at("run.js")], { detached: true, stdio: "ignore" });
   const ended = new Promise((resolve) => run.on("exit", (code, signal) => resolve(code ?? signal)));
   return { run, ended };
@@ -558,7 +558,7 @@ test("a frame the helper can't save rejects with its reason", async (t) => {
 const hasDeveloperTools = (() => {
   try { require("node:child_process").execFileSync("xcode-select", ["-p"], { stdio: "ignore" }); return true; } catch { return false; }
 })();
-// The helper uses SCRecordingOutput, which macOS 15 (Darwin 24) brought: it doesn't build before.
+// The helper uses SCRecordingOutput, which macOS 15 (Darwin 24) brought. It doesn't build before.
 const before15 = Number(os.release().split(".")[0]) < 24;
 test("the helper refuses arguments it can't use, with its usage, and a video it can't read",
   { skip: (!hasDeveloperTools && "no developer tools") || (before15 && "the helper needs macOS 15"), timeout: 300000 }, async () => {

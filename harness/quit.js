@@ -35,7 +35,7 @@ async function main(argv, system = {}) {
   const { kill } = parseArgs(argv);
   const pids = await pidsOf();
   if (pids.length > 1) throw new Error("More than one Live is running: the harness can't tell them apart");
-  // UDP 11001 is held throughout, as relaunch.js holds it: every check holds it while it
+  // UDP 11001 is held throughout, as relaunch.js holds it. Every check holds it while it
   // runs, so none is saving a set into the temp folder while it is emptied.
   const live = await open();
   try {

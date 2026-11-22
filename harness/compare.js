@@ -1,16 +1,16 @@
 "use strict";
 
-// Compares expected notes (e.g. an engine render) with notes recorded in Live. Notes are
+// Compares expected notes (such as an engine render) with notes recorded in Live. Notes are
 // { pitch, start, duration, velocity } in beats. Expected and recorded notes of the same
 // pitch within `windowBeats` of each other are paired closest first, each note at most
 // once; timing errors are reported in milliseconds at `tempo`. Start times must be within
 // `toleranceMs`; durations only when `durationToleranceMs` is given. With `from`/`to`,
 // only notes starting in [from + edgeBeats, to - edgeBeats) are compared, so a recording's
 // first and last moments don't count. Notes are paired before that range applies, and a
-// pair counts by its expected note's start: a recorded note a hair off a range edge
+// pair counts by its expected note's start. A recorded note a hair off a range edge
 // (15.7499997 for 15.75) must not count when its expected note doesn't, or vice versa. So
 // an expected note just outside the range can also absorb a stray recorded note up to
-// `windowBeats` inside it: in effect, the edge skipped for recorded notes is that much wider.
+// `windowBeats` inside it. In effect, the edge skipped for recorded notes is that much wider.
 
 function compareNotes(expected, actual, {
   tempo, windowBeats = 0.125, toleranceMs = 1, durationToleranceMs = null,

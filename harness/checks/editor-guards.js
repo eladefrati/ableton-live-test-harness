@@ -2,12 +2,12 @@
 "use strict";
 
 // Checks what device-ui.swift's click-editor and drag-editor refuse (ADR-0008), in Live, on
-// the editor of Apple's AUDelay, which every Mac has. pointer-guards.js can't run these two:
-// they take only a plug-in window of Live's, whose editor they read from Live through
+// the editor of Apple's AUDelay, which every Mac has. pointer-guards.js can't run these two,
+// because they take only a plug-in window of Live's, whose editor they read from Live through
 // Accessibility. The check adds an audio track with AUDelay, opens its window, and runs the
 // helper against the editor's Dry/Wet Mix slider, as a run does, with a click token, once for
 // each command in each case. It compares the helper's exit status and error, the mouse events
-// the helper posted (checks/event-tap.swift) and Dry/Wet Mix, read over OSC: a refused command
+// the helper posted (checks/event-tap.swift) and Dry/Wet Mix, read over OSC. A refused command
 // posts nothing and leaves the value as it was. Each command first reaches the editor, under
 // harness-computer-use's border too, which the guard skips; then it is refused for a window
 // of another app over the point (checks/pointer-target.swift), or one that comes over it
@@ -19,10 +19,10 @@
 // the 10 s the helper waits for it to go. Not run: the locked screen, since staging it would
 // lock the Mac; a point under harness-computer-use's pill, which AUDelay's editor can't reach
 // (it lies 194 points below the top of its window, which macOS keeps below the menu bar);
-// two windows of the editor's title, which Live doesn't show at once: it hides the plug-in
-// windows of a track that isn't selected, and the harness opens a window only for a device
-// whose name is the only one of its track; and an editor with other than one group in its
-// window. It takes the pointer, so it runs only on the click host ("clickHost" in
+// two windows of the editor's title, which Live doesn't show at once, since it hides the
+// plug-in windows of a track that isn't selected, and the harness opens a window only for a
+// device whose name is the only one of its track; and an editor with other than one group in
+// its window. It takes the pointer, so it runs only on the click host ("clickHost" in
 // harness/local.json), with Live open; it brings Live to the front. The track is deleted at
 // the end. Exits 1 on failure.
 //
@@ -55,7 +55,7 @@ const DRAG = [10, 0];
 // How long the tap has to report the helper's events after the helper has ended.
 const EVENT_WAIT_MS = 300;
 // How long Notification Center takes to cover the screen once a notification is posted, and
-// how often one is posted to keep it covered: each keeps the cover up about 5.3 s
+// how often one is posted to keep it covered. Each keeps the cover up about 5.3 s
 // (live-notes.md).
 const BANNER_WAIT_MS = 1000;
 const BANNER_EVERY_MS = 3000;
@@ -105,7 +105,7 @@ const wrongSize = (name, size) => ({
   ...refused((the) => new RegExp(`^${literal(`The editor of ${the.title} is ${swift(SIZE[0])} x ${swift(SIZE[1])} points, not ${swift(size[0])} x ${swift(size[1])}`)}$`)),
 });
 // A drag from the point that ends a point past the main display's top edge, or else its left
-// edge, whichever the longest drag reaches: the check assumes no display beyond either.
+// edge, whichever the longest drag reaches. The check assumes no display beyond either.
 function offScreen(the) {
   const [up, left] = [Math.floor(the.py) + 1, Math.floor(the.px) + 1];
   if (up <= MAX_DRAG) return [0, -up];
@@ -243,7 +243,7 @@ const CASES = [
     args: (command, the) => commandLine(command, the.title).map((arg, i) => (i === 2 ? "left" : arg)),
     ...refused(() => new RegExp(`^${literal(USAGE)}$`)),
   },
-  // Last: the cover stays up about 5 s after the last notification.
+  // Last, because the cover stays up about 5 s after the last notification.
   {
     name: "a notification's cover over the screen for longer than the helper waits is refused",
     commands: BOTH,

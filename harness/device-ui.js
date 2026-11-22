@@ -25,7 +25,7 @@
 //   await openDeviceUi(live, { track, device });
 //
 // A press clicks only after the checks in ADR-0004 pass, and throws DeviceUiError otherwise.
-// It says nothing about what the click did: the check reads that from Live.
+// It says nothing about what the click did. The check reads that from Live.
 //
 // A plug-in's own window, the one its editor opens in (ADR-0008), at points measured in the
 // editor from its top left, given with the editor's size in points:
@@ -49,7 +49,7 @@ const { patcherChunk } = require("./amxd.js");
 const { checkLocation } = require("./run-log.js");
 
 // `done` is true on the error of a press that was stopped (ADR-0012) with only its button's
-// release left: it throws as any stopped press does, and the click or the drag happened; for
+// release left. Such a press throws as any stopped press does, and the click or the drag happened; for
 // a held drag stopped during its hold, its first move only (ADR-0021).
 class DeviceUiError extends Error {}
 
@@ -211,7 +211,7 @@ async function helper(...args) {
     });
   } catch (error) {
     const ended = error.cause?.cause;
-    // The helper handles the signal from its start: one that the signal ended got it before
+    // The helper handles the signal from its start. One that the signal ended got it before
     // that, so before it posted anything.
     if (ended?.signal === "SIGUSR2") throw new DeviceUiError(`${STOPPED_FROM_PILL}, and the helper had posted nothing`, { cause: error });
     if (ended?.code === HAPPENED_STATUS) error.done = true;
@@ -223,7 +223,7 @@ async function helper(...args) {
 
 // The one machine clicks are allowed on without asking: "clickHost" in harness/local.json,
 // which is not in git (see local.example.json). Null with no file or no key. Never from the
-// environment: a variable would lift the guard for a single command (ADR-0005).
+// environment, since a variable would lift the guard for a single command (ADR-0005).
 const LOCAL = path.join(__dirname, "local.json");
 function readClickHost(file = LOCAL) {
   let text;
@@ -263,7 +263,7 @@ function runName(script = runScript()) {
 
 // Asks the person at this Mac whether the run may click; true only for Allow. Don't Allow is
 // the cancel button, which osascript reports as error -128. `border` is whether the border
-// was built: with none, the person is told so before they answer (ADR-0012). `key` is the
+// was built. With none, the person is told so before they answer (ADR-0012). `key` is the
 // border's stop key in words, or null if it couldn't be read (ADR-0017). Exported for the
 // tests.
 async function askToClick(script, border, key) {
@@ -321,10 +321,10 @@ async function stopKeyOf(binary, { timeoutMs = STOP_KEY_MS } = {}) {
 // What a run that Stop on its pill stopped says, and its helper.
 const STOPPED_FROM_PILL = "harness-computer-use was stopped from its pill: this run clicks no more";
 
-// Stop's last resort (ADR-0012): when Stop can't remove the run's click token it sends the
+// Stop's last resort (ADR-0012). When Stop can't remove the run's click token it sends the
 // run SIGUSR2. The run then counts as stopped for good, whatever its token says, and passes
-// the signal on to the helpers it has running, which stop as after Stop. Nothing ends here:
-// a check fails at the press that throws and still cleans up.
+// the signal on to the helpers it has running, which stop as after Stop. Nothing ends here.
+// A check fails at the press that throws and still cleans up.
 let stopSignalled = false;
 const runningHelpers = new Set();
 function onStopSignal() {
@@ -334,7 +334,7 @@ function onStopSignal() {
 
 // The run's click token (ADR-0012), a file that exists while the run may click and that the
 // pill's Stop removes: one for the run, in a folder of its own, made when first needed and
-// kept here, so that Stop on any pill the run shows stops it. It is never made again: a run
+// kept here, so that Stop on any pill the run shows stops it. It is never made again, so a run
 // whose token has gone stays stopped. From when it is made, the run listens for the signal
 // of Stop's last resort. Exported for the tests.
 let clickTokenPath = null;
@@ -342,7 +342,7 @@ function clickToken() {
   if (!clickTokenPath) {
     // Not in the harness's temp folder, which relaunch.js and quit.js empty.
     const folder = fs.mkdtempSync(path.join(os.tmpdir(), "harness-computer-use-"));
-    // A folder that can't be removed, as one that can't be written to, stays: an error
+    // A folder that can't be removed, as one that can't be written to, stays, because an error
     // thrown as the process ends would be printed and become the run's exit status.
     process.on("exit", () => {
       try {
@@ -382,8 +382,8 @@ function stopped(token = clickTokenPath) {
 }
 
 // The variable that names the run's click token to a helper (device-ui.swift), and to nothing
-// else. This process's own environment is neither read nor written: a token named there
-// belongs to the run that started this one, whose Stop isn't this run's, and one written
+// else. This process's own environment is neither read nor written, because a token named
+// there belongs to the run that started this one, whose Stop isn't this run's, and one written
 // there would reach every process this run starts.
 const CLICK_TOKEN = "HARNESS_COMPUTER_USE_TOKEN";
 function helperEnvironment() {
@@ -393,14 +393,14 @@ function helperEnvironment() {
   return env;
 }
 
-// One line, whatever the reason: a failed build's is the compiler's whole output.
+// One line, whatever the reason, since a failed build's is the compiler's whole output.
 const warnNoBorder = (reason) => console.error(`warn harness-computer-use couldn't show its border: ${reason.split("\n")[0]}. The run clicks without it`);
 
 // How long the overlay has to say that its windows are on screen. By itself it gives up
 // after 2 s.
 const OVERLAY_SHOWN_MS = 5000;
 
-// Builds the helper and the overlay, ahead of the dialog: the wait for a build comes before
+// Builds the helper and the overlay, ahead of the dialog, so the wait for a build comes before
 // the person is asked, and the border shows as soon as they allow. Resolves with the
 // overlay's binary, or with null, after a warning, if only the overlay can't be built.
 async function buildComputerUse() {
@@ -414,7 +414,7 @@ async function buildComputerUse() {
 // Starts the overlay and resolves once it says its windows are on screen. Rejects with the
 // reason the overlay gives if it ends before that, and ends it and rejects if it says nothing
 // for `shownMs`. One that goes later, however it ends, while the run goes on and wasn't
-// stopped, is warned of: the person has lost the pill and its Stop. So is one that says,
+// stopped, is warned of, since the person has lost the pill and its Stop. So is one that says,
 // before it shows, that it couldn't claim its stop key (ADR-0017). Nothing of the overlay
 // keeps this process running.
 async function showComputerUse(binary, { shownMs = OVERLAY_SHOWN_MS } = {}) {
@@ -457,7 +457,7 @@ async function showComputerUse(binary, { shownMs = OVERLAY_SHOWN_MS } = {}) {
 // This machine's name, as "clickHost" gives one.
 const hostname = () => os.hostname().replace(/\.local$/, "");
 
-// Not exported: its pointer calls skip the dialog, the Info View check and Stop.
+// Not exported, since its pointer calls skip the dialog, the Info View check and Stop.
 const machine = {
   hostname,
   clickHost: () => readClickHost(),
@@ -467,7 +467,7 @@ const machine = {
   stopped,
   // A slept display has no windows to capture.
   wake: () => mac.wakeDisplay(),
-  // The display first: activate() returns at once if Live is already in front, even asleep.
+  // The display first, since activate() returns at once if Live is already in front, even asleep.
   // `refuse` is called just before Live is told to activate, and throws if it must not be.
   async focus(refuse) {
     await mac.wakeDisplay();
@@ -529,7 +529,7 @@ const machine = {
 
 // The system's calls that move the pointer or press its button.
 const POINTER_CALLS = ["hover", "click", "drag", "clickEditor", "dragEditor"];
-// Every call of the machine, by name: a test requires each to be classified.
+// Every call of the machine, by name. A test requires each to be classified.
 const MACHINE_CALLS = Object.keys(machine);
 
 // The systems whose run may use the pointer.
@@ -538,9 +538,9 @@ const allowed = new WeakSet();
 // Before a run's first hover: on the click host at once, on any other machine after the
 // person at it allows the run's clicks (ADR-0006). The answer holds for the rest of the run,
 // and while it does a purple border shows there (ADR-0012), built before the person is asked.
-// The border only informs: a run that can't show it still clicks, with a warning. Once the
+// The border only informs. A run that can't show it still clicks, with a warning. Once the
 // run is stopped (ADR-0012), by Stop on the pill or because it can't tell that it wasn't, it
-// throws, saying which: the run goes on, so a check fails there and still cleans up.
+// throws, saying which. The run goes on, so a check fails there and still cleans up.
 async function permit(system) {
   if (!allowed.has(system)) {
     const host = system.hostname();
@@ -582,12 +582,12 @@ async function readUnlessStopped(system, read) {
   }
 }
 
-// The system as DeviceUi and PluginWindow hold it: each call that moves the pointer passes
+// The system as DeviceUi and PluginWindow hold it. Each call that moves the pointer passes
 // permit first, so none can skip the dialog or Stop. `permit` asks ahead of such a call.
-// After Stop the run takes nothing more from the person, the front included: Escape is typed
+// After Stop the run takes nothing more from the person, the front included. Escape is typed
 // only while Live is still in front, and Live isn't brought there, which `focus` refuses.
-// It doesn't pass permit: a run that only captures brings Live forward too, and must not
-// start asking to click. Stop may come while Live is being brought forward, so the system
+// It doesn't pass permit, because a run that only captures brings Live forward too, and must
+// not start asking to click. Stop may come while Live is being brought forward, so the system
 // is handed the refusal, to call again just before it tells Live to activate, and before
 // it types.
 function guarded(system) {
@@ -611,9 +611,9 @@ function guarded(system) {
       }
     }
     // The person may still hold the stop key's modifiers (ADR-0017), and an Escape typed
-    // meanwhile would carry them: it waits for them, a while. If they are still held it isn't
-    // typed, since a modified Escape may be another shortcut (Option-Command-Escape is Force
-    // Quit). If they can't be read, it is typed, as before the stop key.
+    // meanwhile would carry them, so it waits for them, a while. If they are still held it
+    // isn't typed, since a modified Escape may be another shortcut (Option-Command-Escape is
+    // Force Quit). If they can't be read, it is typed, as before the stop key.
     let free;
     try {
       free = await system.waitForNoModifiers(MODIFIERS_WAIT_MS);
@@ -715,13 +715,13 @@ async function liveMainWindow(system = machine) {
   return system.window();
 }
 
-// Saves a picture of one of Live's windows to `file` (PNG), with Live left where it is: the
-// capture works behind other windows. The window is Live's main one, or the one with the id
-// `window` (from liveWindows); a window that isn't Live's is refused. Needs Screen Recording
-// for the terminal app, not the click host. Resolves with the window captured.
+// Saves a picture of one of Live's windows to `file` (PNG), with Live left where it is, since
+// the capture works behind other windows. The window is Live's main one, or the one with the
+// id `window` (from liveWindows); a window that isn't Live's is refused. Needs Screen
+// Recording for the terminal app, not the click host. Resolves with the window captured.
 //
 // screencapture exits 0 when it can't write its file, so the capture is written beside `file`
-// and replaces it only once it is there: a folder that is missing or can't be written throws,
+// and replaces it only once it is there. A folder that is missing or can't be written throws,
 // and leaves a file already at `file` as it was. The name beside it is random, so neither
 // another capture under way nor what a killed one left can be taken for this one's picture.
 async function captureWindow(file, { window: id } = {}, system = machine) {
@@ -748,8 +748,8 @@ class DeviceUi {
   }
 
   // Where the panel is now, from the device's frame in Device Detail (ADR-0020), and the top of
-  // its title in points from the window's top. Every press looks again: selecting a device
-  // can scroll the view. The device's title must be unique on its track.
+  // its title in points from the window's top. Every press looks again, since selecting a
+  // device can scroll the view. The device's title must be unique on its track.
   async locate() {
     await this.system.wake();
     this.live.send("/live/view/set/selected_track", this.track);
@@ -785,7 +785,7 @@ class DeviceUi {
     await this.system.drag(window, x, y, dx, dy, ...hold);
   }
 
-  // Opens the menu `name` and clicks its item `item`, confirmed by its text (ADR-0014): the
+  // Opens the menu `name` and clicks its item `item`, confirmed by its text (ADR-0014). The
   // menu's own window is read, and exactly one row must read `item`. Whatever fails once the
   // menu's control was clicked, the menu is closed with Escape (after Stop, only while Live
   // is still in front) and nothing more is clicked. A click that Stop caught with only its
@@ -846,7 +846,7 @@ class DeviceUi {
     const [x, y] = [at.x + ux, at.y + uy];
     await this.system.hover(at.window.id, x, y);
     await sleep(this.system.settleMs ?? INFO_VIEW_SETTLE_MS);
-    // Only the Info View's title row is read: over the whole window the text recognizer
+    // Only the Info View's title row is read. Over the whole window the text recognizer
     // missed a short title there, or read it wrong, in some states of Live's window.
     const rect = [0, Math.max(0, at.titleY - INFO_ROW_ABOVE), INFO_VIEW_RIGHT, INFO_ROW_HEIGHT];
     const { lines } = await read(at.window.id, { width: at.window.w, rect });
@@ -873,8 +873,8 @@ class DeviceUi {
 
   // Saves a picture of the device, its title bar and frame included, to `file` (PNG). Like
   // ui.text, it rests on the device being selected and its title unique on screen. A device
-  // whose frame isn't wholly inside Live's window is refused before anything is captured:
-  // its picture would be cut off.
+  // whose frame isn't wholly inside Live's window is refused before anything is captured,
+  // since its picture would be cut off.
   async capture(file) {
     if (!this.width) throw new DeviceUiError(`The width of ${this.title}'s panel isn't known: give openDeviceUi a width`);
     const at = await this.locate();
@@ -989,8 +989,8 @@ class PluginWindow {
   async capture(file) {
     await this.system.wake();
     const before = await this.system.frontmost().catch(() => null);
-    // Outside the try: a capture that didn't bring Live forward, as one refused after Stop,
-    // has no front to give back.
+    // Outside the try, since a capture that didn't bring Live forward, as one refused after
+    // Stop, has no front to give back.
     await this.system.focus();
     try {
       const window = await this.shown();

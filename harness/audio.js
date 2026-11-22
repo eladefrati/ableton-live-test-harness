@@ -66,7 +66,7 @@ async function signalTracks(live, { track, device, notes, beats, instrument = ["
   }
 }
 
-// Waits until `file` exists and its size has stopped changing: Live finishes writing a
+// Waits until `file` exists and its size has stopped changing, since Live finishes writing a
 // recording after the transport stops.
 async function settledFile(file, { timeoutMs = 10000, stableMs = 300 } = {}) {
   let last = -1;

@@ -39,8 +39,8 @@ function patcher() {
     openinpresentation: 1,
     devicewidth: 60,
     title: "Example Transpose",
-    // All of these keys, as Live's own devices have them: without searchpath, Live crashes
-    // loading the device.
+    // All of these keys, as Live's own devices have them, since without searchpath, Live
+    // crashes loading the device.
     project: { version: 1, creationdate: 0, modificationdate: 0, viewrect: [0, 0, 300, 500],
       autoorganize: 1, hideprojectwindow: 1, showdependencies: 1, autolocalize: 0,
       contents: { patchers: {} }, layout: {}, searchpath: {}, detailsvisible: 0,

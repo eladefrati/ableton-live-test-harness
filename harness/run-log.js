@@ -38,20 +38,20 @@ function git(repo, ...args) {
 }
 
 // The machine as "remote" on the Mac harness/local.json names as "remote", "local" anywhere
-// else: the log goes into a project's repo, which must not carry machine names.
+// else, since the log goes into a project's repo, which must not carry machine names.
 function machineLabel(hostname = os.hostname(), file = LOCAL) {
   let remote = null;
   try {
     remote = JSON.parse(fs.readFileSync(file, "utf8")).remote;
   } catch {
-    // No file or not JSON: no remote is known.
+    // No file or not JSON, so no remote is known.
   }
   const host = (name) => String(name).split("@").pop().split(".")[0].toLowerCase();
   return typeof remote === "string" && remote && host(remote) === host(hostname) ? "remote" : "local";
 }
 
 function header(repo, name, now) {
-  // The logs themselves don't count: an earlier run's log is not a change to what is tested.
+  // The logs themselves don't count. An earlier run's log is not a change to what is tested.
   const changes = git(repo, "status", "--porcelain", "--", ".", `:(exclude)${LOGS}`);
   const uncommitted = changes === null ? "unknown" : changes ? "yes" : "no";
   return [
@@ -80,8 +80,8 @@ function startRunLog() {
   if (started) return;
   started = true;
   try {
-    // The entry module, not process.argv[1]: under `node -e` that is the first argument or
-    // undefined, and require.main is undefined.
+    // The entry module, not process.argv[1], since under `node -e` that is the first argument
+    // or undefined, and require.main is undefined.
     if (!require.main) return;
     const script = fs.realpathSync(require.main.filename);
     const location = checkLocation(script);

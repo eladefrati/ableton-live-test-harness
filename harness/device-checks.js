@@ -1,6 +1,6 @@
 "use strict";
 
-// A runner for a project's in-Live checks of a MIDI device: it loads the newest build of
+// A runner for a project's in-Live checks of a MIDI device. It loads the newest build of
 // the device from the one Places folder that has it onto a new track, places a known clip in the Arrangement
 // there, and for each case sets the device's parameters, records its output (Post FX) into
 // a second new track, and compares it with the case's expected notes. Both tracks are
@@ -60,26 +60,26 @@ function clipNotes() {
 // Runs `cases` against one loaded device, each recorded from beat 0 for `beats` beats. A
 // case is {name, settings?, beforeRecording?, during?, expect, whileArmed?}:
 //   settings:            {parameterName: value}, set before the recording, put back after
-//   beforeRecording(ctx): anything else to do first, e.g. press a momentary button
+//   beforeRecording(ctx): anything else to do first, such as pressing a momentary button
 //   during:              [{beat, action(ctx)} or {beat, set: {parameterName: value}}], taken
 //                        while it records, once the song has passed `beat`; ctx.during[i] is
 //                        then {beat, before, after}, the song time just before and after
 //                        action i (live.js recordArrangement). A `set` is sent without
 //                        waiting, so the window brackets just that; an action that syncs or
 //                        sleeps pushes `after` late. Parameters a `set` changes are put back
-//                        after the case, as settings are. With `grid` (in beats, e.g. the
-//                        device's step), the case fails if the window, plus `reachMs`,
-//                        crosses a grid line: which step the change hit is then unknown.
+//                        after the case, as settings are. With `grid` (in beats, such as
+//                        the device's step), the case fails if the window, plus `reachMs`,
+//                        crosses a grid line. Which step the change hit is then unknown.
 //                        The window is about one AbletonOSC tick (100-120 ms), so a grid
 //                        step must be well over that plus reachMs (about 250 ms or more, with
-//                        `beat` just after a line), or every run fails: use a coarser grid
+//                        `beat` just after a line), or every run fails. Use a coarser grid
 //                        or a slower --tempo.
 //   expect(ctx):         the notes the device should play: [{pitch, start, duration, velocity}]
 //   whileArmed(ctx):     runs after the recording, with the record track still armed, and
 //                        resolves with its problems (strings), if any
 //
 // Options:
-//   device:         the build's name before its version, e.g. "Device"
+//   device:         the build's name before its version, such as "Device"
 //   builds:         the builds folder; Live finds the build in whichever Places folder has
 //                   it
 //   build:          which file in `builds` to load, for a naming other than
@@ -88,10 +88,10 @@ function clipNotes() {
 //                   use long names (needed when short names repeat);
 //                   without it, settings use Live's short names
 //   notes, beats:   the clip on the device's track (default clipNotes(), 16 beats)
-//   compare:        options for compareNotes (tempo, from and to are set here), e.g.
+//   compare:        options for compareNotes (tempo, from and to are set here), such as
 //                   {edgeBeats: 0.25} to skip notes near the start and the stop
 //   openHooks:      open the test hook's port (ADR-0002) before the device loads
-//   onFail(testCase): e.g. save the device's debug output
+//   onFail(testCase): for example, save the device's debug output
 //   tempo:          set the song's tempo (BPM) first and leave it so; expected notes
 //                   should follow ctx.song.tempo, which is read after it
 //   reachMs:        how long after a `during` window a change may still reach the device
@@ -131,7 +131,7 @@ async function run(cases, {
   let recordTrack;
   let failed = 0;
   try {
-    // Before anything in Live changes: Live must see this very build, in one Places folder.
+    // Checked before anything in Live changes. Live must see this very build, in one Places folder.
     const build = chooseBuild(buildOption, builds, deviceName);
     const buildFile = path.join(builds, build);
     const places = await live.query("/live/browser/get/places_with", build).catch((error) => {
@@ -207,15 +207,15 @@ async function run(cases, {
       await live.deleteArrangementClips(recordTrack);
     }
   } finally {
-    // An error in cleanup must not keep the sockets open: Node would never exit.
+    // An error in cleanup must not keep the sockets open, or Node would never exit.
     try {
       if (first !== undefined && flags.has("--keep")) {
         // a kept record track left armed would stop the next run's recording
         if (recordTrack !== undefined) live.set("track", "arm", recordTrack, 0);
         await live.sync();
       } else if (first !== undefined) {
-        // deleteTracks goes from the last track, so the recording goes before its source:
-        // a track whose MIDI source is gone can't be disarmed
+        // deleteTracks goes from the last track, so the recording goes before its source,
+        // since a track whose MIDI source is gone can't be disarmed
         await live.deleteTracks([deviceTrackName, recordTrackName], first);
       }
     } finally {
@@ -226,7 +226,7 @@ async function run(cases, {
 }
 
 // Why Live can't load `build` from `builds`, given the Places folders that have it (by
-// name: the LOM gives no folder's path), or null if it can.
+// name, since the LOM gives no folder's path), or null if it can.
 function placesProblem(build, builds, places) {
   if (places.length === 0) {
     return `${build} isn't in Live's Places: add ${builds} to Places, with Live quit: `
@@ -269,7 +269,7 @@ function commandLine(argv) {
   return tempo === null ? { flags } : { flags, tempo };
 }
 
-// Runs the cases as a script, with the command line's flags and tempo: exits 1 if any case
+// Runs the cases as a script, with the command line's flags and tempo, and exits 1 if any case
 // fails or the run errors.
 function main(cases, options) {
   Promise.resolve().then(() => run(cases, Object.assign(commandLine(process.argv.slice(2)), options))).then(

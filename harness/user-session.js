@@ -3,7 +3,7 @@
 // Running a command where it sees this user's Audio Units. AudioToolbox finds the
 // components in ~/Library/Audio/Plug-Ins/Components through the per-user
 // AudioComponentRegistrar, a launchd agent of the user's GUI session (Aqua). A process
-// started over ssh is in launchd's Background session, where that agent can't be reached:
+// started over ssh is in launchd's Background session, where that agent can't be reached, so
 // AudioToolbox asks the system's registrar instead, which lists only components in /Library
 // and /System, and `auval -v` on a user's AU ends "didn't find the component".
 // Outside the GUI session the command runs as a one-shot job in the user's GUI
@@ -49,7 +49,7 @@ function jobPlist(label, folder, cmd, args) {
 
 async function runAsGuiJob(cmd, args, timeoutMs) {
   const uid = process.getuid();
-  // Not in the harness's temp folder, which relaunch.js and quit.js empty: a job can run
+  // Not in the harness's temp folder, which relaunch.js and quit.js empty, since a job can run
   // while no client holds UDP 11001.
   const folder = fs.mkdtempSync(path.join(os.tmpdir(), "ableton-harness-job-"));
   const label = `local.ableton-live-test-harness.${path.basename(folder)}`;

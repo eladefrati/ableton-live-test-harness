@@ -1,6 +1,6 @@
 "use strict";
 
-// remote.sh with two local folders standing in for the two Macs: `ssh` and `rsync` on PATH
+// remote.sh with two local folders standing in for the two Macs. `ssh` and `rsync` on PATH
 // are stand-ins that run the remote's side in a folder of its own, as its home.
 
 const test = require("node:test");
@@ -35,8 +35,8 @@ done
 exec /usr/bin/rsync "\${args[@]}"
 `;
 
-// The stand-ins, made once for the file: macOS scans each new program the first time it runs,
-// and a queue of scans held up other test files' programs past their tests' times.
+// The stand-ins, made once for the file, because macOS scans each new program the first time
+// it runs, and a queue of scans held up other test files' programs past their tests' times.
 const BIN = fs.mkdtempSync(path.join(os.tmpdir(), "remote-test-bin-"));
 process.on("exit", () => fs.rmSync(BIN, { recursive: true, force: true }));
 for (const [name, body] of [["ssh", SSH], ["rsync", RSYNC]]) {
@@ -44,7 +44,7 @@ for (const [name, body] of [["ssh", SSH], ["rsync", RSYNC]]) {
 }
 
 // The two Macs, with this Mac's harness clone at `clone` (path parts under the test's folder;
-// "here" is this Mac's home), which remote.sh is run from: it takes the folder holding the
+// "here" is this Mac's home), which remote.sh is run from. It takes the folder holding the
 // clone as the repos' folder.
 function macs(t, clone = ["here", "dev", "ableton-live-test-harness"]) {
   const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "remote-test-")));
@@ -181,8 +181,8 @@ test("remote.sh runs a worktree of a repo, with git working in the remote's copy
     + "mkdir -p tests/live/logs; echo log > tests/live/logs/run.log");
   assert.equal(ran.status, 0, ran.stderr);
   const there = mac.at("there", "dev", "project", ".worktrees", "branch");
-  // The stand-in remote shares this disk, where this Mac's path would resolve too: the remote's
-  // .git must name the remote's copy.
+  // The stand-in remote shares this disk, where this Mac's path would resolve too, so the
+  // remote's .git must name the remote's copy.
   assert.equal(read(path.join(there, ".git")), `gitdir: ${mac.at("there", "dev", "project", ".git", "worktrees", "branch")}\n`);
   assert.equal(read(path.join(there, "ran.txt")), "worktree");
   assert.equal(read(path.join(there, "commit.txt")), `${commit}\n`);

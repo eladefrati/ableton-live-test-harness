@@ -66,7 +66,7 @@ async function main() {
     line(false, "More than one Live is running (Suite and Beta?): the harness can't tell them apart. Ask the user to quit one.");
     return 1;
   }
-  // Live keeps the Remote Script's modules from when it started: code changed since then
+  // Live keeps the Remote Script's modules from when it started, so code changed since then
   // runs only after a reload (manager.py: a restart).
   const started = await liveStartTime(pids[0]);
   const repo = path.join(__dirname, "..");

@@ -2,7 +2,7 @@
 "use strict";
 
 // Checks the path for measuring an audio-effect plug-in, on Apple's AUDelay (installed on
-// every Mac, no state of its own): makes all of its parameters reachable (plugin.js, which
+// every Mac, no state of its own). It makes all of the plug-in's parameters reachable (plugin.js, which
 // replaces the open set with one holding only the plug-in), and moves it onto a new audio
 // track fed by a new MIDI track playing Operator. It records the signal and the plug-in's
 // Post FX output side by side, reads both files and checks that with Dry/Wet Mix 0 the
@@ -71,7 +71,7 @@ async function main() {
         + `the signal by ${(lag * 1000).toFixed(1)} ms, expected ${(want * 1000).toFixed(1)} ms`);
     }
   } finally {
-    // An error in cleanup must not keep the sockets open: Node would never exit.
+    // An error in cleanup must not keep the sockets open, or Node would never exit.
     try {
       if (rig && !keep) await rig.restore();
     } finally {

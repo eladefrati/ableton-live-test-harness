@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 "use strict";
 
-// Checks the harness's save and reopen path, which goes through Live's menus (macos.js):
+// Checks the harness's save and reopen path, which goes through Live's menus (macos.js). It
 // saves the open set as a new set in a temporary folder, changes it, reopens the file
 // discarding the change, and checks the saved state came back. This REPLACES the open set
 // with the temporary one; the file it was opened from is untouched. The folder stays behind
