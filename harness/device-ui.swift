@@ -702,13 +702,13 @@ case "click-editor", "drag-editor":
     }
 case "drag":
     let numbers = arguments.dropFirst(3).prefix(4).compactMap { Double($0) }
-    let held = arguments.dropFirst(8).compactMap { Double($0) }
-    guard arguments.count == 7 || (arguments.count == 11 && arguments[7] == "hold" && held.count == 3),
+    let holding = arguments.dropFirst(8).compactMap { Double($0) }
+    guard arguments.count == 7 || (arguments.count == 11 && arguments[7] == "hold" && holding.count == 3),
           let id = Int(arguments[2]), numbers.count == 4
     else { fail("usage: device-ui drag <window> <x> <y> <dx> <dy> [hold <ms> <dx2> <dy2>]") }
     let (point, delta) = (CGPoint(x: numbers[0], y: numbers[1]), CGVector(dx: numbers[2], dy: numbers[3]))
     requireDrag(point, delta)
-    let hold = held.isEmpty ? nil : Hold(ms: held[0], then: CGVector(dx: held[1], dy: held[2]))
+    let hold = holding.isEmpty ? nil : Hold(ms: holding[0], then: CGVector(dx: holding[1], dy: holding[2]))
     if let hold {
         requireHold(hold.ms)
         requireDrag(CGPoint(x: point.x + delta.dx, y: point.y + delta.dy), hold.then)

@@ -49,7 +49,8 @@ const { patcherChunk } = require("./amxd.js");
 const { checkLocation } = require("./run-log.js");
 
 // `done` is true on the error of a press that was stopped (ADR-0012) with only its button's
-// release left: it throws as any stopped press does, and the click or the drag happened.
+// release left: it throws as any stopped press does, and the click or the drag happened; for
+// a held drag stopped during its hold, its first move only (ADR-0021).
 class DeviceUiError extends Error {}
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -194,7 +195,8 @@ const helperBinary = () => tools.helperBinary(HELPER_SOURCE).catch((e) => {
 });
 
 // How the helper exits when Stop caught it with only a button's release left
-// (device-ui.swift): the click or the drag happened, and the error says so with `done`.
+// (device-ui.swift): the click or the drag happened, or a held drag's first move, and the
+// error says so with `done`.
 const HAPPENED_STATUS = 4;
 
 async function helper(...args) {
