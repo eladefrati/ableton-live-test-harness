@@ -583,7 +583,11 @@ such a repo at any depth there (`project/.worktrees/branch`); `remote.sh` refuse
 path, and a folder that isn't a repo, so it never syncs, or deletes in, a parent of a repo on
 the remote. For a worktree it copies its repo's `.git` too and points the remote's copy of the
 worktree's `.git` file at it, so git, and the commit in a check's log, work there; the rest of
-the repo's working copy isn't copied. It copies the working copies of this clone and of `<repo>` to the same
+the repo's working copy isn't copied. To run checks from a worktree of this clone, so that runs from
+the clone don't see changes in progress, put the worktree in a folder beside the clone
+(`../<clone>-<branch>` from the clone), not inside it, where `remote.sh` refuses it, as its
+repo isn't then one of the repos; run the worktree's own `remote.sh`, with the
+worktree's folder name as `<repo>` for its own checks. It copies the working copies of this clone and of `<repo>` to the same
 paths in the remote's home (uncommitted changes included; the remote can't fetch from this
 Mac), runs the command in `<repo>` there, with `LIVE_HARNESS` set to the remote's copy of
 `harness/`, and exits with its status. The remote is the host named
