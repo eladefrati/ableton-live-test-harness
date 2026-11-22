@@ -9,7 +9,7 @@ checks it runs beside it.
   in `float()` or `double()` to choose.
 - `live.js`: the client. `connect()` binds UDP 11001, so only one client can run at a
   time. Requests are sent one at a time and wait for their reply; a message on
-  `/live/error` fails the request in flight. Setters and methods send no reply: call
+  `/live/error` fails the request in flight. Setters and methods send no reply. Call
   `sync()` to wait until Live has handled them. Any address in
   [osc-api.md](../docs/osc-api.md) works through `query(address, ...args)` (resolves with
   the reply's arguments) and `send(address, ...args)`, or `get(object, property, ...indices)`
@@ -38,7 +38,7 @@ checks it runs beside it.
   `longNames` (every visible parameter's long name; needed when short names repeat),
   otherwise Live's short names. `compare: {edgeBeats}` skips notes near
   the start and the stop, for a device whose first notes are late by design. Durations are
-  compared only with `compare: {durationToleranceMs}`: set it for a device whose note
+  compared only with `compare: {durationToleranceMs}`. Set it for a device whose note
   lengths matter. The case shape,
   the options and `ctx` are described at the top of `run()`. A case's `during` actions run
   while Live records; each gets the song time just before and after it, a window about one
@@ -71,7 +71,7 @@ checks it runs beside it.
   file}`, and refuses to replace a set the harness didn't make (outside its temp folder),
   since opening discards unsaved changes; after a relaunch, `relaunch.js --plugin <name>`
   starts Live on the set instead.
-  Instruments (`aumu`) and VST3 plug-ins refuse: the first are untested, and VST3 parameter
+  Instruments (`aumu`) and VST3 plug-ins refuse. Instruments are untested, and VST3 parameter
   IDs need a VST3 host to read.
 - `audio.js`: measuring an audio effect's output. `signalTracks(live, {track, device,
   notes, beats, instrument, bitDepth})` adds a MIDI track (`harness-signal`, Operator unless
@@ -85,7 +85,7 @@ checks it runs beside it.
   `recordArrangement`, so `during` actions work) and resolves with `{dry, wet,
   sampleRate, files, windows}`, one `Float32Array` per channel; sample 0 is the recording's
   start, `start` in song beats, in both takes. `recordedSamples(live, track)` reads a
-  track's last recorded clip. A check that needs float passes `bitDepth: 32`:
+  track's last recorded clip. A check that needs float passes `bitDepth: 32`.
   `signalTracks` then refuses before adding tracks unless Live records at 32-bit float, and
   `recordSignal` refuses a take that isn't (see "Record bit depth" below).
 - `wav.js`: `readWav(file)` reads a WAV file (PCM 8/16/24/32-bit, float 32/64-bit) into
@@ -116,35 +116,35 @@ checks it runs beside it.
   in 2 minutes throws `DeviceUiError` (ADR-0006). From Allow until the run's process ends, a
   breathing purple glow in from the screen's edges, with a pill naming the run, shows that the
   run may take the pointer; a notification says when it has ended (`computer-use-overlay.swift`,
-  ADR-0012). Stop on the pill takes the mouse back: the press under way stops, with a button
+  ADR-0012). Stop on the pill takes the mouse back. The press under way stops, with a button
   it holds released, and throws `DeviceUiError`, as do the run's later presses, so a
   check fails at the press that throws and still cleans up. The glow goes at once, and the
-  pill stays, its button reading Stopping, until the run's process has ended: the
+  pill stays, its button reading Stopping, until the run's process has ended. The
   notification that the mouse is free comes then. A run still going 10 s after Stop is left
-  running: the pill goes, and the notification says that the run was stopped and is still
+  running. The pill goes, and the notification says that the run was stopped and is still
   running (ADR-0015). If only the press's release was
-  left, the click or the drag has happened: `error.done` is `true` on that press's error, and
+  left, the click or the drag has happened. `error.done` is `true` on that press's error, and
   set on no other, so a check that must undo what a click did reads it in its cleanup. Stop
   removes the run's click token, a file the run and its click helper must be able to read
-  before they click: a run that loses the token any other way (its folder removed, or made
+  before they click. A run that loses the token any other way (its folder removed, or made
   unwritable, so that Stop couldn't remove the token) can't tell that it wasn't stopped,
   stops the same way, and says which it was. The click helper also posts only while the run
-  that started it lives: one whose run a signal killed, which leaves the token behind, posts
+  that started it lives. A helper whose run a signal killed, which leaves the token behind, posts
   nothing but the release of a button it holds. A stopped run doesn't bring Live to the front
   either, so a capture of a plug-in's window throws too. If Stop can't remove the token, it
-  signals the run instead (SIGUSR2): the run stops the same way, whatever its token says,
+  signals the run instead (SIGUSR2). The run stops the same way, whatever its token says,
   and the border stays until the run has ended. A run still there 10 s after the signal is
-  killed, and cleans nothing up: a check has that long to clean up and end. The stop key,
+  killed, and cleans nothing up. A check has that long to clean up and end. The stop key,
   Control-Option-Command-Space (⌃⌥⌘Space, which the pill shows before its Stop and the
   dialog names), presses Stop on the pill through the button's action and needs no
-  pointer: while the border's program runs, no app gets that key, Live included
-  (ADR-0017). The key is claimed exclusively: a border that couldn't claim it, as when
+  pointer. While the border's program runs, no app gets that key, Live included
+  (ADR-0017). The key is claimed exclusively. A border that couldn't claim it, as when
   another run's border, or another program that claimed it exclusively, holds it, shows no
   key, and the run says so on
   stderr in a line starting `warn harness-computer-use` and clicks on. A run
   whose border can't show, or goes, however it ends, while the run goes
   on and wasn't stopped, says so on stderr in a line starting `warn harness-computer-use`, and clicks without
-  it; when the border couldn't be built, the dialog says, in place of the glow, that nothing
+  it. When the border couldn't be built, the dialog says, in place of the glow, that nothing
   on screen will show that the run may take the pointer, and that there will be no Stop and
   no stop key.
   The dialog, the pill and the
@@ -166,7 +166,7 @@ checks it runs beside it.
   the button up at once with no second move, its error saying `done`; a knob of one of Live's
   devices counts both events from the press point, so it turns further than both moves),
   `ui.choose(name, item)` opens the menu a control opens (a chooser) and clicks the one row
-  that reads `item`, closing the menu with Escape if none or two do or anything else fails once the menu's control was clicked (ADR-0014; after Stop, once no modifier key is held, waiting 2 s at most and leaving the menu open with a warning if one still is, since the stop key's may be: ADR-0017), and `ui.text([x, y, w, h])`
+  that reads `item`, closing the menu with Escape if none or two do or anything else fails once the menu's control was clicked (ADR-0014; after Stop, once no modifier key is held, waiting 2 s at most and leaving the menu open with a warning if one still is, since the stop key's may be; see ADR-0017), and `ui.text([x, y, w, h])`
   resolves with the lines shown in that part of the panel, in device units. A press looks
   for the panel again, brings Live to the front, and throws `DeviceUiError` without clicking
   unless the screen is unlocked, Live's main window is on top at the point and the Info View
@@ -174,7 +174,7 @@ checks it runs beside it.
   Accessibility gives (ADR-0020). It needs the Info View and Device Detail visible, Live at
   100% zoom, the device in view and its name unique on its track, an unfrozen `.amxd`, and an
   `annotation_name` on the control; a `live.tab` must be a single column. Most of a press's
-  time goes to reading the Info View from a capture. `press` resolves when the click is sent: read what
+  time goes to reading the Info View from a capture. `press` resolves when the click is sent. Read what
   it did from Live.
   Any other device or plug-in (its controls in Live's device view, not its own window) is
   pressed at measured points (ADR-0007):
@@ -199,13 +199,14 @@ checks it runs beside it.
   `capture` wake the display and bring Live to the front; `capture` gives the front back. A
   press throws `DeviceUiError` without clicking unless the screen is unlocked, the editor is
   `size`, the point inside it, and the plug-in's window on top at the point. There is no Info
-  View to confirm the control: a moved point clicks another control of the plug-in, so take
+  View to confirm the control. A moved point clicks another control of the plug-in, so take
   the evidence from Live. A press needs `size`; opening and capturing don't.
-  To measure a plug-in's points: `node harness/cli.js plugin-window <track> <device> <png>`
+  To measure a plug-in's points, `node harness/cli.js plugin-window <track> <device> <png>`
   prints the editor's size (`editor: {w, h}`, the `size` to give) and saves the editor. Take
   each control's centre from the plug-in's own layout code, whose coordinates are these
-  points when the editor isn't scaled, or from that picture: its pixels are points times the
-  display's scale, its width in pixels divided by `editor.w`. Then press each control once and
+  points when the editor isn't scaled, or from that picture. Its pixels are points times the
+  display's scale, which is its width in pixels divided by `editor.w`. Then press each control
+  once and
   check that the parameter Live reads is the one meant, as a check does.
 - `video.js`: a video of Live, for proof of something that changes over time (ADR-0016),
   for any project's checks as for the harness's own; a fixed state needs a still
@@ -216,47 +217,49 @@ checks it runs beside it.
   resolves once the recording has started, with `{file, pid, stop(), done()}`: `pid` is the
   recording helper's, `stop()` ends the recording now and `done()` waits for it to end by
   itself, both resolving with `{file, seconds, bytes}`, the video's length and size, and
-  `early`, the reason, when it ended before it was stopped: a window recording ends when its
+  `early`, the reason, when it ended before it was stopped. A window recording ends when its
   window closes (a relaunch of Live closes the main window). A window is recorded alone, as
   `captureWindow` captures it: behind other windows, without harness-computer-use's border and
   pill, and without the menus, dialogs and other windows that open over it, each a window of
   its own; the screen has everything on it, those, the border, the pill and other apps
   included. The pointer shows in both. It records H.264 at up to 30 frames a second, at the
-  rate the Mac's encoder picks: measured with Live idle or playing, about 0.1 MB a second for
+  data rate the Mac's encoder picks. Measured with Live idle or playing, the rate is about
+  0.1 MB a second for
   Live's window on a 2x display and 0.2 for that display on an Intel Mac, and 0.46 and 0.75
   on an Apple-silicon one, so a recording that runs to the 10-minute cap can reach about
   280 MB for a window and 450 MB for the screen; more movement costs more. It builds the
-  helper first, then wakes the display, and keeps it on while it records: a display that
+  helper first, then wakes the display, and keeps it on while it records. A display that
   sleeps leaves the video on its last picture. The recording stops after `seconds` (10
   minutes if not given), on `stop()`, when the run's process ends, however it ends, or, when
   the run's stderr is a pipe or a socket, once nothing reads it any more, as when the ssh
   session of a run on the remote ends (the run itself goes on; the result doesn't say why it
   stopped). A run whose stderr goes to a process still reading it, a check that started the
-  run, say, records on. The file is whole each time: a run that fails or is killed still
+  run, say, records on. The file is whole each time. A run that fails or is killed still
   leaves the video up to then, and need not wait for it. A helper killed itself leaves its
   file whole too, but one it was writing in the captures folder stays under its hidden name
   there, in `.unfinished`, until the folder's prune deletes it (`captures.js`). The helper runs in a
   session of its own, a process group with no terminal, so Ctrl-C on the run doesn't reach
-  it: the run stops it. A plug-in's own window shows only while
+  it. The run stops it. A plug-in's own window shows only while
   Live is in front (ADR-0008), so recording it needs Live in front throughout.
   `videoFrame(file, seconds, png)` saves the frame the video shows at that time and resolves
-  with `{file, at, w, h, seconds}`, the last the video's length: how an agent, which can't
-  watch a video, sees what it shows. With no `png` it goes to the captures folder, named as
+  with `{file, at, w, h, seconds}`, the last the video's length. This is how an agent, which can't
+  watch a video, sees what the video shows. With no `png` it goes to the captures folder, named as
   other captures are: the time, then `<video's name>-<seconds>s.png`. Both need macOS 15 or later, refused below with that reason; the
   helper (`video.swift`) is built with `swiftc` on first use, as the click helper is. A
   recording also needs what "What Live needs" lists for it.
 - `captures.js`: where a capture given no path goes, from `cli.js`'s `capture`,
-  `plugin-window`, `video` and `video-frame` and from `recordVideo` and `videoFrame`: the
+  `plugin-window`, `video` and `video-frame` and from `recordVideo` and `videoFrame`. Such a
+  capture goes to the
   captures folder, `ableton-harness-captures` in the system temp folder, apart from the
-  harness's temp folder that `relaunch.js` and `quit.js` empty, named by the local time and
+  harness's temp folder that `relaunch.js` and `quit.js` empty, and is named by the local time and
   what it shows. Every capture they make goes through `startCapture`, given a path or none.
   `captureWindow` and `ui.capture` take a path; code that saves one of theirs uses
   `saveCapture(file, { name, ext }, write)`, with no `file` for the folder. A capture is proof to show
   once, not part of a project, so no project keeps a folder or a `.gitignore` line for one.
-  macOS doesn't clear unused files from that temp folder within days: on macOS 26, whose
+  macOS doesn't clear unused files from that temp folder within days. On macOS 26, whose
   clean-up (`dirhelper`) is set to 3 days, files more than 3 days old by both their times
   were still there after its daily runs. So each capture saved there deletes, once it is
-  saved, the captures there older than 7 days: one left there lasts until a capture is saved
+  saved, the captures there older than 7 days. A capture left there lasts until a capture is saved
   more than 7 days after it. Two captures of one thing named in one millisecond get `-2`,
   `-3` after the name, and none given no path replaces a file. A capture is written in the folder's hidden `.unfinished`
   folder and moved out once it is finished, a video by its helper, so a file in the captures
@@ -264,22 +267,23 @@ checks it runs beside it.
   dot). A path the caller gives outside the folder is used as given, its folder made if it is
   missing, and nothing deletes it; one inside it follows the folder's rules. A capture of
   Live's window (`captureWindow`, `cli.js capture`) is written beside its file as
-  `<name>-capturing-<random>.png` and renamed to it once whole: a run killed while it captures
+  `<name>-capturing-<random>.png` and renamed to it once whole. A run killed while it captures
   can leave that file there, and nothing deletes it outside the captures folder.
   `node harness/captures.js finished` lists the folder's finished captures, for `remote.sh`.
 - `doctor.js`: read-only check that Live is ready to be driven; run it first. What it
-  checks and what to do about each line: the
+  checks and what to do about each line are in the
   [`verify-ableton` skill](../skills/verify-ableton/SKILL.md).
 - `relaunch.js [--kill] [--suite | --app <path>] [--plugin <name>]`: quits Live if it runs and starts the Live named by
   `--app <path>`, else Ableton Live 12 Suite with `--suite`, else `"app"` in `local.json`, else the Live that was running, else the only one in
-  `/Applications`, and refuses to guess between several. It checks the Live exists before quitting anything. Live starts behind other windows, on a fresh copy of `sets/empty.als` (one MIDI track, unarmed, no
-  devices, no returns, nothing on Main, Main at -inf dB so runs are silent (recordings take tracks' Post FX, before Main); saved by Live 12.4.25b1, opens in Suite 12.4.3), not
-  the user's template. It answers "Save changes?" with Don't Save and "delete the temporary files?" with Delete, and kills Live if it is
+  `/Applications`, and refuses to guess between several. It checks the Live exists before quitting anything. Live starts behind other windows, not on the user's template but on a fresh copy
+  of `sets/empty.als`. That set has one MIDI track, unarmed, no
+  devices, no returns, nothing on Main, and Main at -inf dB so runs are silent (recordings take tracks' Post FX, before Main); it was saved by Live 12.4.25b1 and opens in Suite 12.4.3.
+  `relaunch.js` answers "Save changes?" with Don't Save and "delete the temporary files?" with Delete, and kills Live if it is
   still running 10 s after the quit or the last answer (`--kill` kills at once). After a
   kill, or when it finds that Live crashed, it moves Live's recovery data into the
   preferences folder's `Crash` folder, so Live starts without asking to recover. Once the old Live has exited it deletes that Live's
   Temp Projects and the previous copy's folder. It stops at any other dialog, leaving it
-  open. Once Live is up it creates and deletes an audio and a MIDI track (`warmUp`): Live's
+  open. Once Live is up it creates and deletes an audio and a MIDI track (`warmUp`). Live's
   first track after it starts loads the plug-ins of the user's default track, which held
   Live for over 2 s, long enough for a check's next get to time out. Holds UDP 11001 throughout. With `--plugin <name>` Live starts instead on a set
   holding only the Audio Unit effect named `name` on track 0, every parameter listed
@@ -319,17 +323,17 @@ checks it runs beside it.
   log (`Log.txt`), and `requireSampleRate(rate)` rejects unless Live runs at `rate`, the
   same way; a check that needs a sample rate calls it before recording.
 - `log.js`: Live's own log. `maxMessages({since})` resolves with the Max console messages
-  (`{at, level, text}`) Live logged from `since` (ms timestamp or Date) on: take the time
+  (`{at, level, text}`) Live logged from `since` (ms timestamp or Date) on. Take the time
   before a run and read them after it, to see why a device that loaded and answers OSC
   does nothing.
 - `cli.js`: `node harness/cli.js ping | reload | query <address> [args] | send <address> [args] | notes <track> <clip> [--arrangement] | song-notes <track> | max-log [since] | windows | capture [<png>] [--window <id>] | plugin-window <track> <device> [<png>] | video [<file.mov>] [--seconds <n>] [--window <id> | --screen] [-- <command...>] | video-frame <file.mov> <seconds> [<png>]`.
   `max-log` reads Live's log, not OSC, so it runs beside a check; `since` is ms or a local
   time such as `2026-10-31T11:18`, and defaults to Live's start. `windows` lists Live's
-  windows on screen with their layer (`liveWindows` in `device-ui.js`): a dialog or a panel
+  windows on screen with their layer (`liveWindows` in `device-ui.js`). A dialog or a panel
   is a window of its own, and so is a plug-in's window (layer 3), listed only while Live is
   in front. `capture` saves a picture of Live's main window, or with `--window <id>` of one
   from that list, taken with Live behind other windows (`captureWindow`). Both need Screen
-  Recording for the terminal app, and Automation for System Events: they wake the display
+  Recording for the terminal app, and Automation for System Events. They wake the display
   first, as `macos.js` does. `plugin-window` opens a plug-in's own window if it isn't open
   and saves a picture of its editor (`openPluginWindow`), bringing Live to the front while it
   captures; it also needs Accessibility. `video` records Live's main window, a window from
@@ -338,7 +342,7 @@ checks it runs beside it.
   then it records until the command after `--` ends, the `--seconds` given, Ctrl-C or SIGTERM,
   10 minutes at most without `--seconds`, and prints `{file, seconds, bytes}`, with `early`
   when it ended before it was stopped. With a command, the command runs in a session of its
-  own with no input: each Ctrl-C, SIGTERM, SIGHUP or SIGQUIT `video` gets reaches the
+  own with no input. Each Ctrl-C, SIGTERM, SIGHUP or SIGQUIT `video` gets reaches the
   command's whole process group once, as a terminal's would, the recording goes on until the
   command has ended, and `video` exits with the command's status, adding it as `status`; a
   recording that fails as it stops is reported as `error`, the status kept. What the command
@@ -366,7 +370,7 @@ checks it runs beside it.
   open set with one holding only the plug-in, as `exposePluginParameters` does, so it refuses a set the harness
   didn't open.
 - `checks/plugin-set.js <name> [--keep]`: checks the set built for the AU effect `<name>`
-  against the plug-in as Live lists it itself: it exposes the parameters, loads the
+  against the plug-in as Live lists it itself. It exposes the parameters, loads the
   plug-in again from the Plug-Ins browser onto a new track, and checks that the built
   device lists the AU's parameters in its order, that Live's own list is that list with at
   most some left out, and that both read the same values. Up to 64 parameters, Live's own
@@ -434,7 +438,7 @@ checks it runs beside it.
   border up with the pill, is killed 10 s
   after Stop, not sooner, and only then does the overlay say that the run was ended;
   pressed again 5 s into that wait, on the button that then reads Stopping, it changes
-  nothing: the run is still killed 10 s after the first press;
+  nothing, and the run is still killed 10 s after the first press;
   pressed as the run ends, it says
   that the run has ended. Stop is pressed on the pill during a gesture too, where the pill
   reads Stopping and the overlay
@@ -456,18 +460,19 @@ checks it runs beside it.
   that app in front, the pill must show it, it must stop the run, and the app
   must not get it while the overlay is up, and must once the overlay has said its last
   words, while it still waits for its notification, and once it was killed (SIGKILL). With two overlays up, each over a run of its own, the
-  second's claim on the key must be refused: its pill shows no key and its Stop still
+  second's claim on the key must be refused. The second overlay's pill shows no key and its
+  Stop still
   stops its run, and one press of the key stops only the first run. A click and a drag the
   helper posts while the key's modifiers are held, before the key (`press-key --hold`, with
   F13 in place of Space), and a click while Shift alone is, carry them on their button
   events, while the keyboard's state still reads them held as each event arrives, as
-  `checks/pointer-target.swift` reports both: a measurement of the cost ADR-0017 accepts,
+  `checks/pointer-target.swift` reports both. This is a measurement of the cost ADR-0017 accepts,
   after which the modifiers are let go of whatever happened (`press-key --release`). A click
   with nothing held carries none. After every case that presses the key,
   and once more at the end, no modifier key may be left held. First of
-  all the overlay is started with the process id 0, and with -1, for its run: it must
+  all the overlay is started with the process id 0, and with -1, for its run. The overlay must
   refuse, saying nothing and exiting 1 with its usage. After every case it is started over a run
-  that has ended and that nothing has waited for, which still answers signal 0: it must say
+  that has ended and that nothing has waited for, which still answers signal 0. The overlay must say
   that the run has ended, and, after Stop in its last resort, where such a run ends at the
   signal, Stopped, without waiting to kill it. In every case
   the window may receive
@@ -476,7 +481,7 @@ checks it runs beside it.
   click or drag must
   complete, the button-up must reach the window at least half the helper's hold after the
   token was removed (35 ms in a click, 25 ms after a drag's move), or, where the helper was
-  suspended with the button down, not before the token went: under that the case fails,
+  suspended with the button down, not before the token went. Under that the case fails,
   as it hasn't shown that Stop came before the release. The cases that end under a
   notification's banner come after the others, each waiting for the banner of the case before to go,
   and the check takes about 290 s. It takes the
@@ -496,7 +501,7 @@ checks it runs beside it.
   its window; for the plug-in's window closed; for a coordinate that is no number; and for
   a notification's banner that keeps the screen covered past the 10 s the helper waits for
   it to go. A window that comes over the point during the hover gets no button event and is
-  named in the error, the helper having posted only the hover's two moves: the tap
+  named in the error, the helper having posted only the hover's two moves. The tap
   suspends the helper at its first move (SIGSTOP) until that window shows. A run whose
   token is gone posts nothing and exits 3. A drag is refused too for a fraction of a point,
   for no distance, for over 400 points, and for an end off the screen, a point past the
@@ -517,7 +522,7 @@ checks it runs beside it.
   `cli.js video` still running 15 s after fails the case); one that `cli.js video` stops on
   SIGTERM after 3 s (it must exit 0 within 30 s and finish the file); one whose run's stderr closes after
   2 s, as an ssh session's does when it ends (the recording must end then); one of a window that
-  closes after 2 s (a panel of its own, `checks/pointer-target.swift`: the result must say it
+  closes after 2 s (a panel of its own, `checks/pointer-target.swift`; the result must say it
   ended early); and one whose run is killed after 3 s (its helper must end within 15 s, the
   file whole and 3 s long). Each video must be within 0.6 s of its length (the one around
   the command within 1.2 s over it, the Ctrl-C one at least 2.4 s), a window's frames the
@@ -525,8 +530,8 @@ checks it runs beside it.
   saved beside it; the frames of a video that moved, at each second and 0.25 s before its
   end, must each differ from the one before, so a video that froze, as one does while the
   display sleeps, fails. It also runs `cli.js video`, `capture` and `video-frame` with no
-  file: each must save to the captures folder, moved out of its unfinished folder, and say
-  where; it deletes what they saved. The frames are for looking at: with `--out` the videos
+  file. Each must save to the captures folder, moved out of its unfinished folder, and say
+  where; it deletes what they saved. The frames are for looking at. With `--out` the videos
   and frames are kept in that folder, otherwise deleted. Leaves the transport stopped; takes
   about 70 s.
 
@@ -581,7 +586,7 @@ Each run of a check in a project's `tests/live/` is saved in that repo, one file
 and whether the code had uncommitted changes, then everything the run printed, then
 `exit: <code>` (no exit line means the run was killed). `connect()` starts it, through
 `run-log.js`; the harness's own tools and checks are not logged. The `verify-ableton`
-skill has these logs committed in the project's repo. That is a convention: the harness
+skill has these logs committed in the project's repo. That is a convention. The harness
 works without it.
 
 ## Running on a second Mac
@@ -610,28 +615,29 @@ worktree's folder name as `<repo>` for its own checks. It copies the working cop
 paths in the remote's home (uncommitted changes included; the remote can't fetch from this
 Mac), runs the command in `<repo>` there, with `LIVE_HARNESS` set to the remote's copy of
 `harness/`, and exits with its status. The remote is the host named
-as `remote` in `harness/local.json` ("Settings"). The remote's own `.venv`, `node_modules` and `__pycache__` are not copied or deleted: a
+as `remote` in `harness/local.json` ("Settings"). The remote's own `.venv`, `node_modules` and `__pycache__` are not copied or deleted. A
 project that needs them installs them there over ssh. A check's logs (`tests/live/logs/`, at
-any depth, so a worktree's inside a repo too) are not copied or deleted either: `remote.sh`
+any depth, so a worktree's inside a repo too) are not copied or deleted either. `remote.sh`
 moves those of `<repo>` to this Mac after the command, after a failure too, and logs it can't
 move come back after the next run. A worktree's logs come back when the run names the
 worktree, not its repo. Stills, videos and frames taken on the
-remote with no path come back too, from its captures folder to this Mac's (`captures.js`):
-only finished ones, not a video still being recorded, and none whose name this Mac's folder
+remote with no path come back too, from its captures folder to this Mac's (`captures.js`).
+Only finished ones come back, not a video still being recorded, and none whose name this
+Mac's folder
 has already, which stays on the remote and is said so; `remote.sh` names each one it brings
 back, at its path here. A path given on the remote stays there. Ctrl-C on `remote.sh` ends
-it and its ssh, as the terminal signals both, and no signal reaches the remote: the run there
-goes on to its end. A SIGTERM sent to `remote.sh` alone ends only `remote.sh`: its ssh, and
+it and its ssh, as the terminal signals both, and no signal reaches the remote. The run there
+goes on to its end. A SIGTERM sent to `remote.sh` alone ends only `remote.sh`. Its ssh, and
 so the session, goes on to the run's end. A recording there whose run's stderr is the
 session's stops when the session ends, as nothing reads that stderr any more (`video.js`),
 and its file is finished; one whose run's stderr goes to another process there records on.
 The run's logs and captures stay there and come back after the next run. There is no lock; the slot rule below is what keeps two runs apart.
 
-The remote only runs checks. Its copies are mirrors, replaced on every run, `.git` included:
-never edit or commit in them, since the next run discards the work. Changes are made and
+The remote only runs checks. Its copies are mirrors, replaced on every run, `.git` included.
+Never edit or commit in them, since the next run discards the work. Changes are made and
 committed on this Mac.
 
-Who holds the remote's Live: the session working on the remote, with full control (launch, quit,
+The session working on the remote holds the remote's Live, with full control (launch, quit,
 save, settings, anything). Before taking it, that session asks the user whether another session
 is working in Live there; if one is, it agrees slots with that session.
 
@@ -642,7 +648,7 @@ Count-In, any Options.txt entries). A project's builds folder must be in the rem
 `harness/remote.sh <repo> node ../ableton-live-test-harness/harness/add-place.js builds`
 (`../../ableton-live-test-harness` for a repo one level down; the clone's folder name if it
 has another). A worktree's builds folder isn't in Places unless added the same way, and a
-build is found by its file name in every Places folder (`device-checks.js`): a worktree's
+build is found by its file name in every Places folder (`device-checks.js`), so a worktree's
 build named as the repo's is refused as being in two Places. Either give the worktree's builds
 names of their own and add its builds folder to Places, or copy the build into the repo's
 builds folder there before the check (a run that names the worktree doesn't replace the
@@ -655,7 +661,7 @@ parameter helper as launchd jobs in the GUI session, which needs the user logged
 
 While the remote's display sleeps, Live can't be brought to the front, so `macos.js` wakes the
 display (declares user activity) before any step through Live's menus. The screen saver
-must stay off there: waking doesn't reliably dismiss it.
+must stay off there. Waking doesn't reliably dismiss it.
 
 ## What Live needs
 
@@ -673,19 +679,19 @@ must stay off there: waking doesn't reliably dismiss it.
   the terminal app too, and a Live that names its device view over Accessibility, as Live
   12.4 does (seen in 12.4.25b1; earlier versions not tried). Without it the window isn't
   opened, and the error says what it didn't find.
-- Live in front while `saveSetAs()` types into it: keystrokes go to the frontmost app. It
+- Live in front while `saveSetAs()` types into it, since keystrokes go to the frontmost app. It
   brings Live forward itself and types only from a script that finds Live in front; if
   another app comes forward, it brings Live back, up to three times, then fails having typed
   nothing. It puts the app that was in front back afterwards. Don't click or type in another
-  app meanwhile: the save fails. Menu commands
+  app meanwhile, or the save fails. Menu commands
   (`clickMenu`: `saveSet`, Key and MIDI Map Mode) bring Live forward for the click and put
   it back too. A plug-in window's `press` and `capture` bring Live forward, since Live shows
   the window only then; `capture` puts the app back. Nothing else brings Live forward.
 - For `midi.js`: Remote on for the MIDI input `Harness` in Live's Settings > Link, Tempo &
   MIDI, and Track on for notes into a track, set once per Mac while `node harness/cli.js
   midi-port` holds the port open. Live keeps it after the port closes and after a relaunch.
-- Count-In off: "Installation" in the main README.
-- Recording uses the Arrangement: `recordArrangement()` turns the loop off and sets Record
+- Count-In off (see "Installation" in the main README).
+- Recording uses the Arrangement. `recordArrangement()` turns the loop off and sets Record
   Quantization to None, and leaves them that way. It turns Automation Arm off while it
   records, or on with `automation: true` to write automation, and puts it back after. A
   relocation while it records ends Live's take, so it throws if Record is off after a
@@ -708,9 +714,9 @@ rounding, needs 32-bit float. It says so (in its `tests/live/README.md` and its 
 requires it: `bitDepth: 32` on `signalTracks`, or `requireRecordBitDepth(32)` before it
 records. When Live is set otherwise the check refuses without recording. Checks that don't
 need it work at either. `doctor.js` reports the current setting (`info records at 32-bit float`).
-The setting is Live's, on each machine: the remote's is its own.
+The setting is Live's, on each machine, and the remote's is its own.
 
 ## Notes from Live
 
-How Live behaves under the harness, found by running it: [live-notes.md](live-notes.md). Read
+[live-notes.md](live-notes.md) records how Live behaves under the harness, found by running it. Read
 it when Live does something unexpected.
