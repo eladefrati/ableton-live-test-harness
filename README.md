@@ -51,9 +51,9 @@ Max for Live. Live's language must be English: the harness finds its menus and d
   `node harness/add-place.js <folder>`. By hand: Add Folder under Places in Live's browser.
 - For an agent, link `skills/verify-ableton` into its skills folder. For Claude Code:
   `ln -s ~/dev/ableton-live-test-harness/skills/verify-ableton ~/.claude/skills/verify-ableton`
-- To run checks on a second Mac, or to press a device's controls with the mouse, copy
-  `harness/local.example.json` to `harness/local.json` and set its values: "Running on a
-  second Mac" in [harness/README.md](harness/README.md).
+- To choose which Live the harness starts, run checks on a second Mac, or press a device's
+  controls with the mouse, copy `harness/local.example.json` to `harness/local.json` and set
+  its values: "Settings" in [harness/README.md](harness/README.md).
 - `harness/relaunch.js` and `harness/quit.js` quit the running Live and discard its unsaved
   changes and recordings: don't run them on a set you care about. Which Live `relaunch.js`
   starts, and its options: [harness/README.md](harness/README.md).

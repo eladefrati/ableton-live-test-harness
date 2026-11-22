@@ -59,7 +59,8 @@ Run this first, and again whenever anything looks off. It's read-only:
 node ~/dev/ableton-live-test-harness/harness/doctor.js
 ```
 
-It checks that Live is running (only one at a time), AbletonOSC answers, no
+It first prints the harness's settings (`harness/local.json`); on a `warn` there, ask the user
+for the value and set it ("Settings" in `harness/README.md`). It checks that Live is running (only one at a time), AbletonOSC answers, no
 Live dialog is open, and no track is armed, and reports the bit depth Live records at
 (`info records at 24-bit` or `32-bit float`) and the sample rate it runs at. It warns when
 the Remote Script's files changed since Live started (run `harness/cli.js reload`; a changed

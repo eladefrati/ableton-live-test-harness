@@ -13,6 +13,39 @@ const path = require("node:path");
 const { connect } = require("./live.js");
 const { liveApp, livePids, liveStartTime, inHarnessTemp } = require("./macos.js");
 const { liveVersion, recordBitDepth, describeDepth, sampleRate } = require("./settings.js");
+const { installedLives } = require("./relaunch.js");
+
+const LOCAL = path.join(__dirname, "local.json");
+
+// One line per setting in harness/local.json (`text`, null with no file): what is set, and
+// what each missing one leaves off. Lives are the paths installedLives() found. The keys
+// and their effects: "Settings" in harness/README.md.
+function settingsLines(text, installed) {
+  const lines = [];
+  let local = {};
+  if (text === null) lines.push("info no harness/local.json: every setting is unset (\"Settings\" in harness/README.md)");
+  else {
+    try {
+      local = JSON.parse(text);
+    } catch (error) {
+      return [`warn harness/local.json isn't valid JSON (${error.message}): every setting is read as unset`];
+    }
+    if (!local || typeof local !== "object" || Array.isArray(local)) return ["warn harness/local.json isn't a JSON object: every setting is read as unset"];
+  }
+  const set = (key) => typeof local[key] === "string" && local[key] ? local[key] : null;
+  const app = set("app");
+  if (app) lines.push(fs.existsSync(app) ? `info app: relaunch.js starts ${app}` : `warn app: ${app} isn't installed; relaunch.js will refuse`);
+  else if (installed.length > 1) {
+    lines.push(`warn app is not set and ${installed.length} Lives are installed: relaunch.js starts the running one, `
+      + "and with none running refuses; set \"app\" in harness/local.json to the one to use");
+  } else lines.push("info app is not set: relaunch.js starts the running Live, else the only one installed");
+  lines.push(set("remote") ? `info remote: remote.sh runs on ${set("remote")}` : "info remote is not set: remote.sh can't run checks on a second Mac");
+  lines.push(set("clickHost") ? `info clickHost: device-ui.js clicks without asking on ${set("clickHost")} only`
+    : "info clickHost is not set: device-ui.js asks before a run's first click on every machine");
+  const unknown = Object.keys(local).filter((key) => !["app", "remote", "clickHost"].includes(key));
+  if (unknown.length) lines.push(`warn harness/local.json has keys the harness doesn't read: ${unknown.join(", ")}`);
+  return lines;
+}
 
 async function main() {
   let failed = 0;
@@ -20,6 +53,8 @@ async function main() {
     if (!ok) failed++;
     console.log(`${ok ? "ok  " : "FAIL"} ${text}`);
   };
+  const local = fs.existsSync(LOCAL) ? fs.readFileSync(LOCAL, "utf8") : null;
+  for (const text of settingsLines(local, installedLives())) console.log(text);
 
   const pids = await livePids();
   if (pids.length === 0) {
@@ -106,7 +141,11 @@ async function main() {
   return failed ? 1 : 0;
 }
 
-main().then((code) => { process.exitCode = code; }, (error) => {
-  console.error(error.message);
-  process.exitCode = 1;
-});
+if (require.main === module) {
+  main().then((code) => { process.exitCode = code; }, (error) => {
+    console.error(error.message);
+    process.exitCode = 1;
+  });
+}
+
+module.exports = { settingsLines };

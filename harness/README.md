@@ -532,6 +532,22 @@ Project checks live in each project's repo, in `tests/live/`, and use this folde
 library by path. Checks of a MIDI device run on `device-checks.js`; checks of audio or a
 control signal have their own loop.
 
+## Settings
+
+What differs per machine is in `harness/local.json`, which git ignores; copy
+`local.example.json` to start one. Every key is optional, and `doctor.js` prints what each
+is set to and what is off without it. `remote.sh` copies the file to the remote with the
+rest of the clone, so both machines read the same values.
+
+- `app`: the path of the Live `relaunch.js` and `add-place.js` use when `--app` and
+  `--suite` aren't given. Unset, they use the running Live, else the only one in
+  `/Applications`, and refuse when several are installed.
+- `remote`: the ssh destination (`user@host`) of the second Mac `remote.sh` runs on
+  ("Running on a second Mac"). `LIVE_REMOTE` names another for one run.
+- `clickHost`: the hostname (without `.local`) of the one machine `device-ui.js` clicks on
+  without asking. A click takes that machine's pointer, so name your own only if the agent
+  may take it from you (ADR-0005); any other machine asks first (ADR-0006).
+
 ## Running
 
 From the repo root, with Live open and AbletonOSC selected:
@@ -592,11 +608,7 @@ worktree's folder name as `<repo>` for its own checks. It copies the working cop
 paths in the remote's home (uncommitted changes included; the remote can't fetch from this
 Mac), runs the command in `<repo>` there, with `LIVE_HARNESS` set to the remote's copy of
 `harness/`, and exits with its status. The remote is the host named
-as `remote` in `harness/local.json`, a file git ignores (`local.example.json` shows its
-keys); `LIVE_REMOTE` names another for one run. `clickHost` in the same file is the hostname (without `.local`)
-of the one machine `device-ui.js` clicks on without asking. A click takes that machine's pointer, so
-name your own only if the agent may take it from you (ADR-0005); any other machine asks first (ADR-0006). `remote.sh` copies the file with the rest, so both machines read
-the same values. The remote's own `.venv`, `node_modules` and `__pycache__` are not copied or deleted: a
+as `remote` in `harness/local.json` ("Settings"). The remote's own `.venv`, `node_modules` and `__pycache__` are not copied or deleted: a
 project that needs them installs them there over ssh. A check's logs (`tests/live/logs/`, at
 any depth, so a worktree's inside a repo too) are not copied or deleted either: `remote.sh`
 moves those of `<repo>` to this Mac after the command, after a failure too, and logs it can't
