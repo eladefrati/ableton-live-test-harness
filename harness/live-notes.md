@@ -134,7 +134,12 @@ unexpected.
   drag event at the press point plus both moves. Its second move is refused as any drag's
   move is, and so is a hold that isn't whole ms from 1 to 2000, before the pointer moves.
   Stop or an ending signal during the hold brings the button up at once, not at the hold's
-  end: the helper looks for both every 10 ms while it holds.
+  end: the helper looks for both every 10 ms while it holds. On Auto Filter's Resonance,
+  from its minimum, a drag 5 up, held 400 ms, then 5 up more turned 15 steps, where one drag
+  10 up turned 10, in three runs each: the knob counted the first event's 5 points, moved the
+  pointer back to the press point, then counted the second event's 10 points from there. So
+  a held drag reaches Live's knob, and over-turns it as ADR-0021 says (remote Mac, Live
+  12.4.25b2, 2026-11-22).
 - A helper ended by SIGTERM or SIGQUIT while a drag held the button left it held.
   `device-ui.swift` now holds SIGINT, SIGQUIT, SIGTERM and SIGHUP back while the button is
   down: it posts the button up where the pointer is, then dies by that signal. A helper that
