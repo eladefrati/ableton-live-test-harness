@@ -1,6 +1,7 @@
 # Backlog
 
-Open work, not scheduled. An item leaves this list when it is done or dropped.
+The items here are open work, not scheduled. An item leaves this list when it is done or
+dropped.
 
 - **A runner for checks of audio.** `device-checks.js` tests MIDI devices only, so each project
   whose output is audio or a control signal writes its own loop of loading the device, running
@@ -19,17 +20,17 @@ Open work, not scheduled. An item leaves this list when it is done or dropped.
   in `audio.js` is the place to disarm what it leaves.
 - **A check on a set with a group track.** No harness check runs on one, and the harness
   can't make one, so what `doctor.js` and `recordArrangement()` read from a group track
-  (`arm`, `playing_slot_index`) is untested; a property that doesn't apply reads nil, proven
-  only with `fold_state` on a MIDI track. Add a fixture set holding a group track, saved
+  (`arm`, `playing_slot_index`) is untested. A property that doesn't apply reads nil, which is
+  proven only with `fold_state` on a MIDI track. Add a fixture set holding a group track, saved
   from Live as `sets/empty.als` was, and a check that runs both on it.
 - **A selection setter that checks.** `/live/view/set/selected_track` can leave the selection
   unchanged with no error (`harness/live-notes.md`), and `send` waits for nothing. Add a
   `selectTrack()` to `live.js` that sets the track, reads `get/selected_track` back and
   throws on a mismatch.
-- **Clicks in a plug-in's own window.** `device-ui.js` clicks only in Live's main window: it
+- **Clicks in a plug-in's own window.** `device-ui.js` clicks only in Live's main window. It
   finds the device by its title there, and the helper refuses a point where another window is
   on top. Finding the plug-in's window by its title (`liveWindows`) and measuring points from
-  its corner is small. The open question is the check before a click: the plug-in's window
+  its corner is small. The open question is the check before a click. The plug-in's window
   shows its own interface, and whether Live's Info View names anything inside it is untested.
-  Without it, a click there needs another confirmation (such as text read next to the control),
-  a change to ADR-0004's decision 3 that needs its own ADR.
+  Without it, a click there needs another confirmation (such as text read next to the control).
+  That is a change to ADR-0004's decision 3 and needs its own ADR.

@@ -1,11 +1,12 @@
 # Agents
 
-A test harness that lets a coding agent run acceptance tests in a running Ableton Live, for
-projects that run in Live. Built on AbletonOSC. macOS only.
+This repo is a test harness that lets a coding agent run acceptance tests in a running Ableton
+Live, for projects that run in Live. It is built on AbletonOSC and runs on macOS only.
 
 ## Layout
 
-- `manager.py`, `abletonosc/`: the Remote Script. Python, runs inside Live and answers OSC.
+- `manager.py`, `abletonosc/`: the Remote Script. It is written in Python, runs inside Live
+  and answers OSC.
 - `harness/`: the Node client that drives Live, with its own checks and unit tests.
 - `tests/`, `client/`: AbletonOSC's own Python tests and their client.
 
