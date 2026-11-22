@@ -600,17 +600,32 @@ class Live {
       if (started < start - 1e-6) {
         throw new LiveError(`Live started at beat ${started.toFixed(3)}, not ${start}; recording stopped`);
       }
+      // Live turns Record off when the song is relocated (current_song_time set, jump_by), and
+      // Play goes on: the take ends there (live-notes.md). Record is read
+      // after each batch of actions, which may relocate, and at the end, not on every poll,
+      // which would slow the fine polling by a tick.
+      const recording = async (beat) => {
+        if (!(await this.get("song", "record_mode"))) {
+          throw new LiveError(`Live's Record went off by beat ${beat.toFixed(3)}, before beat ${start + length}, ending `
+            + "the take there. A relocation (current_song_time or jump_by) does that: record across a jump in the "
+            + "Session instead");
+        }
+      };
       for (let now = started; now < start + length;
         now = await this.get("song", "current_song_time")) {
+        let acted = false;
         while (pending.length && now >= pending[0].beat) {
           const { beat, action, index } = pending.shift();
           await action();
+          acted = true;
           windows[index] = { beat, before: now, after: await this.get("song", "current_song_time") };
         }
+        if (acted) await recording(now);
         const untilMs = pending.length ? (pending[0].beat - now) * msPerBeat : Infinity;
         await sleep(untilMs < 2 * pollMs ? finePollMs : pollMs);
       }
       if (pending.length) throw new LiveError(`Recording ended before beat ${pending[0].beat}`);
+      await recording(start + length);
       return windows;
     } finally {
       this.send("/live/song/stop_playing");

@@ -174,9 +174,11 @@ test("test-hook reports are collected and awaited by topic and device", async ()
 // moves; Stop while stopped puts it back at 0; setting the song time while stopped leaves it;
 // turning record_mode on while stopped starts Play (unless song.noPlayWithRecord, as with
 // Start Playback with Record off); start_playing while playing restarts it from the marker,
-// counted in song.restarts.
+// counted in song.restarts; setting the song time while playing relocates Play there and turns
+// Record off, Play going on; song.recordOffAt: the beat from which Record reads off.
 function playingSong(song = { cues: [] }) {
   song.restarts = 0;
+  song.record = false;
   let startedAt = null;
   let marker = 0;
   let stoppedAt = 0;
@@ -192,16 +194,22 @@ function playingSong(song = { cues: [] }) {
       return [];
     },
     "/live/song/set/record_mode": ([on]) => {
+      song.record = Boolean(on);
       if (on && startedAt === null && !song.noPlayWithRecord) startedAt = Date.now();
       return [];
     },
+    "/live/song/get/record_mode": () => [["/live/song/get/record_mode", song.record && !(now() >= song.recordOffAt)]],
     "/live/song/get/is_playing": () => [["/live/song/get/is_playing", startedAt !== null]],
     "/live/song/stop_playing": () => {
       if (startedAt === null) marker = 0;
       else [stoppedAt, startedAt] = [now(), null];
       return [];
     },
-    "/live/song/set/current_song_time": ([time]) => { if (startedAt === null) stoppedAt = time; return []; },
+    "/live/song/set/current_song_time": ([time]) => {
+      if (startedAt === null) stoppedAt = time;
+      else [marker, startedAt, song.record] = [time, Date.now(), false];
+      return [];
+    },
     "/live/song/get/current_song_time": () => [["/live/song/get/current_song_time", now()]],
     "/live/song/get/cue_points": () => [["/live/song/get/cue_points", ...cues()]],
     "/live/song/cue_point/add_or_delete": () => {
@@ -282,6 +290,23 @@ test("trackData groups one reply's values by track", () => withFake({
 }, async (live) => {
   assert.deepEqual(await live.trackData("name", "arm"), [["a", false], ["b", true]]);
 }));
+
+test("recordArrangement throws when a during action relocates the song, which ends Live's recording", () =>
+  withFake(playingSong(), async (live) => {
+    await assert.rejects(live.recordArrangement({ start: 0, length: 4, tracks: [], during: [
+      { beat: 0.1, action: async () => { live.set("song", "current_song_time", 2); await live.sync(); } },
+    ] }), /Live's Record went off by beat 0\.\d+, before beat 4, ending the take there\. A relocation/);
+  }));
+
+test("recordArrangement throws when Live's Record is off at the end", () => {
+  // Record goes off after the action's own check, as by a press in Live's window
+  const song = { cues: [], recordOffAt: 0.2 };
+  return withFake(playingSong(song), async (live) => {
+    const before = { beat: 0.05, action: async () => {} };
+    await assert.rejects(live.recordArrangement({ start: 0, length: 0.3, tracks: [], during: [before] }),
+      /Live's Record went off by beat 0\.300, before beat 0\.3,/);
+  });
+});
 
 test("recordArrangement refuses a start off the bar while a track has an active Session clip", () =>
   withFake({ ...playingSong(), ...withSessionClip(4, 4) }, async (live) => {

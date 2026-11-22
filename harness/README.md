@@ -651,7 +651,9 @@ must stay off there: waking doesn't reliably dismiss it.
 - Count-In off: "Installation" in the main README.
 - Recording uses the Arrangement: `recordArrangement()` turns the loop off and sets Record
   Quantization to None, and leaves them that way. It turns Automation Arm off while it
-  records, or on with `automation: true` to write automation, and puts it back after.
+  records, or on with `automation: true` to write automation, and puts it back after. A
+  relocation while it records ends Live's take, so it throws if Record is off after a
+  `during` action or at the end (`live-notes.md`).
 - The record bit depth a check needs, if it needs one (see "Record bit depth").
 
 ## Record bit depth

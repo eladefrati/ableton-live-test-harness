@@ -772,6 +772,14 @@ unexpected.
   at every pitch, at times from -9000 to 20000, `get_all_notes_extended()` returned all of
   them, in a Session and an Arrangement clip, in `get_notes_extended()`'s order, pitch then
   time, which the callers rely on (Live 12.4.25b2, remote Mac, 2026-11-19).
+- A relocation ends an Arrangement recording: setting `current_song_time` while Live records
+  (or `/live/song/jump_by`) turns Record off and Play goes on from the new place, so the take
+  ends at the jump. Read 0.15 s after a jump from beat 4 to 20, `record_mode` was off and
+  Play on, and the MIDI take ended at beat 4.4; the same with `jump_by` 16 (this Mac, Live
+  12.4.25b2, 2026-11-21); an audio take ended the same way on the remote Mac.
+  `recordArrangement()` throws when Record is off after a `during` action or at the end, rather
+  than return a short take. A loop's end doesn't end the take. To record across a jump, record
+  in the Session: fire a clip slot on the armed track and relocate while it records.
 - Play starts from the start marker, `Song.start_time`; `recordArrangement()` sets it to
   `start` and leaves cue points alone. Setting `current_song_time` while stopped doesn't
   move the marker, Stop while stopped puts it back at 0, and turning `record_mode` on while
