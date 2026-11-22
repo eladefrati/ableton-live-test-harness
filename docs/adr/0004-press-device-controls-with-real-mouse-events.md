@@ -21,7 +21,7 @@ and takes the pointer from whoever is using the Mac.
 
 1. **Real mouse events.** `harness/device-ui.js` posts them through `CGEvent`, with a Swift
    helper, on the unmodified build.
-2. **On the remote Mac only.** It refuses on any other machine: nobody uses that Mac's
+2. **On an unattended Mac only.** It refuses on any other machine: nobody uses that Mac's
    pointer.
 3. **Never blind.** A click goes out only if the screen is unlocked, Live is frontmost, its
    main window is the topmost window at the point, and with the pointer on the point, Live's

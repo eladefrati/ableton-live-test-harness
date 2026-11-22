@@ -69,7 +69,7 @@ so reaching Stop means competing with the run for the pointer. A key needs no po
 
 ## Consequences
 
-Probed on the remote Mac (macOS 26), with a stand-in app in front and keys posted as events
+Probed on an Intel Mac (macOS 26), with a stand-in app in front and keys posted as events
 (`CGEvent`):
 
 - The key reached the program that registered it whether its modifiers were posted as their
@@ -94,7 +94,7 @@ Not proven:
   but only posted ones were tried.
 - That System Events, as the harness types Escape, posts it as the probe did, and so would be
   caught by a claimed Escape.
-- macOS's default shortcuts: only the remote Mac's settings were read, where nothing else
+- macOS's default shortcuts: only one Mac's settings were read, where nothing else
   answered the key.
 
 Also:
@@ -105,7 +105,7 @@ Also:
   the keyboard layout, which never include Control; that wasn't tried.
 - A run with no border has no key either: the key belongs to the border's program.
 - A person reaches the key with its modifiers held first, and the run's clicks carry
-  whatever modifiers are held as they are posted: on the remote Mac a click the helper
+  whatever modifiers are held as they are posted: on an Intel Mac (macOS 26) a click the helper
   posted 200 ms into a 1 s hold of Control, Option and Command carried all three, on its
   button-down and button-up, where one with nothing held carried none. So a click already
   in flight when the key is pressed can reach Live as a Control-Option-Command click, and

@@ -20,7 +20,7 @@ const TRACK = "harness-midi-map";
 const CC = 20;
 const KEY = "k";
 // Live takes a CC or a key and shows the parameter's new value within this time (measured
-// well under it on the remote Mac).
+// well under it on an Intel Mac).
 const SETTLE_MS = 600;
 
 async function main() {

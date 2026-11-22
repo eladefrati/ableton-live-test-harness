@@ -59,7 +59,7 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 // panel's corner, in points at Live's 100% zoom (ADR-0020): the device's body starts 1 point
 // in and 18 down, below the title bar, for Live's own devices, Max devices and plug-ins alike,
 // and a Max device's presentation 2 points further in than its body (measured in captures of
-// Live's window, Live 12.4.25b2, 2026-11-21). The title's text starts 4 points below the
+// Live's window, Live 12.4.25b2). The title's text starts 4 points below the
 // frame's top.
 const DEVICE_TO_PANEL = { x: 3, y: 18 };
 const DEVICE_TO_TITLE_Y = 4;
@@ -69,7 +69,7 @@ const isPlugin = (className) => /PluginDevice$/.test(className); // AuPluginDevi
 const INFO_VIEW_RIGHT = 240; // points from the window's left edge
 // The Info View's title row, read on its own after a hover: from this far above the top of
 // the device's title, this tall: to 14 points below that top. The Info View's text below
-// its title starts 20 points below it (measured on the remote Mac).
+// its title starts 20 points below it.
 const INFO_ROW_ABOVE = 4; // points
 const INFO_ROW_HEIGHT = 18; // points
 // Long enough for Live to show the control under the pointer in the Info View.
@@ -80,15 +80,14 @@ const STOP_POLL_MS = 100;
 // let go of: about twice as long as a person holds them before reaching the key.
 const MODIFIERS_WAIT_MS = 2000;
 // A device's frame around its panel, in points at 100% zoom: left of and above the panel's
-// corner (the title bar), right of the panel, and the whole height (measured on the remote
-// Mac, 2026-11-11).
+// corner (the title bar), right of the panel, and the whole height (measured in Live
+// 12.4.25b1).
 const FRAME = { left: 5, top: 20, right: 17, height: 192 };
 
 // Devices measured in Live, by class name (/live/device/get/class_name): each control's
 // centre in points from the panel's corner, with its Info View title, and the panel's width.
-// Live 12.4.25b1 at 100% zoom, on the remote Mac, 2026-11-11; each x taken again from the
-// centre of the control's Accessibility frame, from the panel's corner (ADR-0020), Live
-// 12.4.25b2, 2026-11-21.
+// Live 12.4.25b1 at 100% zoom; each x taken again from the centre of the control's
+// Accessibility frame, from the panel's corner (ADR-0020), Live 12.4.25b2.
 const MEASURED_DEVICES = {
   // Auto Filter's knobs, by parameter name
   AutoFilter2: {

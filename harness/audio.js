@@ -43,7 +43,7 @@ async function signalTracks(live, { track, device, notes, beats, instrument = ["
     const source = await live.createMidiTrack(NAMES.source);
     await live.loadDevice(source, instrument[0], instrument[1]);
     // With Options.txt's -EnableArmOnSelection, loading the instrument armed its track, and
-    // recordArrangement then refuses (measured 2026-10-31; live-notes.md).
+    // recordArrangement then refuses (live-notes.md).
     live.set("track", "arm", source, 0);
     await live.placeClip(source, notes, beats);
     // The Session clip is deleted; the Arrangement copy plays.

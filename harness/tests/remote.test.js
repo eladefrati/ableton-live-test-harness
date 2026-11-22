@@ -95,7 +95,7 @@ test("remote.sh copies the repo over, runs the command there, brings its logs ba
   assert.ok(!fs.existsSync(mac.at("there", "dev", "project", "tests", "live", "logs", "run.log")), "moved, not copied");
 });
 
-test("remote.sh takes a repo one level down in ~/dev, and leaves the other folders of its parent on the remote alone", (t) => {
+test("remote.sh takes a repo one level down beside the clone, and leaves the other folders of its parent on the remote alone", (t) => {
   const mac = macs(t);
   mac.repo("product", "format");
   mac.write(mac.at("here", "dev", "product", "format", "file.txt"), "here");
@@ -137,7 +137,7 @@ test("remote.sh run from a clone outside the home folder refuses, and touches no
   assert.deepEqual(fs.readdirSync(mac.at("there")), []);
 });
 
-test("remote.sh refuses anything but a git repo in ~/dev or one level down, or a worktree, and touches nothing on the remote", (t) => {
+test("remote.sh refuses anything but a git repo beside the clone or one level down, or a worktree, and touches nothing on the remote", (t) => {
   const mac = macs(t);
   mac.repo("product", "format");
   mac.repo("a", "b", "c");

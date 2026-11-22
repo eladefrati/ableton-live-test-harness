@@ -40,10 +40,9 @@ function run() {
   if (status !== 0) throw new Error("IOPMAssertionDeclareUserActivity returned " + status);
 }`;
 
-// Wakes the display and waits until some app is frontmost. With the remote Mac's display asleep,
+// Wakes the display and waits until some app is frontmost. With the display asleep,
 // System Events reported no frontmost process and Live couldn't be brought to the front,
-// so menu clicks and Save As timed out; declaring user activity brought both back
-// (2026-11-03).
+// so menu clicks and Save As timed out; declaring user activity brought both back.
 async function wakeDisplay({ timeoutMs = 3000 } = {}) {
   await new Promise((resolve, reject) => {
     execFile("osascript", ["-l", "JavaScript", "-e", WAKE_DISPLAY], (error, stdout, stderr) => {
@@ -61,7 +60,7 @@ async function wakeDisplay({ timeoutMs = 3000 } = {}) {
 // Wakes the display and keeps it on until stop() is called, or until this process exits. A
 // Live started while the display slept never redrew its window: captures, on the screen as
 // well as of the window, kept showing the set as it opened, and neither waking the display
-// nor bringing Live to the front nor resizing its window changed that (2026-11-11). `wake`
+// nor bringing Live to the front nor resizing its window changed that. `wake`
 // and `hold` are replaceable for tests.
 const holdDisplay = () => spawn("caffeinate", ["-d", "-w", String(process.pid)], { stdio: "ignore" });
 async function keepDisplayOn({ wake = wakeDisplay, hold: start = holdDisplay } = {}) {
@@ -80,8 +79,8 @@ async function keepDisplayOn({ wake = wakeDisplay, hold: start = holdDisplay } =
 
 // Brings Live to the front and waits until it is there; throws if it doesn't come. System
 // Events' "set frontmost of process", sent once and not checked, wasn't enough: started
-// with Ghostty in front, save-reopen.js failed in 1 of 2 runs, and 0 of 6 with this
-// (2026-11-02). Live is addressed by its bundle id, which Suite and Beta don't share.
+// with another app in front, save-reopen.js failed in 1 of 2 runs, and 0 of 6 with this.
+// Live is addressed by its bundle id, which Suite and Beta don't share.
 // `refuse`, if given, is called just before Live is told to activate, and throws if Live
 // must no longer be: what its caller looked at may have changed while the display woke.
 async function activate({ timeoutMs = 3000, refuse } = {}) {
@@ -245,7 +244,7 @@ const mtime = (file) => (fs.existsSync(file) ? fs.statSync(file).mtimeMs : 0);
 // The folder that holds every temp folder the harness makes (sets saved as, the sets
 // relaunch.js starts Live on, plug-in sets). Its own folder, not the system temp folder itself: Go to Folder lists the
 // parent of the path typed into it, and with 15,857 entries in the system temp folder it
-// was still loading when saveSetAs pressed Return (measured 2026-11-01). relaunch.js
+// was still loading when saveSetAs pressed Return. relaunch.js
 // empties it once Live has quit.
 const HARNESS_TEMP = path.join(os.tmpdir(), "ableton-harness");
 
@@ -326,7 +325,7 @@ async function saveSetAs(folder, name, { timeoutMs = 10000 } = {}) {
   try {
     // Live stays in front from the click on: with the app that was in front put back
     // meanwhile, the panel lost the typed name and folder though it took Command-A, Go to
-    // Folder and Return (measured 2026-11-20).
+    // Folder and Return.
     await clickMenu("File", "Save Live Set As...", { giveBack: false });
     await waitFor(panelOpen, "the Save dialog", timeoutMs);
     // The panel exists a moment before it takes keys, so it waits first.
@@ -337,8 +336,7 @@ async function saveSetAs(folder, name, { timeoutMs = 10000 } = {}) {
       keystroke "g" using {command down, shift down}`);
     await waitFor(sheetOpen, "the Go to Folder sheet", timeoutMs);
     // Go to Folder's highlighted suggestion lags the typed path, and Return takes the
-    // suggestion: half a second after typing it still named the previous temp folder
-    // (measured 2026-10-31).
+    // suggestion: half a second after typing it still named the previous temp folder.
     await typeInLive(`keystroke ${quote(folder)}\ndelay 2`);
     // A Return pressed while the sheet is still loading the path is lost, so Return is
     // pressed again until the sheet closes, then (Save) until the file is written; never
@@ -372,7 +370,7 @@ async function saveSetAs(folder, name, { timeoutMs = 10000 } = {}) {
 // bringing it to the front (ADR-0003): NSWorkspace with activation off, through JXA. Live
 // came forward with `open -a` and with `open -g -a`. The request is asynchronous, so the
 // script waits for its completion handler: exiting at once dropped the open in 3 of 3
-// tries (2026-11-02). Rejects with Launch Services' error, e.g. while the app is quitting.
+// tries. Rejects with Launch Services' error, e.g. while the app is quitting.
 const OPEN_IN_BACKGROUND = `ObjC.import("AppKit");
 function run(argv) {
   const config = $.NSWorkspaceOpenConfiguration.configuration;

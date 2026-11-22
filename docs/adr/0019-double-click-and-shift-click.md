@@ -14,7 +14,7 @@ Live's window only.
 A device's own views can act on a double-click (deleting a point, say) or on a click with Shift
 held (a variant of a button's action). harness-computer-use only clicked, so a check had to post
 these events itself, outside the harness's checks and its Stop (ADR-0012). A press of
-`device-ui.js` takes about 9 s on the remote Mac, so two presses can't make a double-click:
+`device-ui.js` takes about 9 s on an Intel Mac (macOS 26), so two presses can't make a double-click:
 the gesture has to be one call of the helper. A modifier key posted as a key event stays held
 for every app until its release is posted, and a mouse event posted with its modifiers cleared
 lets go of keys a person holds (`harness/live-notes.md`).

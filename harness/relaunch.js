@@ -138,7 +138,7 @@ async function waitExit(pid, ms) {
 // Resolves true once Live has exited, false if it is still running HANG_MS after the quit or the last answer.
 async function quit(live, app, pid, say) {
   // Playing, Live asked "This action will stop audio. Proceed?" before quitting a set with
-  // no unsaved changes (2 of 2, 2026-11-02), so the transport is stopped first. A Live that
+  // no unsaved changes (2 of 2), so the transport is stopped first. A Live that
   // doesn't answer is quit as it is.
   try {
     if (await live.get("song", "is_playing")) {
@@ -272,7 +272,7 @@ async function waitUp(live, began, file) {
     if (dialog && dialog.message) throw new Error(`Live started with a dialog open: ${dialog.message}`);
     if (dialog) continue;
     // A reply can still go missing while Live finishes starting: /live/test answered, then
-    // file_path didn't within 1 s (1 of 8 relaunches, 2026-11-02).
+    // file_path didn't within 1 s (1 of 8 relaunches).
     let opened;
     try {
       opened = await live.get("song", "file_path");
@@ -289,8 +289,8 @@ async function waitUp(live, began, file) {
 
 // Live builds a new track from the user's default track (User Library, Defaults/Creating
 // Tracks) and loads its plug-ins. The first time after Live starts, that held Live's main
-// thread 2.2 s (with plug-ins on the default audio track, Live 12.4.25b1, 2026-11-03 and
-// -04), so a check's first get after creating a track got no reply within 2 s; later
+// thread 2.2 s (with plug-ins on the default audio track, Live 12.4.25b1), so a check's
+// first get after creating a track got no reply within 2 s; later
 // creations took 0.3 s. Creating and deleting one track of each kind pays that cost here,
 // waiting up to `timeout` ms for each.
 async function warmUp(live, timeout = WARM_MS) {

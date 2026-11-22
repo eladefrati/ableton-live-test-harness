@@ -3,11 +3,11 @@
 // Live's settings, read from Preferences.cfg in the running version's preferences folder
 // (~/Library/Preferences/Ableton/Live <version>/), without touching Live's window. The LOM
 // doesn't expose them. Live writes Preferences.cfg when its Settings window closes, not when
-// a setting changes (seen 2026-11-05); the sample rate is read from Live's log instead,
+// a setting changes; the sample rate is read from Live's log instead,
 // which has it within a second.
 //
 // Preferences.cfg is binary and undocumented; this reading of it was worked out from Live
-// 12.4.25b1's files on 2026-11-01:
+// 12.4.25b1's files:
 //   "ab1e5678", u8 format (5), u32 (unknown), u8 0, u8-length root name ("LivePreferences"),
 //   i32 count, then count - 1 class definitions, the root's among them:
 //     u8 0, u8-length ASCII class name, i32 field count (-1 for List<> and Slot<>), and per
@@ -18,7 +18,7 @@
 //   an i32 (unknown) and its fields; an empty name (u8 0, u8 0) ends it. Most settings are
 //   items of the root's PreferenceMembers list (SongPrefData among them), which readSetting
 //   finds by their class name.
-// The values' layout was worked out on 2026-11-05 by walking whole files from the root to
+// The values' layout was worked out by walking whole files from the root to
 // their last byte (every file at hand from Live 12.2 to 12.4.25b1; 12.0
 // and 12.1 files don't define the root). The walk took these sizes: 0x12 float32, 0x15 8
 // bytes, 0x16 16 bytes, 0x17 float64, 0x50 and arrays a u32 byte count and the bytes.
@@ -128,7 +128,7 @@ function readSetting(buffer, object, field) {
 }
 
 // Settings > Record/Warp/Launch > Bit Depth, by the value Live stores. 1 and 2 were
-// matched with the files Live recorded (2026-11-01); 0 for 16-bit is inferred from the
+// matched with the files Live recorded; 0 for 16-bit is inferred from the
 // menu's order, not seen.
 const BIT_DEPTHS = { 0: { bits: 16, float: false }, 1: { bits: 24, float: false }, 2: { bits: 32, float: true } };
 

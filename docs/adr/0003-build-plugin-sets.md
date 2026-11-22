@@ -22,7 +22,7 @@ app, so it takes the user's focus, and a click elsewhere at the wrong moment tak
 
 Opening a set with `open -a`, as `openSet` and `relaunch.js` did, also brought Live forward.
 
-Measured in Live 12.4.25b1 and Suite 12.4.3 (2026-11-02):
+Measured in Live 12.4.25b1 and Suite 12.4.3:
 
 - Live opens a set holding an `AuPluginDevice` with no plug-in state (an empty `Preset`),
   no preset references, and slots filled as Live fills them (parameter i in pair i). It lists every

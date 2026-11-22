@@ -2,6 +2,8 @@
 
 A Node client for this AbletonOSC fork, for driving Live from tests. No dependencies;
 Node 18 or later. See [ADR-0001](../docs/adr/0001-fork-abletonosc.md) for the design.
+Paths here assume a clone at `~/dev/ableton-live-test-harness`, with the projects whose
+checks it runs beside it.
 
 - `osc.js`: OSC encoding. Integers go out as int32, other numbers as float32; wrap a value
   in `float()` or `double()` to choose.

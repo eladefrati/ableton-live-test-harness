@@ -57,8 +57,7 @@ const UNIT_BOOLEAN = 2;
 const ENUM_TOLERANCE = 1e-3;
 // AudioUnitParameterOptions' display scale: the bits that say how a host shows a float's
 // range. Live normalizes a Display Logarithmic float on a log scale: AUDelay's Lowpass
-// Cutoff Frequency, 10 to 22050 Hz at 15000 Hz, read 0.94996 in Live, ln(1500)/ln(2205)
-// (measured on the remote Mac, 2026-11-03).
+// Cutoff Frequency, 10 to 22050 Hz at 15000 Hz, read 0.94996 in Live, ln(1500)/ln(2205).
 const DISPLAY_MASK = (7 << 16) | (1 << 22);
 const DISPLAY_LOGARITHMIC = 1 << 22;
 
@@ -242,9 +241,9 @@ const SLOT_PAIRS = 128;
 // for an enum, the other slot of the pair left free, its default as the value and i as its
 // place in Live's list. Filling floats and enums into the first free slots of their kind
 // instead put a float and an enum in one pair; both read back in Live, but some floats
-// never reached the plug-in (with one plug-in, one float did not while another did;
-// measured 2026-10-31). The block keeps AUDelay's bus counts, which didn't matter: it ran
-// a plug-in with a different bus count (2026-11-02). Values go in through replacer
+// never reached the plug-in (with one plug-in, one float did not while another did). The
+// block keeps AUDelay's bus counts, which didn't matter: it ran a plug-in with a different
+// bus count. Values go in through replacer
 // functions, so a "$" in a name is written as it is.
 function fillPluginSet(template, component, params) {
   if (params.length > SLOT_PAIRS) {
@@ -274,7 +273,7 @@ function fillPluginSet(template, component, params) {
       .replace(/<VisualIndex Value="\d+" \/>/, () => `<VisualIndex Value="${i}" />`)
       .replace(/<Manual Value="[^"]*" \/>/, () => `<Manual Value="${manual}" />`)
       // An enum slot's item count, which Live keeps from the set: left at 1, every
-      // value read back as 0 (measured 2026-10-31).
+      // value read back as 0.
       .replace(/<LastItemCount Value="\d+" \/>/, () => `<LastItemCount Value="${p.max + 1}" />`);
   });
   return template.slice(0, start) + device + template.slice(end);
@@ -294,7 +293,7 @@ async function buildPluginSet(name) {
 // itself. A set naming a plug-in Live doesn't load (not installed when Live scanned, Audio
 // Units off, deactivated after a failed scan) opens without a word as a stand-in listing
 // the file's parameters; its enum values read as bare numbers ("0") where the plug-in names
-// them ("Off"; measured 2026-11-02). So the first enum parameter's value string must be
+// them ("Off"). So the first enum parameter's value string must be
 // one of its items, or not a number for a Boolean. A plug-in with no enum parameter can't
 // be told from its stand-in this way and passes on the count alone.
 async function checkPluginLoaded(live, name, parameters) {

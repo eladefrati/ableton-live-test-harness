@@ -5,8 +5,8 @@
 // AudioComponentRegistrar, a launchd agent of the user's GUI session (Aqua). A process
 // started over ssh is in launchd's Background session, where that agent can't be reached:
 // AudioToolbox asks the system's registrar instead, which lists only components in /Library
-// and /System, and `auval -v` on a user's AU ends "didn't find the component" (the remote Mac,
-// 2026-11-02). Outside the GUI session the command runs as a one-shot job in the user's GUI
+// and /System, and `auval -v` on a user's AU ends "didn't find the component".
+// Outside the GUI session the command runs as a one-shot job in the user's GUI
 // domain (`launchctl bootstrap gui/<uid>`, which needs no root), and its output and exit
 // status come back through files.
 

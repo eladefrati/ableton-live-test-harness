@@ -15,7 +15,7 @@ Open work, not scheduled. An item leaves this list when it is done or dropped.
   slot rule in `harness/README.md` is the only guard.
 - **`plugin-record.js` leaves the plug-in's track armed.** With `-EnableArmOnSelection` in
   Options.txt, `doctor.js` reports no armed tracks before the check and track 0 armed after
-  it (Live 12.4.25b1, 2026-11-11, 3 of 3 runs). Which step arms it isn't known; `restore()`
+  it. Which step arms it isn't known; `restore()`
   in `audio.js` is the place to disarm what it leaves.
 - **A check on a set with a group track.** No harness check runs on one, and the harness
   can't make one, so what `doctor.js` and `recordArrangement()` read from a group track

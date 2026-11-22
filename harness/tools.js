@@ -28,7 +28,7 @@ function run(cmd, args = [], { env, started } = {}) {
 
 // Compiled helpers, by source hash. Not in the harness's temp folder (HARNESS_TEMP in
 // macos.js), which relaunch.js empties after building a plug-in's set: the first build with
-// an empty module cache took 53 s on the remote Mac.
+// an empty module cache took 53 s on an Intel Mac.
 const HELPER_CACHE = path.join(os.tmpdir(), "ableton-harness-tools");
 // How long a build stays in the cache unused. A build's last use is the later of its access
 // and modification times: this module sets both when a process first finds the build, and an

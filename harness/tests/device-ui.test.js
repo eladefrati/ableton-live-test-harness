@@ -1258,7 +1258,7 @@ test("buildComputerUse rejects when the helper can't be built", async () => {
 // A stand-in for the overlay: a shell script of `lines`, run with the overlay's arguments,
 // that first writes its pid beside itself. Returns its path. Each is a link to one program,
 // made and run once for the file, which runs the lines saved beside the link: macOS scans a
-// new program the first time it runs, which took about 0.6 s on the remote Mac, longer than
+// new program the first time it runs, which took about 0.6 s on an Intel Mac, longer than
 // the 500 ms a border is given below, and a link to a program it has run started in 0.02 s.
 const STAND_INS = fs.mkdtempSync(path.join(os.tmpdir(), "device-ui-test-"));
 process.on("exit", () => fs.rmSync(STAND_INS, { recursive: true, force: true }));
