@@ -106,7 +106,8 @@ then take `const since = Date.now()` before the action and `await live.waitForHo
 
 `harness/device-ui.js`
 (`docs/adr/0004-press-device-controls-with-real-mouse-events.md`)
-presses a device's controls with real mouse events, picks an item from a chooser's menu
+presses a device's controls with real mouse events (a double-click and a Shift-click too,
+ADR-0019), picks an item from a chooser's menu
 (ADR-0014), drags them to turn them by whole points (ADR-0013,
 mainly for a plug-in's editor: Live's own devices are set over OSC, and Auto Filter's knobs
 turn one of their 126 steps per point up), reads the text its panel

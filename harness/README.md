@@ -150,7 +150,9 @@ Node 18 or later. See [ADR-0001](../docs/adr/0001-fork-abletonosc.md) for the de
   `tests/live/<check>.js`, another script by its file, and code run with `node -e` or given
   on stdin not at all.
   `openDeviceUi(live, {track, device, build})` takes the controls from the
-  `.amxd`; `ui.press(name)` or `ui.press(tabName, item)` clicks, `ui.drag(name, {up, right})`
+  `.amxd`; `ui.press(name)` or `ui.press(tabName, item)` clicks, with
+  `{ double: true }` or `{ shift: true }` after them a double-click or a Shift-click (ADR-0019;
+  Stop between a double-click's clicks ends it with the first made, its error saying `done`), `ui.drag(name, {up, right})`
   turns a control by dragging it that many whole points with the button down, in one move
   (ADR-0013; a fraction of a point throws `DeviceUiError`; Auto Filter's knobs turn one of
   their 126 steps per point up, and a Max for Live number box in 2-point steps, with the

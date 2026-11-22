@@ -66,7 +66,7 @@ function fakeMachine({ info = "Button", titles = [line(`> ${TITLE}`, 1800, 1400)
     read: async () => ({ width: 2880, lines: [line(info, 26, 1400), ...titles, line("text", 2000, 1560)] }),
     captureRect: async (id, width, rect, file) => { calls.push(["capture", id, width, rect, file]); },
     hover: async (id, x, y) => { calls.push(["hover", id, x, y]); },
-    click: async (id, x, y) => { calls.push(["click", id, x, y]); },
+    click: async (id, x, y, ...gesture) => { calls.push(["click", id, x, y, ...gesture]); },
     drag: async (id, x, y, dx, dy) => { calls.push(["drag", id, x, y, dx, dy]); },
   };
 }
@@ -235,6 +235,28 @@ test("a press on a tab's item goes to its row", async () => {
   const ui = await open(system);
   await ui.press("Tab", "C");
   assert.equal(clicks(system)[0][3], 25 + 1400 / 2 + 14 + 49);
+});
+
+test("a press with double or shift hands the helper that gesture, at the same point, after the same checks", async () => {
+  const expected = [7, 0 + 1800 / 2 + 15 - 17 + 230, 25 + 1400 / 2 + 14 + 80];
+  for (const [options, gesture] of [[{ double: true }, "double"], [{ shift: true }, "shift"], [{}, undefined]]) {
+    const system = fakeMachine();
+    const ui = await open(system);
+    await ui.press("Button", options);
+    assert.deepEqual(system.calls, ["focus", ["hover", ...expected], "focus", ["click", ...expected, ...(gesture ? [gesture] : [])]]);
+  }
+  const system = fakeMachine({ info: "Tab" });
+  const ui = await open(system);
+  await ui.press("Tab", "C", { double: true });
+  assert.deepEqual(clicks(system)[0].slice(3), [25 + 1400 / 2 + 14 + 49, "double"]);
+});
+
+test("a press refuses double and shift together, and an option it doesn't know, before anything moves", async () => {
+  const system = fakeMachine();
+  const ui = await open(system);
+  await assert.rejects(ui.press("Button", { double: true, shift: true }), /a double-click or a Shift-click, not both\. Not clicked/);
+  await assert.rejects(ui.press("Button", { triple: true }), /no option triple \(double, shift\)\. Not clicked/);
+  assert.deepEqual(system.calls, []);
 });
 
 test("no click when the Info View names something else or nothing", async () => {

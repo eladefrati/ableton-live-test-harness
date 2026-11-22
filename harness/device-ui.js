@@ -10,6 +10,8 @@
 //   const ui = await openDeviceUi(live, { track, device, build: "/path/to/Device.amxd" });
 //   await ui.press("Button");
 //   await ui.press("Tab", "B");            // one item of a live.tab
+//   await ui.press("View", { double: true });  // a double-click (ADR-0019)
+//   await ui.press("View", { shift: true });   // a Shift-click (ADR-0019)
 //   await ui.drag("Knob", { up: 40 });     // turns a control: whole points with the button down (ADR-0013)
 //   await ui.choose("Menu", "Item");       // an item of the menu a control opens (ADR-0014)
 //   await ui.text([0, 0, 200, 100]);       // the text shown in part of the panel, device units
@@ -152,6 +154,14 @@ function pointControls(points) {
 }
 
 // The point to press, in device units.
+// The helper's word for a press's options: "double", "shift", or null for a plain click.
+function pressGesture(name, options = {}) {
+  const unknown = Object.keys(options).filter((key) => key !== "double" && key !== "shift");
+  if (unknown.length) throw new DeviceUiError(`Pressing ${name}: no option ${unknown.join(", ")} (double, shift). Not clicked`);
+  if (options.double && options.shift) throw new DeviceUiError(`Pressing ${name}: a double-click or a Shift-click, not both. Not clicked`);
+  return options.double ? "double" : options.shift ? "shift" : null;
+}
+
 function controlPoint(control, item) {
   const centre = control.x + control.w / 2;
   if (item === undefined) {
@@ -528,7 +538,8 @@ const machine = {
     }
   },
   hover: (windowId, x, y) => helper("hover", windowId, x, y),
-  click: (windowId, x, y) => helper("click", windowId, x, y),
+  // `gesture`: "double" or "shift" (ADR-0019), or none for a plain click.
+  click: (windowId, x, y, ...gesture) => helper("click", windowId, x, y, ...gesture),
   drag: (windowId, x, y, dx, dy) => helper("drag", windowId, x, y, dx, dy),
   // A plug-in's window (ADR-0008): its button's state, opened or closed; where it and its
   // editor are; a click in the editor.
@@ -776,9 +787,13 @@ class DeviceUi {
     };
   }
 
-  async press(name, item) {
+  // `options`, after the item or in its place: { double: true } for a double-click, or
+  // { shift: true } for a click with Shift held (ADR-0019), not both.
+  async press(name, item, options) {
+    if (item !== null && typeof item === "object") [item, options] = [undefined, item];
+    const gesture = pressGesture(name, options);
     const { window, x, y } = await this.aim(name, item);
-    await this.system.click(window, x, y);
+    await this.system.click(window, x, y, ...(gesture ? [gesture] : []));
   }
 
   // Drags a control by { up, right } whole points with the button down, after the same checks

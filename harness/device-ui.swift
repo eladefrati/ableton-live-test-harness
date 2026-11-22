@@ -16,7 +16,11 @@
 //                                     resolution: <x> <y> <w> <h> in points of an image that
 //                                     is <width> points wide, as a window's capture is
 //   device-ui hover <window> <x> <y>  moves the pointer to a point on the screen, in points
-//   device-ui click <window> <x> <y>  moves the pointer there, presses and releases
+//   device-ui click <window> <x> <y> [double | shift]
+//                                     moves the pointer there, presses and releases; with
+//                                     double, presses and releases again 0.1 s later, as a
+//                                     double-click; with shift, holds Shift down through the
+//                                     click (ADR-0019)
 //   device-ui click-editor <title> <x> <y> <w> <h>
 //                                     clicks the point <x> <y> of the plug-in window's editor,
 //                                     in points from its top left, if the editor is <w> x <h>
@@ -42,9 +46,9 @@
 // So does a run that Stop signalled because it couldn't remove the token: the run passes the
 // signal, SIGUSR2, on to this helper, which handles it from its start, whatever its command. A
 // click or a drag with only that release left has happened: the helper posts it and exits 4,
-// saying that too. A helper that fails, or is sent SIGINT,
-// SIGQUIT, SIGTERM or SIGHUP, while it holds the button releases it before it ends: by that
-// signal, or with status 131 after SIGQUIT.
+// saying that too; so does a double-click stopped after its first click, which happened. A
+// helper that fails, or is sent SIGINT, SIGQUIT, SIGTERM or SIGHUP, while it holds the button
+// or Shift releases them before it ends: by that signal, or with status 131 after SIGQUIT.
 
 import ApplicationServices
 import Foundation
@@ -101,6 +105,10 @@ func stopped() -> String? {
 // down, when failing to make it leaves nothing held, so that whatever fails with the button
 // down has the event to release it with.
 var held: CGEvent? = nil
+// Whether this helper holds Shift down, for a Shift-click: a posted key event leaves its key
+// held until its release is posted (live-notes.md), so every way out releases it (release).
+var shiftHeld = false
+let SHIFT_KEY: CGKeyCode = 56
 // A signal that would end the helper, as Ctrl-C on the run does, is held back once the button
 // goes down: the helper releases the button first, then ends by that signal (obeySignal).
 let ENDING_SIGNALS = [SIGINT, SIGQUIT, SIGTERM, SIGHUP]
@@ -350,16 +358,17 @@ func requireOnTop(_ id: Int, _ point: CGPoint) {
     }
 }
 
-func mouseEvent(_ type: CGEventType, _ point: CGPoint) -> CGEvent {
+// `clicks`: the click count the event carries, 2 for a double-click's second press and release.
+func mouseEvent(_ type: CGEventType, _ point: CGPoint, clicks: Int64 = 1) -> CGEvent {
     guard let event = CGEvent(mouseEventSource: CGEventSource(stateID: .hidSystemState), mouseType: type,
                               mouseCursorPosition: point, mouseButton: .left)
     else { fail("Cannot create a mouse event") }
-    event.setIntegerValueField(.mouseEventClickState, value: 1)
+    event.setIntegerValueField(.mouseEventClickState, value: clicks)
     return event
 }
 
-func emit(_ type: CGEventType, _ point: CGPoint, moved: CGVector? = nil) {
-    let event = mouseEvent(type, point)
+func emit(_ type: CGEventType, _ point: CGPoint, moved: CGVector? = nil, clicks: Int64 = 1) {
+    let event = mouseEvent(type, point, clicks: clicks)
     if let moved {
         event.setIntegerValueField(.mouseEventDeltaX, value: Int64(moved.dx))
         event.setIntegerValueField(.mouseEventDeltaY, value: Int64(moved.dy))
@@ -379,13 +388,48 @@ func buttonUp(_ point: CGPoint) {
     while nanosleep(&wait, &left) != 0 && errno == EINTR { wait = left }
 }
 
-// The one event a helper that is halting or failing still posts: the button up where the
-// pointer is, if it holds the button. Returns that point.
+// Shift's key up, if this helper holds it, and then a wait, as after a button up: an event
+// posted as the last thing a program does is lost.
+func releaseShift() {
+    guard shiftHeld else { return }
+    guard let up = CGEvent(keyboardEventSource: CGEventSource(stateID: .hidSystemState), virtualKey: SHIFT_KEY, keyDown: false)
+    else { return }
+    up.flags = up.flags.subtracting(.maskShift)
+    up.post(tap: .cghidEventTap)
+    shiftHeld = false
+    usleep(100_000)
+}
+
+// Holds Shift down, as a person does before a Shift-click: the mouse events made after it
+// from the keyboard's state carry it. Ending signals are held back from here on, as once the
+// button is down, so that Shift is released before the helper ends.
+func pressShift() {
+    obeySignal()
+    if let why = stopped() { halt(why) }
+    guard let down = CGEvent(keyboardEventSource: CGEventSource(stateID: .hidSystemState), virtualKey: SHIFT_KEY, keyDown: true)
+    else { fail("Cannot create a key event") }
+    down.flags = down.flags.union(.maskShift)
+    holdBackSignals()
+    down.post(tap: .cghidEventTap)
+    shiftHeld = true
+    usleep(50_000)
+}
+
+// The events a helper that is halting or failing still posts: the button up where the pointer
+// is, if it holds the button, and Shift's release, if it holds Shift. Returns that point.
 @discardableResult func release() -> CGPoint? {
+    defer { releaseShift() }
     guard let up = held else { return nil }
     let point = CGEvent(source: nil)?.location ?? up.location
     buttonUp(point)
     return point
+}
+
+// A signal the helper was started ignoring, as under nohup, stays ignored.
+func holdBackSignals() {
+    for number in ENDING_SIGNALS {
+        if let before = signal(number, { signalled = $0 }) { signal(number, before) }
+    }
 }
 
 // Ends by a signal that was held back, once the button is up: dies by it, or after a quit
@@ -412,16 +456,13 @@ func halt(_ why: String) -> Never {
 
 // The one function a hover's, a click's and a drag's events leave from, the button-up apart
 // (complete), so it checks Stop before each, as requireOnTop does while it waits.
-func post(_ type: CGEventType, _ point: CGPoint, moved: CGVector? = nil) {
+func post(_ type: CGEventType, _ point: CGPoint, moved: CGVector? = nil, clicks: Int64 = 1) {
     obeySignal()
     if let why = stopped() { halt(why) }
     if type == .leftMouseDown {
-        let up = mouseEvent(.leftMouseUp, point)
-        // A signal the helper was started ignoring, as under nohup, stays ignored.
-        for number in ENDING_SIGNALS {
-            if let before = signal(number, { signalled = $0 }) { signal(number, before) }
-        }
-        emit(type, point)
+        let up = mouseEvent(.leftMouseUp, point, clicks: clicks)
+        holdBackSignals()
+        emit(type, point, clicks: clicks)
         held = up
     } else {
         emit(type, point, moved: moved)
@@ -434,6 +475,7 @@ func post(_ type: CGEventType, _ point: CGPoint, moved: CGVector? = nil) {
 // what the click did (ADR-0012). A signal held back comes first.
 func complete(_ gesture: String, at point: CGPoint) {
     buttonUp(point)
+    releaseShift()
     obeySignal()
     guard let why = stopped() else { return }
     FileHandle.standardError.write(Data("\(why), and the helper released the button at \(point.x), \(point.y): the \(gesture) had happened\n".utf8))
@@ -474,10 +516,22 @@ func drag(_ point: CGPoint, by delta: CGVector) {
     complete("drag", at: CGEvent(source: nil)?.location ?? end)
 }
 
-func press(_ point: CGPoint) {
+// A click; `double`, a double-click: a second press and release at the same point, 0.1 s after
+// the first release (buttonUp's wait), carrying click count 2, as a person's second click does.
+// Stop after the first click ends it there, as a click that happened (ADR-0019).
+func press(_ point: CGPoint, double: Bool = false) {
     post(.leftMouseDown, point)
     usleep(70_000)
-    complete("click", at: point)
+    guard double else { return complete("click", at: point) }
+    buttonUp(point)
+    obeySignal()
+    if let why = stopped() {
+        FileHandle.standardError.write(Data("\(why), after the first click of the double-click at \(point.x), \(point.y): that click had happened\n".utf8))
+        exit(HAPPENED_STATUS)
+    }
+    post(.leftMouseDown, point, clicks: 2)
+    usleep(70_000)
+    complete("double-click", at: point)
 }
 
 // Within this of a size counts as that size: Accessibility reports whole points.
@@ -515,9 +569,11 @@ func hover(_ point: CGPoint) {
 }
 
 let arguments = CommandLine.arguments
-func pointer() -> (Int, CGPoint) {
-    guard arguments.count == 5, let id = Int(arguments[2]), let x = Double(arguments[3]), let y = Double(arguments[4])
-    else { fail("usage: device-ui \(arguments[1]) <window> <x> <y>") }
+func pointer(gestures: [String] = []) -> (Int, CGPoint) {
+    let usage = "usage: device-ui \(arguments[1]) <window> <x> <y>" + gestures.map { " [\($0)]" }.joined(separator: "")
+    guard arguments.count == 5 || (arguments.count == 6 && gestures.contains(arguments[5])),
+          let id = Int(arguments[2]), let x = Double(arguments[3]), let y = Double(arguments[4])
+    else { fail(usage) }
     return (id, CGPoint(x: x, y: y))
 }
 
@@ -539,10 +595,13 @@ case "hover":
     requireOnTop(id, point)
     hover(point)
 case "click":
-    let (id, point) = pointer()
+    let (id, point) = pointer(gestures: ["double", "shift"])
+    let gesture = arguments.count == 6 ? arguments[5] : ""
     requireUnlocked()
     aim(id, point)
-    press(point)
+    // Shift goes down after the aim's checks and hover, just before the button.
+    if gesture == "shift" { pressShift() }
+    press(point, double: gesture == "double")
 case "plugin-window":
     guard arguments.count == 4, ["state", "open", "close"].contains(arguments[2])
     else { fail("usage: device-ui plugin-window state|open|close <device>") }
@@ -576,7 +635,7 @@ case "drag":
     aim(id, point)
     drag(point, by: delta)
 default:
-    fail("usage: device-ui window | windows | text <png> | crop <png> <width> <x> <y> <w> <h> <out> | hover <window> <x> <y> | click <window> <x> <y> | "
+    fail("usage: device-ui window | windows | text <png> | crop <png> <width> <x> <y> <w> <h> <out> | hover <window> <x> <y> | click <window> <x> <y> [double | shift] | "
         + "plugin-window state|open|close <device> | plugin-editor <title> | click-editor <title> <x> <y> <w> <h> | "
         + "drag <window> <x> <y> <dx> <dy> | drag-editor <title> <x> <y> <w> <h> <dx> <dy>")
 }

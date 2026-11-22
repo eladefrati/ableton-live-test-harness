@@ -135,6 +135,10 @@ const CLICK_HOLD_MS = 70;
 const DRAG_HOLD_MS = 50;
 
 const click = (window, x, y) => ["click", window, x, y];
+// A double-click and a Shift-click (ADR-0019).
+const doubleClick = (window, x, y) => ["click", window, x, y, "double"];
+const shiftClick = (window, x, y) => ["click", window, x, y, "shift"];
+const SHIFT = ["shift"];
 // A hover's first move, off the point; its second is to the point (device-ui.swift).
 const firstMove = (x, y) => ({ x: x - 15, y: y - 10 });
 // A drag 30 points right and 20 up, and the one drag event it posts.
@@ -324,6 +328,51 @@ const CASES = [
     stderr: happened("click"),
     upAfterStopMs: CLICK_HOLD_MS / 2,
     events: (x, y) => [{ type: "down", x, y }, { type: "up", x, y }],
+  },
+  {
+    name: "a double-click reaches the target as two clicks at the point, the second carrying click count 2",
+    target: RECT,
+    command: doubleClick,
+    status: 0,
+    events: (x, y) => [{ type: "down", x, y, clicks: 1 }, { type: "up", x, y, clicks: 1 },
+      { type: "down", x, y, clicks: 2 }, { type: "up", x, y, clicks: 2 }],
+  },
+  {
+    name: "Stop during a double-click's first click: that click completes, there is no second, and the helper ends as stopped, saying the first click had happened",
+    target: [...RECT, "--stop", TOKEN],
+    command: doubleClick,
+    status: HAPPENED,
+    stderr: new RegExp(`^${literal(BY_STOP)}, after the first click of the double-click at [\\d.]+, [\\d.]+: that click had happened$`),
+    upAfterStopMs: CLICK_HOLD_MS / 2,
+    events: (x, y) => [{ type: "down", x, y, clicks: 1 }, { type: "up", x, y, clicks: 1 }],
+  },
+  {
+    name: "a Shift-click reaches the target with Shift on its button events and held as each arrives",
+    target: RECT,
+    command: shiftClick,
+    status: 0,
+    modifiers: true,
+    events: (x, y) => [{ type: "down", x, y, flags: SHIFT, held: SHIFT }, { type: "up", x, y, flags: SHIFT, held: SHIFT }],
+  },
+  {
+    name: "Stop while a Shift-click holds the button: the click completes with Shift, and the helper ends as stopped, saying the click had happened",
+    target: [...RECT, "--stop", TOKEN],
+    command: shiftClick,
+    status: HAPPENED,
+    stderr: happened("click"),
+    upAfterStopMs: CLICK_HOLD_MS / 2,
+    modifiers: true,
+    events: (x, y) => [{ type: "down", x, y, flags: SHIFT }, { type: "up", x, y, flags: SHIFT }],
+  },
+  {
+    name: "a Shift-click stopped before the helper starts posts nothing, Shift included",
+    target: RECT,
+    stopped: true,
+    command: shiftClick,
+    status: STOPPED,
+    stderr: stoppedError(),
+    modifiers: true,
+    events: () => [],
   },
   {
     name: "Stop while a drag holds the button, before its move: the button comes up at the press point, with no drag event",
@@ -1165,8 +1214,9 @@ async function twoOverlaysFailures(binaries) {
   }
 }
 
+// By value, so that a field holding a list (flags, held) compares too.
 const sameEvents = (seen, expected) => seen.length === expected.length
-  && expected.every((event, i) => Object.entries(event).every(([field, value]) => seen[i][field] === value));
+  && expected.every((event, i) => Object.entries(event).every(([field, value]) => JSON.stringify(seen[i][field]) === JSON.stringify(value)));
 
 // Runs one case and resolves with what differed from what it expects, nothing if it passed.
 async function failures(test, binaries) {
@@ -1334,9 +1384,12 @@ async function main() {
     for (const pid of NO_RUNS) {
       report(`the overlay refuses the process id ${pid} for its run: it says nothing, and exits 1 with its usage`, await unrefused(binaries.overlay, pid));
     }
-    for (const test of CASES) report(test.name, await failures(test, binaries));
-    // Every case that presses the stop key must leave no modifier held.
+    // Every case that presses the stop key or a Shift-click must leave no modifier held.
     const withKey = async (name, failed) => report(`${name}; no modifier key is left held`, [...(await failed), ...(await leftHeld(binaries))]);
+    for (const test of CASES) {
+      if (test.modifiers) await withKey(test.name, failures(test, binaries));
+      else report(test.name, await failures(test, binaries));
+    }
     for (const test of KEY_CASES) await withKey(test.name, failures(test, binaries));
     for (const test of UNREAPED) report(test.name, await unreapedFailures(test, binaries));
     await withKey("the stop key pressed before the overlay says that its windows are on screen is taken as an early Stop: it says stopping, "
