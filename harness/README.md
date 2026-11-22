@@ -162,10 +162,11 @@ Node 18 or later. See [ADR-0001](../docs/adr/0001-fork-abletonosc.md) for the de
   resolves with the lines shown in that part of the panel, in device units. A press looks
   for the panel again, brings Live to the front, and throws `DeviceUiError` without clicking
   unless the screen is unlocked, Live's main window is on top at the point and the Info View
-  names the control. It needs the Info View visible, Live at 100% zoom, the device in view
-  with its title on screen once, an unfrozen `.amxd`, and an `annotation_name` on the
-  control; a `live.tab` must be a single column. A press takes about 9 s on the remote Mac, nearly
-  all of it reading text from captures. `press` resolves when the click is sent: read what
+  names the control. It finds the panel from the device's frame in Device Detail, which
+  Accessibility gives (ADR-0020). It needs the Info View and Device Detail visible, Live at
+  100% zoom, the device in view and its name unique on its track, an unfrozen `.amxd`, and an
+  `annotation_name` on the control; a `live.tab` must be a single column. Most of a press's
+  time goes to reading the Info View from a capture. `press` resolves when the click is sent: read what
   it did from Live.
   Any other device or plug-in (its controls in Live's device view, not its own window) is
   pressed at measured points (ADR-0007):

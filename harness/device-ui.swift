@@ -7,6 +7,9 @@
 //                                     reads, or presses until it reads so, the Show/Hide
 //                                     Plug-In Window checkbox of the device of that name in
 //                                     Device Detail: {"open"}
+//   device-ui device <title>          the one device of that title in Device Detail, which
+//                                     shows the selected track's devices: {"x", "y", "w",
+//                                     "h"} in points, as Accessibility frames it
 //   device-ui plugin-editor <title>   the plug-in window of that title and its editor:
 //                                     {"id", "x", "y", "w", "h", "editor": {"x", "y", "w", "h"}}
 //   device-ui text <png>              the text in an image, in pixels: {"width", "lines":
@@ -191,9 +194,8 @@ func within(_ element: AXUIElement, depth: Int, _ match: (AXUIElement) -> Bool) 
 
 let SHOW_PLUGIN_WINDOW = "Show/Hide Plug-In Window"
 
-// The Show/Hide Plug-In Window checkbox of the one device named `device` in Device Detail,
-// which shows the selected track's devices.
-func pluginWindowButton(_ device: String) -> AXUIElement {
+// The one device named `device` in Device Detail, which shows the selected track's devices.
+func deviceElement(_ device: String) -> AXUIElement {
     let app = liveElement()
     let detail = axWindows(app).flatMap { within($0, depth: 3) { attribute($0, kAXTitleAttribute) as? String == "Device Detail" } }
     guard !detail.isEmpty else { fail("Live's Device Detail isn't in its window: is the Detail View shown?") }
@@ -201,7 +203,17 @@ func pluginWindowButton(_ device: String) -> AXUIElement {
     guard devices.count == 1 else {
         fail(devices.isEmpty ? "Device Detail shows no device named \(device): is it selected?" : "Device Detail shows \(devices.count) devices named \(device)")
     }
-    guard let button = children(devices[0]).first(where: { attribute($0, kAXDescriptionAttribute) as? String == SHOW_PLUGIN_WINDOW })
+    return devices[0]
+}
+
+func printDevice(_ device: String) {
+    let r = frame(deviceElement(device))
+    printJSON(["x": r.minX, "y": r.minY, "w": r.width, "h": r.height])
+}
+
+// The Show/Hide Plug-In Window checkbox of the one device named `device` in Device Detail.
+func pluginWindowButton(_ device: String) -> AXUIElement {
+    guard let button = children(deviceElement(device)).first(where: { attribute($0, kAXDescriptionAttribute) as? String == SHOW_PLUGIN_WINDOW })
     else { fail("\(device) has no \(SHOW_PLUGIN_WINDOW) button: is it a plug-in?") }
     return button
 }
@@ -606,6 +618,9 @@ case "plugin-window":
     guard arguments.count == 4, ["state", "open", "close"].contains(arguments[2])
     else { fail("usage: device-ui plugin-window state|open|close <device>") }
     pluginWindow(arguments[2], arguments[3])
+case "device":
+    guard arguments.count == 3 else { fail("usage: device-ui device <title>") }
+    printDevice(arguments[2])
 case "plugin-editor":
     guard arguments.count == 3 else { fail("usage: device-ui plugin-editor <title>") }
     printEditor(arguments[2])
@@ -635,7 +650,7 @@ case "drag":
     aim(id, point)
     drag(point, by: delta)
 default:
-    fail("usage: device-ui window | windows | text <png> | crop <png> <width> <x> <y> <w> <h> <out> | hover <window> <x> <y> | click <window> <x> <y> [double | shift] | "
+    fail("usage: device-ui window | windows | device <title> | text <png> | crop <png> <width> <x> <y> <w> <h> <out> | hover <window> <x> <y> | click <window> <x> <y> [double | shift] | "
         + "plugin-window state|open|close <device> | plugin-editor <title> | click-editor <title> <x> <y> <w> <h> | "
         + "drag <window> <x> <y> <dx> <dy> | drag-editor <title> <x> <y> <w> <h> <dx> <dy>")
 }

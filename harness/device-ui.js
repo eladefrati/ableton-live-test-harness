@@ -52,28 +52,23 @@ class DeviceUiError extends Error {}
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-// From the left edge of the device title's first word to the panel's corner, in points, at
-// Live's 100% zoom (measured on the remote Mac, 2026-11-08). A line's own left edge won't
-// do: icons in the title bar are read as characters.
-const TITLE_TO_PANEL = { x: -17, y: 14 };
-// A plug-in's title bar has two more buttons before its title (Unfold Device Parameters and
-// the plug-in window's), so its title starts this much further right, in points (measured on
-// the remote Mac, 2026-11-11).
-const PLUGIN_TITLE_SHIFT = 32;
+// From the corner of the device's frame in Device Detail, as Accessibility gives it, to the
+// panel's corner, in points at Live's 100% zoom (ADR-0020): the device's body starts 1 point
+// in and 18 down, below the title bar, for Live's own devices, Max devices and plug-ins alike,
+// and a Max device's presentation 2 points further in than its body (measured in captures of
+// Live's window, Live 12.4.25b2, 2026-11-21). The title's text starts 4 points below the
+// frame's top.
+const DEVICE_TO_PANEL = { x: 3, y: 18 };
+const DEVICE_TO_TITLE_Y = 4;
 const isPlugin = (className) => /PluginDevice$/.test(className); // AuPluginDevice, PluginDevice
-// The Info View's title is on the same row as the device titles, left of them. The Info View
-// and the browser's lists are left of this; the device titles right of it.
+// The Info View's title is on the same row as the device titles, left of them, and ends left
+// of this.
 const INFO_VIEW_RIGHT = 240; // points from the window's left edge
 // The Info View's title row, read on its own after a hover: from this far above the top of
 // the device's title, this tall: to 14 points below that top. The Info View's text below
 // its title starts 20 points below it (measured on the remote Mac).
 const INFO_ROW_ABOVE = 4; // points
 const INFO_ROW_HEIGHT = 18; // points
-// Live's status bar, along the window's bottom edge, shows the selected track's and device's
-// names, so a device name short enough to fit there is on screen twice. The device titles are
-// above it. Its height in points, from the window's bottom edge (measured on the remote Mac,
-// Live 12.4.25b2, 2026-11-19).
-const STATUS_BAR_HEIGHT = 37;
 // Long enough for Live to show the control under the pointer in the Info View.
 const INFO_VIEW_SETTLE_MS = 350;
 // How often a press looks for Stop while it waits on a read of Live's window.
@@ -88,7 +83,9 @@ const FRAME = { left: 5, top: 20, right: 17, height: 192 };
 
 // Devices measured in Live, by class name (/live/device/get/class_name): each control's
 // centre in points from the panel's corner, with its Info View title, and the panel's width.
-// Live 12.4.25b1 at 100% zoom, on the remote Mac, 2026-11-11.
+// Live 12.4.25b1 at 100% zoom, on the remote Mac, 2026-11-11; each x taken again from the
+// centre of the control's Accessibility frame, from the panel's corner (ADR-0020), Live
+// 12.4.25b2, 2026-11-21.
 const MEASURED_DEVICES = {
   // Auto Filter's knobs, by parameter name
   AutoFilter2: {
@@ -96,11 +93,11 @@ const MEASURED_DEVICES = {
     controls: {
       Frequency: { x: 50.5, y: 33.5, info: "Filter Frequency" },
       Resonance: { x: 50.5, y: 142.5, info: "Filter Resonance" },
-      "LFO Amount": { x: 109, y: 141.5, info: "LFO Amount" },
+      "LFO Amount": { x: 115.5, y: 141.5, info: "LFO Amount" },
       // The Rate knob, while the LFO's rate is in Hz; in other modes the Info View names
       // another parameter and a press is refused.
-      "LFO Freq": { x: 170, y: 141.5, info: "LFO Frequency" },
-      "Env Amount": { x: 337, y: 141.5, info: "Envelope Amount" },
+      "LFO Freq": { x: 169.5, y: 141.5, info: "LFO Frequency" },
+      "Env Amount": { x: 337.5, y: 141.5, info: "Envelope Amount" },
       Drive: { x: 409.5, y: 29.5, info: "Drive" },
       "Dry/Wet": { x: 409.5, y: 141.5, info: "Dry/Wet" },
     },
@@ -176,51 +173,6 @@ function controlPoint(control, item) {
   }
   const rowHeight = (control.h - (control.rows - 1) * control.spacing) / control.rows;
   return [centre, control.y + index * (rowHeight + control.spacing) + rowHeight / 2];
-}
-
-const SHORTENED_MIN = 3;
-const ELLIPSIS = /(\.\.\.|…)$/;
-
-// Whether a recognized word is the title's last word with an icon Live draws right after the
-// title read onto its end as symbols, such as the hand of a device a control surface appoints
-// ("2030.11.08.1\").
-const withIconAfter = (word, wanted) => word.startsWith(wanted) && /^[^\p{L}\p{N}_]+$/u.test(word.slice(wanted.length));
-
-// Whether the recognized words, from the first, read as the title: all its words, or its start
-// cut short with an ellipsis.
-function matchesTitle(words, wanted) {
-  for (let i = 0; i < wanted.length && i < words.length; i++) {
-    if (ELLIPSIS.test(words[i])) {
-      const stem = words[i].replace(ELLIPSIS, "");
-      const shown = [...wanted.slice(0, i), stem].join(" ");
-      return wanted[i].startsWith(stem) && shown.replace(/ /g, "").length >= SHORTENED_MIN;
-    }
-    const last = i === wanted.length - 1;
-    if (words[i] !== wanted[i] && !(last && withIconAfter(words[i], wanted[i]))) return false;
-  }
-  return words.length >= wanted.length;
-}
-
-// Where the device's title is in the recognized lines: its first word's left edge and the
-// line's top, in pixels. Text starting left of `fromX` (pixels) is skipped: the Info View and
-// the browser, which can show the same name; so is a line whose top is at or below `toY`
-// (pixels): the status bar, which shows the selected device's name. Exactly one must match, or the wrong device could
-// be pressed. A title too long for its device, which Live cuts short with an ellipsis
-// ("Long Na..."), matches by its start, of at least SHORTENED_MIN characters.
-function findTitle(lines, title, fromX = 0, toY = Infinity) {
-  const wanted = title.split(" ").map(normalized);
-  const found = [];
-  for (const line of lines) {
-    if (line.y >= toY) continue;
-    const words = line.words.map((word) => normalized(word.text));
-    for (let start = 0; start < words.length; start++) {
-      if (line.words[start].x < fromX) continue;
-      if (matchesTitle(words.slice(start), wanted)) found.push({ x: line.words[start].x, y: line.y });
-    }
-  }
-  if (found.length === 0) throw new DeviceUiError(`The title "${title}" isn't on screen: is the device in view, at 100% zoom? Not clicked`);
-  if (found.length > 1) throw new DeviceUiError(`The title "${title}" is on screen ${found.length} times. Not clicked`);
-  return found[0];
 }
 
 // The Info View's title among the lines read from its title row: the leftmost.
@@ -520,6 +472,8 @@ const machine = {
     if (!(await mac.isFrontmost())) throw new DeviceUiError("Live isn't frontmost. Not clicked");
   },
   window: async () => JSON.parse(await helper("window")),
+  // The device of that title in Device Detail: its frame in points (ADR-0020).
+  device: async (title) => JSON.parse(await helper("device", title)),
   windows: async () => JSON.parse(await helper("windows")),
   capture: (windowId, file) => exec("screencapture", ["-x", "-o", "-l", windowId, file]),
   // The text in Live's window; with `crop`, { width, rect } as for captureRect, the text in
@@ -765,25 +719,25 @@ async function captureWindow(file, { window: id } = {}, system = machine) {
 }
 
 class DeviceUi {
-  constructor(live, { track, device, title, controls, width, plugin = false }, system) {
-    Object.assign(this, { live, track, device, title, controls, width, plugin, system });
+  constructor(live, { track, device, title, controls, width }, system) {
+    Object.assign(this, { live, track, device, title, controls, width, system });
   }
 
-  // Where the panel is now. Every press looks again: selecting a device can scroll the view.
-  // `read` reads Live's window: a press's gives up on Stop.
-  async locate(read = (id) => this.system.read(id)) {
+  // Where the panel is now, from the device's frame in Device Detail (ADR-0020), and the top of
+  // its title in points from the window's top. Every press looks again: selecting a device
+  // can scroll the view. The device's title must be unique on its track.
+  async locate() {
     await this.system.wake();
     this.live.send("/live/view/set/selected_track", this.track);
     this.live.send("/live/view/set/selected_device", this.track, this.device);
     await this.live.sync();
     const window = await this.system.window();
-    const { width, lines } = await read(window.id);
-    const scale = width / window.w; // pixels per point
-    const title = findTitle(lines, this.title, INFO_VIEW_RIGHT * scale, (window.h - STATUS_BAR_HEIGHT) * scale);
+    const frame = await this.system.device(this.title);
     return {
-      window, scale, title,
-      x: window.x + title.x / scale + TITLE_TO_PANEL.x - (this.plugin ? PLUGIN_TITLE_SHIFT : 0),
-      y: window.y + title.y / scale + TITLE_TO_PANEL.y,
+      window,
+      titleY: frame.y - window.y + DEVICE_TO_TITLE_Y,
+      x: frame.x + DEVICE_TO_PANEL.x,
+      y: frame.y + DEVICE_TO_PANEL.y,
     };
   }
 
@@ -861,13 +815,13 @@ class DeviceUi {
     await this.system.permit();
     await this.system.focus();
     const read = (id, crop) => readUnlessStopped(this.system, () => this.system.read(id, crop));
-    const at = await this.locate(read);
+    const at = await this.locate();
     const [x, y] = [at.x + ux, at.y + uy];
     await this.system.hover(at.window.id, x, y);
     await sleep(this.system.settleMs ?? INFO_VIEW_SETTLE_MS);
     // Only the Info View's title row is read: over the whole window the text recognizer
     // missed a short title there, or read it wrong, in some states of Live's window.
-    const rect = [0, Math.max(0, at.title.y / at.scale - INFO_ROW_ABOVE), INFO_VIEW_RIGHT, INFO_ROW_HEIGHT];
+    const rect = [0, Math.max(0, at.titleY - INFO_ROW_ABOVE), INFO_VIEW_RIGHT, INFO_ROW_HEIGHT];
     const { lines } = await read(at.window.id, { width: at.window.w, rect });
     const shown = infoTitle(lines);
     if (normalized(shown) !== normalized(control.info)) {
@@ -880,11 +834,12 @@ class DeviceUi {
   // The lines of text shown inside a rectangle of the panel, [x, y, w, h] in device units.
   async text([rx, ry, rw, rh]) {
     const at = await this.locate();
-    const { lines } = await this.system.read(at.window.id);
+    const { width, lines } = await this.system.read(at.window.id);
+    const scale = width / at.window.w; // pixels per point
     const inside = lines.map((line) => ({
       text: line.text,
-      x: (line.x + line.w / 2) / at.scale + at.window.x - at.x,
-      y: (line.y + line.h / 2) / at.scale + at.window.y - at.y,
+      x: (line.x + line.w / 2) / scale + at.window.x - at.x,
+      y: (line.y + line.h / 2) / scale + at.window.y - at.y,
     })).filter(({ x, y }) => x >= rx && x <= rx + rw && y >= ry && y <= ry + rh);
     return inside.sort((a, b) => a.y - b.y || a.x - b.x).map((line) => line.text);
   }
@@ -926,10 +881,9 @@ async function openDeviceUi(live, { track, device, build, controls, width }, sys
       if (!measured) throw new DeviceUiError(`The harness has no measured points for ${title} (${className}): give openDeviceUi a build or controls`);
       panel = { controls: pointControls(measured.controls), width: measured.width };
     }
-    panel.plugin = isPlugin(className);
   }
   return new DeviceUi(live, {
-    track, device, title, controls: panel.controls, width: width ?? panel.width, plugin: panel.plugin,
+    track, device, title, controls: panel.controls, width: width ?? panel.width,
   }, guarded(system));
 }
 
@@ -1043,6 +997,6 @@ async function openPluginWindow(live, { track, device, size, controls = {} }, sy
 
 module.exports = {
   DeviceUiError, openDeviceUi, openPluginWindow, captureWindow, liveWindows, liveMainWindow, readControls, readPanelWidth, pointControls, controlPoint,
-  findTitle, infoTitle, readClickHost, hostname, runName, runScript, MEASURED_DEVICES, POINTER_CALLS, MACHINE_CALLS,
+  infoTitle, readClickHost, hostname, runName, runScript, MEASURED_DEVICES, POINTER_CALLS, MACHINE_CALLS,
   stopped, clickToken, buildComputerUse, showComputerUse, askToClick, stopKeyOf,
 };

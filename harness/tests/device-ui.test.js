@@ -6,7 +6,7 @@ const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 const {
-  DeviceUiError, openDeviceUi, readControls, readPanelWidth, pointControls, controlPoint, findTitle, infoTitle, readClickHost, runName, runScript,
+  DeviceUiError, openDeviceUi, readControls, readPanelWidth, pointControls, controlPoint, infoTitle, readClickHost, runName, runScript,
   MEASURED_DEVICES, POINTER_CALLS, MACHINE_CALLS, stopped, clickToken, buildComputerUse, showComputerUse, liveWindows, askToClick, stopKeyOf,
 } = require("../device-ui.js");
 
@@ -50,7 +50,12 @@ const line = (text, x, y) => ({
 const WINDOW = { id: 7, x: 0, y: 25, w: 1440, h: 875 };
 const TITLE = "Device 2030.11.08.1";
 
-function fakeMachine({ info = "Button", titles = [line(`> ${TITLE}`, 1800, 1400)], onFocus = () => {} } = {}) {
+// The device's frame in Device Detail, as Accessibility gives it, in points: its panel's corner
+// 3 points right and 18 down, at 898, 739; its title's top 4 points down, 700 points into the
+// window.
+const DEVICE = { x: 895, y: 721, w: 300, h: 190 };
+
+function fakeMachine({ info = "Button", device = async () => DEVICE, onFocus = () => {} } = {}) {
   const calls = [];
   return {
     calls,
@@ -63,7 +68,8 @@ function fakeMachine({ info = "Button", titles = [line(`> ${TITLE}`, 1800, 1400)
     stopped: () => null,
     focus: async () => { calls.push("focus"); onFocus(calls); },
     window: async () => WINDOW,
-    read: async () => ({ width: 2880, lines: [line(info, 26, 1400), ...titles, line("text", 2000, 1560)] }),
+    device,
+    read: async () => ({ width: 2880, lines: [line(info, 26, 1400), line(`> ${TITLE}`, 1800, 1400), line("text", 2000, 1560)] }),
     captureRect: async (id, width, rect, file) => { calls.push(["capture", id, width, rect, file]); },
     hover: async (id, x, y) => { calls.push(["hover", id, x, y]); },
     click: async (id, x, y, ...gesture) => { calls.push(["click", id, x, y, ...gesture]); },
@@ -117,8 +123,8 @@ async function open(system) {
   }
 }
 
-// The panel's corner in the fake window, in points, from the title at 1830 px, 1400 px.
-const PANEL = { x: 1830 / 2 - 17, y: 25 + 1400 / 2 + 14 };
+// The panel's corner in points, from the device's frame.
+const PANEL = { x: DEVICE.x + 3, y: DEVICE.y + 18 };
 
 const clicks = (system) => system.calls.filter((call) => call[0] === "click");
 
@@ -151,52 +157,6 @@ test("controlPoint refuses a missing item, an item on a button and a layout it c
   assert.throws(() => controlPoint({ ...controls.get("Tab"), rows: 1 }, "A"), DeviceUiError);
 });
 
-test("findTitle uses the first word's edge, past icons read as characters, and allows misread digits", () => {
-  assert.deepEqual(findTitle([line(`> ${TITLE} V`, 1800, 1400)], TITLE), { x: 1830, y: 1400 });
-  assert.deepEqual(findTitle([line("Dev1ce 2O3O.11.08.I", 100, 50)], TITLE), { x: 100, y: 50 });
-});
-
-test("findTitle matches a title whose last word has an icon read onto its end", () => {
-  assert.deepEqual(findTitle([line(`${TITLE}\\`, 100, 50)], TITLE), { x: 100, y: 50 });
-  assert.deepEqual(findTitle([line(`> ${TITLE}\\ V`, 1800, 1400)], TITLE), { x: 1830, y: 1400 });
-});
-
-test("findTitle refuses a last word that goes on in letters or digits, or symbols inside the title", () => {
-  assert.throws(() => findTitle([line(`${TITLE}2\\`, 0, 0)], TITLE), /isn't on screen/);
-  assert.throws(() => findTitle([line("Device\\ 2030.11.08.1", 0, 0)], TITLE), /isn't on screen/);
-  assert.throws(() => findTitle([line(`${TITLE}\\`, 0, 0), line(TITLE, 900, 0)], TITLE), /2 times/);
-});
-
-test("findTitle skips a match left of the given edge, as the browser's or the Info View's", () => {
-  const lines = [line(TITLE, 26, 1400), line(TITLE, 260, 400), line(`> ${TITLE}`, 1800, 1400)];
-  assert.deepEqual(findTitle(lines, TITLE, 480), { x: 1830, y: 1400 });
-  assert.throws(() => findTitle(lines, TITLE), /3 times/);
-});
-
-test("findTitle matches a title Live cut short with an ellipsis by its start", () => {
-  assert.deepEqual(findTitle([line("© AUD...", 567, 1450)], "AUDelay"), { x: 597, y: 1450 });
-  assert.deepEqual(findTitle([line("Device 20...", 100, 50)], TITLE), { x: 100, y: 50 });
-  assert.deepEqual(findTitle([line("Device 2030.11.08.1…", 100, 50)], TITLE), { x: 100, y: 50 });
-});
-
-test("findTitle refuses a shortened start that differs, is under 3 characters, or is on screen twice", () => {
-  assert.throws(() => findTitle([line("AUF...", 0, 0)], "AUDelay"), /isn't on screen/);
-  assert.throws(() => findTitle([line("AU...", 0, 0)], "AUDelay"), /isn't on screen/);
-  assert.throws(() => findTitle([line("Device 21...", 0, 0)], TITLE), /isn't on screen/);
-  assert.throws(() => findTitle([line("AUD...", 0, 0), line("AUDelay", 900, 0)], "AUDelay"), /2 times/);
-});
-
-test("findTitle refuses a title that is missing or on screen twice", () => {
-  assert.throws(() => findTitle([line("Drum Rack", 0, 0)], TITLE), /isn't on screen/);
-  assert.throws(() => findTitle([line(TITLE, 0, 0), line(TITLE, 900, 0)], TITLE), /2 times/);
-});
-
-test("findTitle skips a match from the given top down, as the status bar's", () => {
-  const lines = [line(`> ${TITLE}`, 1800, 1400), line(`Track ${TITLE}`, 2500, 1700)];
-  assert.deepEqual(findTitle(lines, TITLE, 0, 1676), { x: 1830, y: 1400 });
-  assert.throws(() => findTitle(lines, TITLE), /2 times/);
-});
-
 test("infoTitle reads the leftmost text read from the Info View's title row", () => {
   assert.equal(infoTitle([line("Icon", 470, 4), line("Tab", 26, 6)]), "Tab");
   assert.equal(infoTitle([]), "");
@@ -210,12 +170,12 @@ test("a press reads the Info View from its title row only, left of the devices",
   const ui = await open(system);
   crops.length = 0;
   await ui.press("Button");
-  // the device's title is read from the whole window, then the Info View's row: its top at
-  // 1400 px, 700 points, in a window 1440 points wide
-  assert.deepEqual(crops, [undefined, { width: 1440, rect: [0, 696, 240, 18] }]);
+  // only the Info View's row is read: the device's title's top at 700 points, in a window
+  // 1440 points wide
+  assert.deepEqual(crops, [{ width: 1440, rect: [0, 696, 240, 18] }]);
 });
 
-test("a press clicks the control at the point worked out from the title, last, after a second focus", async () => {
+test("a press clicks the control at the point worked out from the device's frame, last, after a second focus", async () => {
   const system = fakeMachine();
   const ui = await open(system);
   await ui.press("Button");
@@ -223,11 +183,15 @@ test("a press clicks the control at the point worked out from the title, last, a
   assert.deepEqual(system.calls, ["focus", ["hover", ...expected], "focus", ["click", ...expected]]);
 });
 
-test("a press finds the title past the selected device's name in the status bar", async () => {
-  const system = fakeMachine({ titles: [line(`> ${TITLE}`, 1800, 1400), line(`Track ${TITLE}`, 2500, 1700)] });
+test("a press asks for the device's frame by its title, and fails as the frame's lookup fails, clicking nothing", async () => {
+  const asked = [];
+  const system = fakeMachine({ device: async (title) => { asked.push(title); return DEVICE; } });
   const ui = await open(system);
   await ui.press("Button");
-  assert.deepEqual(clicks(system)[0], ["click", 7, 0 + 1800 / 2 + 15 - 17 + 230, 25 + 1400 / 2 + 14 + 80]);
+  assert.deepEqual(asked, [TITLE]);
+  const failing = fakeMachine({ device: async () => { throw new DeviceUiError("Device Detail shows 2 devices named x"); } });
+  await assert.rejects((await open(failing)).press("Button"), /2 devices named/);
+  assert.deepEqual(clicks(failing), []);
 });
 
 test("a press on a tab's item goes to its row", async () => {
@@ -401,22 +365,6 @@ function slowRead(system, stop, slow) {
   return held;
 }
 
-test("Stop while a press finds the device stops it at once, before the hover", async () => {
-  const system = fakeMachine();
-  const stop = stoppable(system);
-  const ui = await open(system);
-  await ui.press("Button");
-  const held = slowRead(system, stop, () => true);
-  const before = system.calls.length;
-  const start = Date.now();
-  await assert.rejects(ui.press("Button"), { message: `${STOPPED}. Not clicked` });
-  const ms = Date.now() - start;
-  held.finish();
-  await held.reading;
-  assert.ok(ms < 1000, `the press threw ${ms} ms after it started`);
-  assert.deepEqual(system.calls.slice(before), ["focus"]);
-});
-
 test("Stop during a press's Info View read stops the press at once, not when the read ends", async () => {
   const system = fakeMachine();
   const stop = stoppable(system);
@@ -458,7 +406,7 @@ test("a press stopped before its Info View read starts none", async () => {
   system.read = (...args) => { reads += 1; return read(...args); };
   const ui = await open(system);
   await assert.rejects(ui.press("Button"), { message: `${STOPPED}. Not clicked` });
-  assert.equal(reads, 1);
+  assert.equal(reads, 0);
   assert.equal(clicks(system).length, 0);
 });
 
@@ -494,7 +442,7 @@ test("a press and a drag that Stop caught with only the release left reject with
 
 // The machine's calls that never move the pointer or press its button, so need no permit.
 const OTHER_CALLS = [
-  "hostname", "clickHost", "ask", "buildComputerUse", "showComputerUse", "stopped", "wake", "focus", "window", "windows", "capture", "read",
+  "hostname", "clickHost", "ask", "buildComputerUse", "showComputerUse", "stopped", "wake", "focus", "window", "windows", "device", "capture", "read",
   "pluginWindow", "editor", "frontmost", "escape", "escapeIfInFront", "waitForNoModifiers", "giveBack", "captureRect",
 ];
 
@@ -720,12 +668,12 @@ test("a press on a device given as points clicks the point from the panel's corn
   assert.deepEqual(clicks(system), [["click", 7, PANEL.x + 50, PANEL.y + 36]]);
 });
 
-test("a plug-in's panel corner is left of its title by the two extra title-bar buttons", async () => {
+test("a plug-in's panel corner is found from its frame as any device's", async () => {
   for (const className of ["AuPluginDevice", "PluginDevice"]) {
     const system = fakeMachine({ info: "Knob" });
     const ui = await openDeviceUi(fakeLive(className), { track: 1, device: 1, controls: { Knob: { x: 50, y: 36, info: "Knob" } } }, system);
     await ui.press("Knob");
-    assert.deepEqual(clicks(system), [["click", 7, PANEL.x - 32 + 50, PANEL.y + 36]]);
+    assert.deepEqual(clicks(system), [["click", 7, PANEL.x + 50, PANEL.y + 36]]);
   }
 });
 
@@ -749,10 +697,11 @@ test("with neither build nor controls, a device the harness hasn't measured is r
   await assert.rejects(openDeviceUi(fakeLive("Compressor2"), { track: 1, device: 1 }, fakeMachine()), /no measured points for .* \(Compressor2\)/);
 });
 
-// A device's title `x`, `y` pixels into the window's capture, and where its frame then starts,
-// in points from the window's top. The device the other tests press is too low in the window
-// for a capture: its frame, 192 points high, ends 11 points below the window.
-const titleAt = (x, y) => ({ titles: [line(`> ${TITLE}`, x, y)] });
+// A device whose panel's corner is `x` - 30, `y` pixels into the window's capture (where its
+// title's first word was read, before ADR-0020), and where its frame then starts, in points
+// from the window's top. The device the other tests press is too low in the window for a
+// capture: its frame, 192 points high, ends 11 points below the window.
+const titleAt = (x, y) => ({ device: async () => ({ x: (x + 30) / 2 - 17 - 3, y: 25 + y / 2 + 14 - 18, w: 300, h: 190 }) });
 const frameTop = (y) => y / 2 + 14 - 20;
 
 test("capture crops the window to the device's frame, in points from the window's corner, its width from the build", async () => {

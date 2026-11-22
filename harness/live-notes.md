@@ -143,11 +143,11 @@ unexpected.
   Filter's Frequency, Dry/Wet and Resonance, with `settleMs` 1000 (remote Mac, 2026-11-11).
   Not tried with both devices on one track.
 - The browser and the Info View can show a device's name in the same window as its title
-  bar, left of 240 points; `device-ui.js` looks for titles right of that.
+  bar, left of 240 points.
 - The status bar, along the bottom of Live's window, shows the selected track's name and the
   selected device's, right-aligned, and a short device name ("Device-dev") was read there as
-  a second title (Live 12.4.25b2, on the remote Mac, 2026-11-19). The status bar is the bottom 37 points of the window;
-  `device-ui.js` looks for titles above it.
+  a second title (Live 12.4.25b2, on the remote Mac, 2026-11-19). The status bar is the bottom
+  37 points of the window.
 - Live draws a hand right after the title of the device a Control Surface controls. The
   text reader's first read of a device's title had no hand; every read after a press read
   "Device 2030.11.08.1" as ") Device 2030.11.08.1\", the hand on the end of the last word,
@@ -156,11 +156,26 @@ unexpected.
   The likely source, unverified: AbletonOSC's `Manager` subclasses
   `ableton.v2.control_surface.ControlSurface`, which sets up a device provider, and the
   names in Live 12's compiled `device_provider.pyc` (`_appoint_device_from_song`,
-  `__on_selected_device_changed`) suggest it appoints the selected device. `device-ui.js`
-  takes symbols on the end of a title's last word as an icon.
+  `__on_selected_device_changed`) suggest it appoints the selected device.
 - Live cuts a title too long for its device short with an ellipsis: a folded AUDelay's title
   bar reads "AUD..."; unfolded, the device is wider and it reads "AUDelay" (remote Mac,
   2026-11-11).
+- Where the text recognizer puts the start of a device's title is off by up to a few points,
+  by the title and by where the device is: from its title's reading, the same Utility's panel
+  corner came out 2.0 points right of its body's edge in Live's window as the first device on
+  a track and 0.7 points left as the second, and Erosion's 0.1 left; Erosion's title read 2.2
+  points left of where Accessibility puts its text (2 pixels per point, Live 12.4.25b2,
+  2026-11-21); and a Max device's panel was captured 2 points in from where it was expected
+  (remote Mac). Accessibility's frame of the device's
+  group in Device Detail doesn't move with the title: in Live's window the device's body
+  starts 1 point right of it and 18 below, for Erosion, Utility, Auto Filter and Saturator in
+  a row, for the plug-in AUDelay and for the Max device Max Audio Effect alike, also after
+  Device Detail scrolled to another device, and the title's text 4 points below its top. A Max
+  device's presentation starts 2 points right of its body: Example Transpose's number box,
+  at 8, 8 in the patch, was drawn from 2 points right of where the body's edge put it, and
+  exactly at 8 points down (remote Mac). The first device on a track had a 2-point dark
+  outline left of its body there, and none on the local Mac. `device-ui.js` finds the panel
+  from that frame (ADR-0020).
 - A plug-in's title bar has two more buttons before its title than a Max or Live device's:
   Unfold Device Parameters and the one that opens the plug-in's window, 32 points in all. Over
   AUDelay's controls the Info View reads "Device Activator", "Unfold Device Parameters" and
@@ -733,8 +748,7 @@ unexpected.
   Map Mode off and as "nate", its top 4.5 points below the device title's, with it on; after a
   relaunch it read "Rate". Read from a crop of the Info View's title row only, it read
   "Rate" in both modes, every time (remote Mac, Live 12.4.25b2, 2026-11-21). `device-ui.js`
-  reads the Info View from that crop after its hover; it still finds the device's title over
-  the whole window.
+  reads the Info View from that crop after its hover.
 - `-EnableArmOnSelection` is an optional Options.txt entry; without it, none of this
   applies. With it, the arm follows the selection: while a track is armed, selecting another
   moves the arm to it; with no track armed, selecting a track arms nothing (Live 12.4.16,
