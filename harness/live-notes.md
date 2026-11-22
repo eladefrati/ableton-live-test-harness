@@ -130,6 +130,11 @@ unexpected.
 - A drag too short to move the pointer (`0 -1e-15`) crashed the helper after the button went
   down and left it held. A drag under 1 point on its longer axis is now refused (remote Mac,
   2026-11-13).
+- A held drag (ADR-0021) keeps the button down and posts nothing for its hold, then a second
+  drag event at the press point plus both moves. Its second move is refused as any drag's
+  move is, and so is a hold that isn't whole ms from 1 to 2000, before the pointer moves.
+  Stop or an ending signal during the hold brings the button up at once, not at the hold's
+  end: the helper looks for both every 10 ms while it holds.
 - A helper ended by SIGTERM or SIGQUIT while a drag held the button left it held.
   `device-ui.swift` now holds SIGINT, SIGQUIT, SIGTERM and SIGHUP back while the button is
   down: it posts the button up where the pointer is, then dies by that signal. A helper that

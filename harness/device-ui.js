@@ -13,6 +13,8 @@
 //   await ui.press("View", { double: true });  // a double-click (ADR-0019)
 //   await ui.press("View", { shift: true });   // a Shift-click (ADR-0019)
 //   await ui.drag("Knob", { up: 40 });     // turns a control: whole points with the button down (ADR-0013)
+//   await ui.drag("View", { right: 12 }, { hold: 400, then: { right: 12 } });
+//                                          // held still 400 ms between two moves (ADR-0021)
 //   await ui.choose("Menu", "Item");       // an item of the menu a control opens (ADR-0014)
 //   await ui.text([0, 0, 200, 100]);       // the text shown in part of the panel, device units
 //   await ui.capture("/path/to/device.png"); // the device, title bar and frame included
@@ -494,7 +496,8 @@ const machine = {
   hover: (windowId, x, y) => helper("hover", windowId, x, y),
   // `gesture`: "double" or "shift" (ADR-0019), or none for a plain click.
   click: (windowId, x, y, ...gesture) => helper("click", windowId, x, y, ...gesture),
-  drag: (windowId, x, y, dx, dy) => helper("drag", windowId, x, y, dx, dy),
+  // `hold`: "hold", ms, dx, dy for a held drag's pause and second move (ADR-0021), or none.
+  drag: (windowId, x, y, dx, dy, ...hold) => helper("drag", windowId, x, y, dx, dy, ...hold),
   // A plug-in's window (ADR-0008): its button's state, opened or closed; where it and its
   // editor are; a click in the editor.
   pluginWindow: async (action, device) => JSON.parse(await helper("plugin-window", action, device)).open,
@@ -678,6 +681,26 @@ function dragDistance({ up = 0, right = 0 } = {}) {
   return [right, -up];
 }
 
+// The longest hold of a held drag, in ms (ADR-0021); device-ui.swift holds the same limit.
+const MAX_HOLD_MS = 2000;
+
+// A held drag's { hold, then: { up, right } } as the helper's "hold", ms, dx, dy (ADR-0021), or
+// [] with no options, refused before anything moves unless the hold is whole ms from 1 to
+// MAX_HOLD_MS and `then` a distance a drag may move.
+function dragHold(options) {
+  if (options === undefined) return [];
+  const { hold, then, ...other } = options ?? {};
+  const unknown = Object.keys(other);
+  if (unknown.length) throw new DeviceUiError(`A drag takes { hold, then }, not ${unknown.join(", ")}. Not dragged`);
+  if (!Number.isInteger(hold) || hold < 1 || hold > MAX_HOLD_MS) {
+    throw new DeviceUiError(`A held drag needs hold in whole ms, from 1 to ${MAX_HOLD_MS}, and then, the move after it. Not dragged`);
+  }
+  if (then === null || typeof then !== "object") {
+    throw new DeviceUiError(`A held drag needs then, the move after the hold, as { up, right }. Not dragged`);
+  }
+  return ["hold", hold, ...dragDistance(then)];
+}
+
 // Live's windows on screen, front to back: [{ id, title, layer, x, y, w, h }] in points. A
 // dialog, a panel (the Save panel) or a plug-in's window (layer 3) is a window of its own.
 async function liveWindows(system = machine) {
@@ -751,11 +774,14 @@ class DeviceUi {
   }
 
   // Drags a control by { up, right } whole points with the button down, after the same checks
-  // as a press (ADR-0013): a knob turns with up, a horizontal slider with right.
-  async drag(name, distance) {
+  // as a press (ADR-0013): a knob turns with up, a horizontal slider with right. `options`:
+  // { hold, then: { up, right } } keeps the button down and the pointer still for `hold` ms
+  // after that move, then moves `then` further before the release (ADR-0021).
+  async drag(name, distance, options) {
     const [dx, dy] = dragDistance(distance);
+    const hold = dragHold(options);
     const { window, x, y } = await this.aim(name);
-    await this.system.drag(window, x, y, dx, dy);
+    await this.system.drag(window, x, y, dx, dy, ...hold);
   }
 
   // Opens the menu `name` and clicks its item `item`, confirmed by its text (ADR-0014): the
@@ -937,8 +963,9 @@ class PluginWindow {
   }
 
   // Drags a control by { up, right } whole points with the button down (ADR-0013). The helper
-  // checks the start as for a click.
-  async drag(name, distance) {
+  // checks the start as for a click. A held drag (ADR-0021) is for Live's window only.
+  async drag(name, distance, options) {
+    if (options !== undefined) throw new DeviceUiError(`A plug-in's window takes a drag of one move only, not a held one (ADR-0021). Not dragged`);
     const [dx, dy] = dragDistance(distance);
     const [x, y] = await this.aim(name);
     await this.system.dragEditor(this.title, x, y, this.size, dx, dy);

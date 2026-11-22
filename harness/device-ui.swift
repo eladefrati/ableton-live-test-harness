@@ -27,19 +27,23 @@
 //   device-ui click-editor <title> <x> <y> <w> <h>
 //                                     clicks the point <x> <y> of the plug-in window's editor,
 //                                     in points from its top left, if the editor is <w> x <h>
-//   device-ui drag <window> <x> <y> <dx> <dy>
+//   device-ui drag <window> <x> <y> <dx> <dy> [hold <ms> <dx2> <dy2>]
 //   device-ui drag-editor <title> <x> <y> <w> <h> <dx> <dy>
 //                                     as click and click-editor, but with the button down
 //                                     moves the pointer by <dx>, <dy> whole points (right,
 //                                     down) in one move, and releases the button where the
-//                                     pointer then is (ADR-0013)
+//                                     pointer then is (ADR-0013); with hold, keeps the button
+//                                     down and the pointer still for <ms> after that move, then
+//                                     moves it by <dx2>, <dy2> more before the release
+//                                     (ADR-0021)
 //
 // hover, click and drag refuse, posting nothing, unless the screen is unlocked and <window> is
 // the topmost window at the point, which a click and a drag check again after their hover,
 // before the button goes down; the editor's commands also unless the point is inside the
-// editor and the editor is the size given; a drag also unless it moves whole points, at least
-// 1 on its longer axis and at most MAX_DRAG on either, and ends on a screen. Exits 1 with the
-// reason on stderr if anything fails.
+// editor and the editor is the size given; a drag also unless each of its moves is whole
+// points, at least 1 on its longer axis and at most MAX_DRAG on either, and ends on a screen,
+// and its hold is whole ms from 1 to MAX_HOLD_MS. Exits 1 with the reason on stderr if
+// anything fails.
 //
 // Once the run is stopped (ADR-0012), hover, click and drag post nothing but the release of a
 // button this helper holds, and exit 3 saying so. The run counts as stopped unless the helper
@@ -49,7 +53,9 @@
 // So does a run that Stop signalled because it couldn't remove the token: the run passes the
 // signal, SIGUSR2, on to this helper, which handles it from its start, whatever its command. A
 // click or a drag with only that release left has happened: the helper posts it and exits 4,
-// saying that too; so does a double-click stopped after its first click, which happened. A
+// saying that too; so does a double-click stopped after its first click, which happened, and a
+// held drag stopped during its hold, which releases the button at once, its first move
+// having happened (ADR-0021). A
 // helper that fails, or is sent SIGINT, SIGQUIT, SIGTERM or SIGHUP, while it holds the button
 // or Shift releases them before it ends: by that signal, or with status 131 after SIGQUIT.
 
@@ -467,10 +473,12 @@ func halt(_ why: String) -> Never {
 }
 
 // The one function a hover's, a click's and a drag's events leave from, the button-up apart
-// (complete), so it checks Stop before each, as requireOnTop does while it waits.
-func post(_ type: CGEventType, _ point: CGPoint, moved: CGVector? = nil, clicks: Int64 = 1) {
+// (complete), so it checks Stop before each, as requireOnTop does while it waits. Stopped, it
+// ends the helper with `onStop`: halt, unless what was posted before has happened.
+func post(_ type: CGEventType, _ point: CGPoint, moved: CGVector? = nil, clicks: Int64 = 1,
+          onStop: (String) -> Never = halt) {
     obeySignal()
-    if let why = stopped() { halt(why) }
+    if let why = stopped() { onStop(why) }
     if type == .leftMouseDown {
         let up = mouseEvent(.leftMouseUp, point, clicks: clicks)
         holdBackSignals()
@@ -510,6 +518,21 @@ func requireDrag(_ point: CGPoint, _ delta: CGVector) {
     guard CGGetDisplaysWithPoint(end, 0, nil, &count) == .success, count > 0 else { fail("A drag to \(end) ends off screen") }
 }
 
+// The longest hold of a held drag, in ms (ADR-0021): it holds the person's mouse.
+let MAX_HOLD_MS = 2000.0
+
+// Refuses a hold, before any event is posted, unless it is whole ms from 1 to MAX_HOLD_MS.
+func requireHold(_ ms: Double) {
+    guard ms == ms.rounded(), ms >= 1, ms <= MAX_HOLD_MS
+    else { fail("A drag holds still for whole ms, from 1 to \(Int(MAX_HOLD_MS)), not \(ms)") }
+}
+
+// A held drag's pause and second move (ADR-0021).
+struct Hold {
+    let ms: Double
+    let then: CGVector
+}
+
 // Button down at `point`, one drag event at the end of `delta`, button up where the pointer
 // then is. One event, not a path of steps: for every drag event, a knob of one of Live's
 // devices adds how far that event is from the press point and, when the event has a vertical
@@ -517,15 +540,52 @@ func requireDrag(_ point: CGPoint, _ delta: CGVector) {
 // again at each step (live-notes.md). A control that reads where the pointer is ends at the
 // same value either way. The event carries the whole distance in its delta fields too, for
 // controls that read how far the mouse moved.
-func drag(_ point: CGPoint, by delta: CGVector) {
-    let end = CGPoint(x: point.x + delta.dx, y: point.y + delta.dy)
+//
+// With `hold`, the button stays down and the pointer still for `hold.ms` after that event,
+// then a second drag event goes to the press point plus both moves, carrying the second in
+// its delta fields: placed from the press point, not from where the pointer is, which a
+// control may have moved (ADR-0021).
+func drag(_ point: CGPoint, by delta: CGVector, hold: Hold? = nil) {
+    var end = CGPoint(x: point.x + delta.dx, y: point.y + delta.dy)
     post(.leftMouseDown, point)
     usleep(70_000)
     post(.leftMouseDragged, end, moved: delta)
+    if let hold {
+        holdStill(hold.ms)
+        end = CGPoint(x: end.x + hold.then.dx, y: end.y + hold.then.dy)
+        post(.leftMouseDragged, end, moved: hold.then, onStop: stoppedInHold)
+    }
     usleep(50_000)
     // Live has moved the pointer back to the press point by now after a move with a vertical
     // part; after any other, and on other controls, it is at the end.
     complete("drag", at: CGEvent(source: nil)?.location ?? end)
+}
+
+// How often a hold looks for Stop and for an ending signal held back, in µs.
+let HOLD_POLL_US: UInt64 = 10_000
+
+// Posts nothing for `ms`, with the button down, on the system's uptime clock. Stop or an
+// ending signal held back ends the hold within HOLD_POLL_US, the button released where the
+// pointer is: a signal cuts a sleep short, so the wait is to a deadline, not a count of sleeps.
+func holdStill(_ ms: Double) {
+    let deadline = DispatchTime.now().uptimeNanoseconds + UInt64(ms * 1_000_000)
+    while true {
+        obeySignal()
+        if let why = stopped() { stoppedInHold(why) }
+        let now = DispatchTime.now().uptimeNanoseconds
+        if now >= deadline { return }
+        usleep(UInt32(min(HOLD_POLL_US, (deadline - now) / 1000)))
+    }
+}
+
+// Ends a held drag that Stop caught after its first move, before its second: the button comes
+// up where the pointer is, and the helper exits as a gesture that had happened, since what
+// the first move did happened (ADR-0021).
+func stoppedInHold(_ why: String) -> Never {
+    let point = release() ?? CGEvent(source: nil)?.location ?? .zero
+    obeySignal()
+    FileHandle.standardError.write(Data("\(why), and the helper released the button at \(point.x), \(point.y) during the drag's hold: its first move had happened, its second hadn't\n".utf8))
+    exit(HAPPENED_STATUS)
 }
 
 // A click; `double`, a double-click: a second press and release at the same point, 0.1 s after
@@ -641,16 +701,23 @@ case "click-editor", "drag-editor":
         press(point)
     }
 case "drag":
-    guard arguments.count == 7, let id = Int(arguments[2]), let x = Double(arguments[3]), let y = Double(arguments[4]),
-          let dx = Double(arguments[5]), let dy = Double(arguments[6])
-    else { fail("usage: device-ui drag <window> <x> <y> <dx> <dy>") }
-    let (point, delta) = (CGPoint(x: x, y: y), CGVector(dx: dx, dy: dy))
+    let numbers = arguments.dropFirst(3).prefix(4).compactMap { Double($0) }
+    let held = arguments.dropFirst(8).compactMap { Double($0) }
+    guard arguments.count == 7 || (arguments.count == 11 && arguments[7] == "hold" && held.count == 3),
+          let id = Int(arguments[2]), numbers.count == 4
+    else { fail("usage: device-ui drag <window> <x> <y> <dx> <dy> [hold <ms> <dx2> <dy2>]") }
+    let (point, delta) = (CGPoint(x: numbers[0], y: numbers[1]), CGVector(dx: numbers[2], dy: numbers[3]))
     requireDrag(point, delta)
+    let hold = held.isEmpty ? nil : Hold(ms: held[0], then: CGVector(dx: held[1], dy: held[2]))
+    if let hold {
+        requireHold(hold.ms)
+        requireDrag(CGPoint(x: point.x + delta.dx, y: point.y + delta.dy), hold.then)
+    }
     requireUnlocked()
     aim(id, point)
-    drag(point, by: delta)
+    drag(point, by: delta, hold: hold)
 default:
     fail("usage: device-ui window | windows | device <title> | text <png> | crop <png> <width> <x> <y> <w> <h> <out> | hover <window> <x> <y> | click <window> <x> <y> [double | shift] | "
         + "plugin-window state|open|close <device> | plugin-editor <title> | click-editor <title> <x> <y> <w> <h> | "
-        + "drag <window> <x> <y> <dx> <dy> | drag-editor <title> <x> <y> <w> <h> <dx> <dy>")
+        + "drag <window> <x> <y> <dx> <dy> [hold <ms> <dx2> <dy2>] | drag-editor <title> <x> <y> <w> <h> <dx> <dy>")
 }

@@ -73,7 +73,7 @@ function fakeMachine({ info = "Button", device = async () => DEVICE, onFocus = (
     captureRect: async (id, width, rect, file) => { calls.push(["capture", id, width, rect, file]); },
     hover: async (id, x, y) => { calls.push(["hover", id, x, y]); },
     click: async (id, x, y, ...gesture) => { calls.push(["click", id, x, y, ...gesture]); },
-    drag: async (id, x, y, dx, dy) => { calls.push(["drag", id, x, y, dx, dy]); },
+    drag: async (id, x, y, dx, dy, ...hold) => { calls.push(["drag", id, x, y, dx, dy, ...hold]); },
   };
 }
 
@@ -931,6 +931,39 @@ test("a drag that is under 1 point, too long or a fraction of a point is refused
   assert.equal(system.calls.length, 0);
 });
 
+test("a held drag goes to the helper as one drag with its hold and its second move, up as negative dy (ADR-0021)", async () => {
+  const system = fakeMachine();
+  const ui = await open(system);
+  await ui.drag("Button", { right: 12, up: 1 }, { hold: 400, then: { right: 3, up: 2 } });
+  const point = [7, 0 + 1800 / 2 + 15 - 17 + 230, 25 + 1400 / 2 + 14 + 80];
+  assert.deepEqual(system.calls, ["focus", ["hover", ...point], "focus", ["drag", ...point, 12, -1, "hold", 400, 3, -2]]);
+});
+
+test("a held drag whose hold or second move a drag can't make is refused before the pointer moves", async () => {
+  const system = fakeMachine();
+  const ui = await open(system);
+  for (const hold of [0, 2001, 400.5, -1, Number.NaN, "400", undefined]) {
+    await assert.rejects(ui.drag("Button", { up: 5 }, { hold, then: { up: 5 } }), /hold in whole ms, from 1 to 2000, and then, the move after it\. Not dragged/);
+  }
+  for (const then of [undefined, null, 5]) {
+    await assert.rejects(ui.drag("Button", { up: 5 }, { hold: 400, then }), /then, the move after the hold, as \{ up, right \}\. Not dragged/);
+  }
+  for (const then of [{}, { up: 0.5 }, { right: 401 }]) {
+    await assert.rejects(ui.drag("Button", { up: 5 }, { hold: 400, then }), /in whole points, at least 1 on the longer axis and at most 400 on either\. Not dragged/);
+  }
+  await assert.rejects(ui.drag("Button", { up: 5 }, { hold: 400, then: { up: 5 }, wait: 100 }), /takes \{ hold, then \}, not wait\. Not dragged/);
+  await assert.rejects(ui.drag("Button", { up: 5 }, null), /hold in whole ms/);
+  assert.equal(system.calls.length, 0);
+});
+
+test("a plug-in's window refuses a held drag before the pointer moves", async () => {
+  const system = fakePluginMachine();
+  const window = await openPluginWindow(pluginLive(), PLUGIN, system);
+  const before = system.calls.length;
+  await assert.rejects(window.drag("Button", { up: 5 }, { hold: 400, then: { up: 5 } }), /of one move only, not a held one \(ADR-0021\)\. Not dragged/);
+  assert.equal(system.calls.length, before);
+});
+
 test("a drag in a plug-in's editor goes to the helper with the point, the size and right, down", async () => {
   const system = fakePluginMachine();
   const window = await openPluginWindow(pluginLive(), PLUGIN, system);
@@ -1575,6 +1608,18 @@ test("the helper refuses a drag under 1 point or by a fraction of a point", { sk
   for (const [dx, dy] of [[0, -1e-15], [0, -0.4], [0.9, 0], [0.5, -0.5], [0, -1.4], [0, -10.5], [7.5, -3]]) {
     await assert.rejects(tools.run(helper, ["drag", -1, 100, 100, dx, dy]), /whole points, at least 1 on its longer axis and at most 400 on either/);
   }
+});
+
+// As above, for a held drag (ADR-0021): its hold and its second move are refused before any event.
+test("the helper refuses a held drag whose hold isn't whole ms from 1 to 2000 or whose second move a drag can't make", { skip: !hasDeveloperTools && "no developer tools", timeout: 300000 }, async () => {
+  const helper = await tools.helperBinary(path.join(__dirname, "..", "device-ui.swift"));
+  for (const ms of [0, 2001, 400.5]) {
+    await assert.rejects(tools.run(helper, ["drag", -1, 100, 100, 5, 0, "hold", ms, 5, 0]), /holds still for whole ms, from 1 to 2000/);
+  }
+  for (const [dx, dy] of [[0, 0], [0.5, 0], [0, 401]]) {
+    await assert.rejects(tools.run(helper, ["drag", -1, 100, 100, 5, 0, "hold", 400, dx, dy]), /whole points, at least 1 on its longer axis and at most 400 on either/);
+  }
+  await assert.rejects(tools.run(helper, ["drag", -1, 100, 100, 5, 0, "wait", 400, 5, 0]), /usage: device-ui drag <window> <x> <y> <dx> <dy> \[hold <ms> <dx2> <dy2>\]/);
 });
 
 // A PNG's chunk, and a grey PNG `width` x `height` pixels that gives its resolution as

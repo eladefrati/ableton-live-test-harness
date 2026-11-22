@@ -146,6 +146,20 @@ const drag = (window, x, y) => ["drag", window, x, y, 30, -20];
 const DRAGGED = { type: "drag", dx: 30, dy: -20 };
 // A drag by another distance: one the helper must refuse for it.
 const dragBy = (dx, dy) => (window, x, y) => ["drag", window, x, y, dx, dy];
+// A held drag (ADR-0021): the drag above, held still for PAUSE_MS, then 10 points right and 10
+// down more, or by a second move the helper must refuse.
+const PAUSE_MS = 400;
+const heldDragBy = (dx, dy) => (window, x, y) => ["drag", window, x, y, 30, -20, "hold", PAUSE_MS, dx, dy];
+const heldDrag = heldDragBy(10, 10);
+const heldEvents = (x, y) => [{ type: "down", x, y }, { ...DRAGGED, x: x + 30, y: y - 20 },
+  { type: "drag", dx: 10, dy: 10, x: x + 40, y: y - 10 }];
+// How far from PAUSE_MS apart the held drag's two drag events may reach the target: each
+// reaches it a little after it is posted, by an amount that varies.
+const PAUSE_SLACK_MS = 50;
+// How soon after the first drag event the button-up must reach the target when Stop or a
+// signal comes at that event: the helper looks for both every 10 ms during the hold, so well
+// before the hold would have ended.
+const PAUSE_STOP_MS = PAUSE_MS / 4;
 
 // Each case: the target's options, whether harness-computer-use's overlay runs, whether the
 // token can't be removed, whether the run ignores the signal of Stop's last resort, whether a
@@ -171,7 +185,9 @@ const dragBy = (dx, dy) => (window, x, y) => ["drag", window, x, y, dx, dy];
 // target: half the hold where the target removes the token, which leaves a loaded machine
 // room, and not before it where the helper is frozen with the button down until the token has
 // gone. Under that, the token may have gone after the helper posted its release, and the case
-// fails as not shown.
+// fails as not shown. A held drag's case (ADR-0021) may also say how far apart its two drag
+// events must reach the target, at the least and at the most, and how soon after the first
+// the button-up must, where Stop or a signal comes at that event.
 const CASES = [
   {
     name: "a click reaches the target",
@@ -405,6 +421,59 @@ const CASES = [
     status: HAPPENED,
     stderr: happened("drag"),
     upAfterStopMs: DRAG_HOLD_MS / 2,
+    events: (x, y) => [{ type: "down", x, y }, { ...DRAGGED, x: x + 30, y: y - 20 }, { type: "up", x: x + 30, y: y - 20 }],
+  },
+  {
+    name: "a held drag's events: down, a drag at the first move's end, none for the hold, a drag at both moves' end carrying the second, up",
+    target: RECT,
+    command: heldDrag,
+    status: 0,
+    pausedMs: [PAUSE_MS - PAUSE_SLACK_MS, PAUSE_MS + PAUSE_SLACK_MS],
+    events: (x, y) => [...heldEvents(x, y), { type: "up", x: x + 40, y: y - 10 }],
+  },
+  {
+    name: "a held drag's second move is placed from the press point when the control has moved the pointer back, and the button comes up where the pointer is",
+    target: [...RECT, "--return"],
+    command: heldDrag,
+    status: 0,
+    pausedMs: [PAUSE_MS - PAUSE_SLACK_MS, PAUSE_MS + PAUSE_SLACK_MS],
+    events: (x, y) => [...heldEvents(x, y), { type: "up", x, y }],
+  },
+  // 400 points up from the first move's end is above the top of the screen.
+  {
+    name: "a held drag whose second move would end off the screen is refused before the pointer moves",
+    target: RECT,
+    command: heldDragBy(0, -400),
+    status: 1,
+    stderr: /^A drag to \(.+\) ends off screen$/,
+    moves: () => [],
+    events: () => [],
+  },
+  {
+    name: "Stop during a held drag's hold: the button comes up at once where the pointer is, with no second move, and the helper ends as stopped, "
+      + "saying the first move had happened",
+    target: [...RECT, "--stop-at-drag", TOKEN],
+    command: heldDrag,
+    status: HAPPENED,
+    stderr: new RegExp(`^${literal(BY_STOP)}, and the helper released the button at [\\d.]+, [\\d.]+ during the drag's hold: its first move had happened, its second hadn't$`),
+    upAfterDragMs: PAUSE_STOP_MS,
+    events: (x, y) => [{ type: "down", x, y }, { ...DRAGGED, x: x + 30, y: y - 20 }, { type: "up", x: x + 30, y: y - 20 }],
+  },
+  {
+    name: "Stop's signal during a held drag's hold: the button comes up at once, with no second move, and the helper ends as stopped, saying the first move had happened",
+    target: [...RECT, "--signal-at-drag", "SIGUSR2"],
+    command: heldDrag,
+    status: HAPPENED,
+    stderr: new RegExp(`^${literal(BY_STOP)}, and the helper released the button at [\\d.]+, [\\d.]+ during the drag's hold: its first move had happened, its second hadn't$`),
+    upAfterDragMs: PAUSE_STOP_MS,
+    events: (x, y) => [{ type: "down", x, y }, { ...DRAGGED, x: x + 30, y: y - 20 }, { type: "up", x: x + 30, y: y - 20 }],
+  },
+  {
+    name: "SIGTERM during a held drag's hold: the helper releases the button at once where the pointer is, with no second move, then dies by the signal",
+    target: [...RECT, "--signal-at-drag", "SIGTERM"],
+    command: heldDrag,
+    status: "SIGTERM",
+    upAfterDragMs: PAUSE_STOP_MS,
     events: (x, y) => [{ type: "down", x, y }, { ...DRAGGED, x: x + 30, y: y - 20 }, { type: "up", x: x + 30, y: y - 20 }],
   },
   // A helper that died by a quit signal would leave a crash report, so it exits instead.
@@ -1323,6 +1392,11 @@ async function failures(test, binaries) {
     stoppedAt = printed.find((line) => "stopped" in line)?.stopped ?? stoppedAt;
     const afterStop = seen.filter((event) => event.at >= stoppedAt && event.type !== "up");
     const upAfterStop = seen.find((event) => event.type === "up")?.at - stoppedAt;
+    // How far apart a held drag's two drag events reached the target, and how soon after the
+    // first the button-up did (ADR-0021).
+    const drags = seen.filter((event) => event.type === "drag");
+    const paused = drags.length === 2 ? drags[1].at - drags[0].at : undefined;
+    const upAfterDrag = seen.find((event) => event.type === "up")?.at - drags[0]?.at;
     const killed = run.endedAt() - stoppedAt;
     // How long after Stop the overlay went. When it went is read as a whole millisecond, up
     // to one before the moment itself, and the token went at a fraction of one: the lower
@@ -1340,6 +1414,10 @@ async function failures(test, binaries) {
       test.upAfterStopMs !== undefined && fs.existsSync(TOKEN) && "the click token was never removed",
       test.upAfterStopMs !== undefined && !fs.existsSync(TOKEN) && !(upAfterStop >= test.upAfterStopMs)
         && `not shown that Stop came before the release: the button-up reached the target ${upAfterStop.toFixed(1)} ms after the token was removed, under ${test.upAfterStopMs}`,
+      test.upAfterDragMs !== undefined && !(upAfterDrag <= test.upAfterDragMs)
+        && `the button-up reached the target ${upAfterDrag?.toFixed(1)} ms after the first drag event, over ${test.upAfterDragMs}`,
+      test.pausedMs && !(paused >= test.pausedMs[0] && paused <= test.pausedMs[1])
+        && `the two drag events reached the target ${paused?.toFixed(1)} ms apart, not ${test.pausedMs.join(" to ")}`,
       held && `the button was left held, and ${held.released ? "has been released" : "could not be released"}`,
       ...stopping,
       unpressedAgain && `Stop couldn't be pressed again: ${unpressedAgain}`,

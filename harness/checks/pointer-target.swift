@@ -2,7 +2,8 @@
 // that takes clicks without taking the front.
 //
 //   pointer-target <x> <y> <w> <h> [--cover] [--return] [--stop <file>] [--stop-at-drag <file>]
-//                  [--signal <name>] [--signal-parent <name>] [--freeze move|down]
+//                  [--signal <name>] [--signal-at-drag <name>] [--signal-parent <name>]
+//                  [--freeze move|down]
 //                                     at that rectangle, in points from the screen's top left
 //   pointer-target --under <title>    at the rectangle of the window of that title, under it
 //
@@ -21,9 +22,11 @@
 // as Stop on harness-computer-use's pill removes a run's click token, with --signal it
 // sends the signal of that name to the process that posted the event, and with
 // --signal-parent to that process's parent alone, the run that started it. With
-// --stop-at-drag it removes <file> at a drag event. Having removed <file>, signalled the
-// parent, or sent the process that posted the event SIGUSR2, the signal of Stop's last
-// resort, it prints {"stopped": <when, in ms>}, after the line of the event it did so at.
+// --stop-at-drag it removes <file> at a drag event, and with --signal-at-drag it sends the
+// signal of that name to the process that posted the first drag event. Having removed <file>,
+// signalled the parent, or sent the process that posted the event SIGUSR2, the signal of
+// Stop's last resort, it prints {"stopped": <when, in ms>}, after the line of the event it did
+// so at.
 // With --freeze it suspends the process that posted an event (SIGSTOP), once: at the first
 // pointer move a process posted (move) or when the button goes down (down). It prints
 // {"frozen": <that process's id>} after the event's line, for the check to let the process
@@ -58,7 +61,7 @@ final class Pad: NSView {
     var onFirstMove: (() -> Void)?
     var onMove: ((CGEvent) -> Void)?
     var onDown: ((CGEvent) -> Void)?
-    var onDrag: (() -> Void)?
+    var onDrag: ((CGEvent) -> Void)?
     var returnsPointer = false
     var pressed = CGPoint.zero
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
@@ -69,7 +72,7 @@ final class Pad: NSView {
     }
     override func mouseDragged(with event: NSEvent) {
         report("drag", event)
-        onDrag?()
+        if let posted = event.cgEvent { onDrag?(posted) }
         if returnsPointer { CGWarpMouseCursorPosition(pressed) }
     }
     override func mouseUp(with event: NSEvent) { report("up", event) }
@@ -155,6 +158,7 @@ func signalOption(_ option: String) -> Int32? {
     }
 }
 let (sent, sentToParent) = (signalOption("--signal"), signalOption("--signal-parent"))
+var sentAtDrag = signalOption("--signal-at-drag")
 // The parent of the process `pid`, or 0 if the system doesn't say.
 func parent(of pid: pid_t) -> pid_t {
     var info = proc_bsdinfo()
@@ -180,7 +184,7 @@ if options.count == 2, options[0] == "--under" {
 } else {
     let numbers = options.compactMap { Double($0) }
     guard options.count == 4, numbers.count == 4
-    else { fail("usage: pointer-target <x> <y> <w> <h> [--cover] [--return] [--stop <file>] [--stop-at-drag <file>] [--signal <name>] [--signal-parent <name>] [--freeze move|down] | --under <title>") }
+    else { fail("usage: pointer-target <x> <y> <w> <h> [--cover] [--return] [--stop <file>] [--stop-at-drag <file>] [--signal <name>] [--signal-at-drag <name>] [--signal-parent <name>] [--freeze move|down] | --under <title>") }
     rect = CGRect(x: numbers[0], y: numbers[1], width: numbers[2], height: numbers[3])
 }
 
@@ -198,7 +202,15 @@ pad.onDown = { posted in
     if freezeAt == "down" { freeze(posted) }
 }
 pad.onMove = { posted in if freezeAt == "move" { freeze(posted) } }
-pad.onDrag = { stop(dragToken) }
+pad.onDrag = { posted in
+    stop(dragToken)
+    let poster = pid_t(posted.getIntegerValueField(.eventSourceUnixProcessID))
+    // Once, at the first drag event; never to process 0, this program's own process group.
+    if let signal = sentAtDrag, poster > 0 {
+        sentAtDrag = nil
+        if kill(poster, signal) == 0, signal == SIGUSR2 { printJSON(["stopped": now()]) }
+    }
+}
 var over: Panel?
 if cover { pad.onFirstMove = { over = showPanel(rect).0 } }
 // While a notification's banner shows, Notification Center holds a transparent window over
