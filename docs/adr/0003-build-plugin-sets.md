@@ -12,13 +12,14 @@ date: 2026-11-02
 
 An Audio Unit with more than 64 parameters lists only "Device On" over the LOM until they
 are added in Configure mode, a UI gesture (`harness/live-notes.md`), and is back in that
-state after every relaunch. A project's checks need Live relaunched after each plug-in build anyway:
-Live loads an AU's code once per launch.
+state after every relaunch. A project's checks need Live relaunched after each plug-in build
+anyway, because Live loads an AU's code once per launch.
 
 `exposePluginParameters` (plugin.js) got around this by saving the open set with File >
 Save Live Set As, writing the parameters into a copy of the file, and opening the copy. The
 save types into Live's Save panel with System Events keystrokes, which go to the frontmost
-app, so it takes the user's focus, and a click elsewhere at the wrong moment takes the keys.
+app, so it takes the user's focus, and after a click elsewhere at the wrong moment the keys go
+where the click landed.
 
 Opening a set with `open -a`, as `openSet` and `relaunch.js` did, also brought Live forward.
 
@@ -26,7 +27,7 @@ Measured in Live 12.4.25b1 and Suite 12.4.3:
 
 - Live opens a set holding an `AuPluginDevice` with no plug-in state (an empty `Preset`),
   no preset references, and slots filled as Live fills them (parameter i in pair i). It lists every
-  parameter, and they reach the plug-in: a plug-in's checks passed on such a set.
+  parameter, and they reach the plug-in. A plug-in's checks passed on such a set.
 - The device block can come from another plug-in. AUDelay's block (`aufx`, one input bus),
   with another plug-in's codes and names put in, ran that plug-in, of another type and bus
   count; its checks passed.
@@ -44,9 +45,9 @@ Measured in Live 12.4.25b1 and Suite 12.4.3:
    references, every slot free, pointee ids consistent with `NextPointeeId`. A builder in
    `plugin.js` copies it into a temp folder and fills in the target plug-in's codes and
    names. It then fills the slots from the AU's own `ParameterList` and `ParameterInfo`,
-   read by a helper (`harness/au-parameters.swift`): the parameter at index i of the list
-   into pair i, as Live does, its default as Live normalizes it as `Manual`
-   (`harness/live-notes.md`).
+   read by a helper (`harness/au-parameters.swift`). The builder puts the parameter at index i
+   of the list into pair i, as Live does, and writes its default as `Manual`, normalized as Live
+   normalizes it (`harness/live-notes.md`).
 2. **The plug-in is found by name in its component's `Info.plist`** (`AudioComponents`,
    `name` "Maker: Name"), under `~/Library/Audio/Plug-Ins/Components`,
    `/Library/Audio/Plug-Ins/Components` and `/System/Library/Components` (where AUDelay
@@ -57,7 +58,7 @@ Measured in Live 12.4.25b1 and Suite 12.4.3:
    parameters.
 4. **`relaunch.js --plugin <name>` starts Live on the built set**, so a check after a
    relaunch finds the plug-in on track 0 with its parameters listed.
-5. **`exposePluginParameters` refuses to replace a set the harness didn't make:** it opens
+5. **`exposePluginParameters` refuses to replace a set the harness didn't make.** It opens
    a built set only if the open set is in the harness's temp folder, checked just before the
    open, because opening answers "Save changes?" with Don't Save, and the LOM can't tell
    whether the user's set has unsaved work.
@@ -78,8 +79,9 @@ Measured in Live 12.4.25b1 and Suite 12.4.3:
 - The harness compiles its helper with `swiftc` (Xcode or the Command Line Tools) and keeps
   the binary between runs.
 - Instruments (`aumu`) are untested and refused until a project needs them. VST3 plug-ins
-  are refused too: their parameter IDs need a VST3 host to read.
-- A plug-in with more than 128 parameters is refused: the device has 128 pairs of slots.
+  are refused too, because their parameter IDs need a VST3 host to read.
+- A plug-in with more than 128 parameters is refused, because the device has 128 pairs of
+  slots.
 - The fixture is tied to Live's set format, like `empty.als`.
 
 ## Alternatives considered

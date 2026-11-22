@@ -12,11 +12,11 @@ date: 2026-11-13
 
 A plug-in's editor opens in a window of its own, not in Live's device view. To prove an editor in
 Live, a check has to open that window, capture it and click inside it. The harness reached only
-Live's main window: the plug-in's window floats above it (window layer 3), Live hides it while
+Live's main window. The plug-in's window floats above it (window layer 3), Live hides it while
 Live is in the background or the display sleeps, and nothing opened it but a person clicking the
 button on the device's title bar. ADR-0004 clicks only once Live's Info View names the control
-under the pointer; a plug-in's window has no Info View, and a plug-in's controls need not name
-themselves to Accessibility (a JUCE slider is exposed without its label, a custom component as
+under the pointer; a plug-in's window has no Info View, and a plug-in's controls need not expose
+their names to Accessibility (a JUCE slider is exposed without its label, a custom component as
 nothing at all).
 
 ## Decision
@@ -39,8 +39,8 @@ nothing at all).
 
 ## Consequences
 
-- Weaker than the Info View check: a point that has drifted within an editor of the same size
-  clicks another control of the plug-in under test, never anything outside it. The check's
+- This is weaker than the Info View check. A point that has moved within an editor of the same
+  size clicks another control of the plug-in under test, never anything outside it. The check's
   evidence shows it; the points are then measured again.
 - A plug-in whose editor's size changes (a resizable editor, another scale) is refused until the
   check gives the new size and points.

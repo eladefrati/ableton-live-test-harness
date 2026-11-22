@@ -28,7 +28,7 @@ own devices and plug-ins have no build to read positions from.
 
 ## Consequences
 
-- Measured points hold for one layout: a Live version that redraws a device, or another
+- Measured points hold for one layout. A Live version that redraws a device, or another
   zoom, moves them. The Info View check turns a moved point into a refusal, not a wrong
   click; the points are then measured again.
 - A control whose Info View title changes with the device's state (Auto Filter's Rate knob

@@ -11,7 +11,7 @@ date: 2026-11-21
 ## Context
 
 A device's controls can be MIDI-mapped, and a check of a mapping needs MIDI to come into Live as
-it would from a controller: Live takes a CC as a mapped control's value only from an input with
+it would from a controller. Live takes a CC as a mapped control's value only from an input with
 Remote on. The LOM can't send MIDI in. macOS has a built-in virtual bus (the IAC Driver), but it
 is off until turned on in Audio MIDI Setup on each Mac, and any app can send on it or listen to
 it.
@@ -25,9 +25,10 @@ it.
 2. **The user turns Remote on for it once per Mac,** in Live's Settings > Link, Tempo & MIDI,
    with the port held open, and Track on if checks send notes into tracks. Live keeps the
    setting after the port closes and after a relaunch (measured, Live 12.4.25b2).
-3. **No IAC:** nothing to turn on in macOS, and no other app's messages on the port.
+3. **No IAC.** There is nothing to turn on in macOS, and no other app's messages are on
+   the port.
 
 ## Consequences
 
-The harness can't turn Remote on, or read whether it is: a check whose CCs do nothing points
+The harness can't turn Remote on, or read whether it is. A check whose CCs do nothing points
 to the setting. One port named Harness at a time: two are two inputs of one name in Live.

@@ -24,7 +24,7 @@ the projects that used it. A published repo can carry none of that.
    (`LIVE_REMOTE` overrides it for one run), and `clickHost`, the one machine `device-ui.js`
    may click on.
 3. **The click host comes from the file only,** never from the environment. With no file or
-   no key, `device-ui.js` refuses on every machine. ADR-0004's reason stands: a click takes
+   no key, `device-ui.js` refuses on every machine. ADR-0004's reason stands. A click takes
    the pointer from whoever is using the Mac.
 4. **The public history starts with one commit** on top of AbletonOSC's own history, which
    ends at the `upstream-base` tag and is left as it is. The work before publication is not

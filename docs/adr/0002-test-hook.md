@@ -15,7 +15,7 @@ cannot read what the device shows: a status line, the result of an in-device che
 item names of a menu that isn't a parameter. Nor can it press a control that isn't an automated parameter: a
 `live.text` with `parameter_enable=0` is out of reach, and Visible (Not Stored) parameters
 don't appear in `device.parameters` (found in Live 12.4). Checks that depend on these need
-the user's eyes. Every device with a UI has the same gap.
+the user to look at the screen. Every device with a UI has the same gap.
 
 Several instances of a device run at once (two of the same, or devices that
 work together), and a UDP port can have only one listener, so a device can't listen on a fixed
@@ -32,9 +32,9 @@ port.
    harness at build time (`$LIVE_HARNESS`, default `~/dev/ableton-live-test-harness/harness`)
    and embeds it in development builds, so a development build needs the harness checked out
    to build, not to run.
-3. **Commands go in through an automated parameter**, not a `[udpreceive]`: a check sets it
+3. **Commands go in through an automated parameter**, not a `[udpreceive]`. A check sets it
    over the LOM like any other parameter. A device that needs commands adds one automated
-   menu parameter (e.g. "Command": none, run check, ...) and acts on its changes.
+   menu parameter (for example "Command": none, run check, ...) and acts on its changes.
 4. **Development builds only.** A project's build tool adds the outlet, the `[udpsend]` and
    the command parameter in development builds; release builds leave them out. Adopting the
    hook changes the device, so each project records it in its own ADR.
@@ -47,7 +47,7 @@ port.
   builds.
 - The harness binds 11002 only when a check calls `openHooks()`; like 11001, one client at
   a time.
-- Reports are fire and forget: a check that waits for one times out if the device isn't a
+- Reports are fire and forget, so a check that waits for one times out if the device isn't a
   development build or doesn't send it.
 
 ## Alternatives considered

@@ -24,7 +24,7 @@ Detail, titled with the device's name, whose frame doesn't move with the title.
 
 ## Decision
 
-1. **The panel's corner is the device's frame's corner plus a fixed offset:** 3 points right
+1. **The panel's corner is the device's frame's corner plus a fixed offset** of 3 points right
    and 18 down, for Live's own devices, Max devices and plug-ins alike. In captures of Live's
    window the device's body starts 1 point right of the frame and 18 below it, and a Max
    device's presentation 2 points further in, where a control's rectangle starts from. The Info View's row is found from the frame's
@@ -37,7 +37,7 @@ Detail, titled with the device's name, whose frame doesn't move with the title.
 
 - Device Detail must be shown and the terminal app must have Accessibility, as for a plug-in's
   window.
-- Points measured from the old corner move: Auto Filter's were taken again from its controls'
+- Points measured from the old corner move. Auto Filter's were taken again from its controls'
   Accessibility frames. A project's own measured points (`controls`) may be off by the
   reading error their measurement carried.
 - Two devices of one name on a track are refused, though the old reading could tell them apart

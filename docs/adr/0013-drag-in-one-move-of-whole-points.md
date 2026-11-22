@@ -21,7 +21,7 @@ OSC, and their controls are Live's; a plug-in's editor is the plug-in's own code
 the mouse exercises.
 
 ADR-0010 moved the pointer in steps of one point. A knob of one of Live's own devices turned
-further than the distance asked for, and further still with a sideways part: it counts every
+further than the distance asked for, and further still with a sideways part. It counts every
 drag event's distance from the press point, and it reads positions in whole points.
 
 ## Decision
@@ -30,7 +30,7 @@ drag event's distance from the press point, and it reads positions in whole poin
    click pass there (ADR-0004's Info View in Live's window, ADR-0008's editor checks in a
    plug-in's window, and Stop, ADR-0012), then the button goes down, the pointer moves the
    distance given in one move, to the end, and the button comes up where the pointer then
-   is. One move, not a path of steps: for every drag event, a knob of one of Live's own
+   is. One move, not a path of steps. For every drag event, a knob of one of Live's own
    devices adds that event's distance from the press point and, when the event has a
    vertical part, moves the pointer back there, so a path measured from the press point is
    counted again at each step, and the knob turns further the more events the drag has
@@ -43,18 +43,18 @@ drag event's distance from the press point, and it reads positions in whole poin
 3. **Evidence still comes from Live** (ADR-0004 decision 5): the parameter read back after the
    drag, which shows that it moved and which way.
 4. **The drag is bounded, and in whole points.** At least 1 point on its longer axis and at
-   most 400 on either, and its end must be on screen. A fraction of a point is refused:
+   most 400 on either, and its end must be on screen. A fraction of a point is refused.
    Live's knob reads positions in whole points, so what a fraction turned would depend on
    the fraction the press point happens to have.
 
 ## Consequences
 
-- Only the start is checked: once the button is down the control has the mouse, wherever the
+- Only the start is checked. Once the button is down the control has the mouse, wherever the
   pointer goes.
 - A drag can't set an exact value; a check that needs one sets it over OSC and drags only to
   prove the mouse turns the control.
-- The one drag event carries its movement as well as its position, for controls that read
-  how far the mouse moved rather than where it is: the whole distance, in its delta fields.
+- The one drag event carries its movement, the whole distance in its delta fields, as well as
+  its position, for controls that read how far the mouse moved rather than where it is.
 - A control that needs to see the pointer pass through places on the way doesn't get them.
   None of the four kinds measured does: a knob of one of Live's devices, a JUCE editor's
   slider, the slider of Apple's AUDelay editor and a Max for Live device's number box

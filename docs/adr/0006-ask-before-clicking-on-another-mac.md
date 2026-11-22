@@ -26,10 +26,10 @@ works at can't press hidden controls, so that person presses them by hand.
 
 ## Consequences
 
-- Someone has to be at the Mac: an unattended run there waits 2 minutes, then fails.
+- Someone has to be at the Mac. An unattended run there waits 2 minutes, then fails.
 - The dialog takes the front; the harness brings Live back before each click, as it already
   did.
 - A script could press Allow through System Events, so the dialog stops accidents, not a
   program set on clicking.
 - Opening a device's UI and reading its panel's text (`ui.text`) no longer needs the click
-  host: neither moves the pointer.
+  host, because neither moves the pointer.

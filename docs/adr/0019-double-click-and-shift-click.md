@@ -14,8 +14,8 @@ Live's window only.
 A device's own views can act on a double-click (deleting a point, say) or on a click with Shift
 held (a variant of a button's action). harness-computer-use only clicked, so a check had to post
 these events itself, outside the harness's checks and its Stop (ADR-0012). A press of
-`device-ui.js` takes about 9 s on an Intel Mac (macOS 26), so two presses can't make a double-click:
-the gesture has to be one call of the helper. A modifier key posted as a key event stays held
+`device-ui.js` takes about 9 s on an Intel Mac (macOS 26), so two presses can't make a double-click.
+The gesture has to be one call of the helper. A modifier key posted as a key event stays held
 for every app until its release is posted, and a mouse event posted with its modifiers cleared
 lets go of keys a person holds (`harness/live-notes.md`).
 
@@ -26,7 +26,7 @@ lets go of keys a person holds (`harness/live-notes.md`).
    posts the whole gesture in one call.
 2. **A double-click is two clicks at one point.** The second press comes 0.1 s after the first
    release and carries click count 2, as a person's does; there is no new check between them.
-   Stop after the first click ends the gesture there: the helper exits as for a click that had
+   Stop after the first click ends the gesture there. The helper exits as for a click that had
    happened (ADR-0012), saying that its first click had.
 3. **Shift is a key held, not a flag.** The helper posts Shift's key down after the aim, just
    before the button, and its release after the button's, so the mouse events, built from the
