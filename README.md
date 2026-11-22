@@ -26,7 +26,7 @@ over Live's control interfaces using the same naming structure and object hierar
 
 # Installation
 
-This repo needs macOS, Ableton Live 12 (it is used with Live 12.4, Suite and Beta), Node 18 or
+This repo needs macOS, Ableton Live 12 (it is used with Live 12.4), Node 18 or
 later (no packages to install) and, for the plug-in and device-ui helpers, `swiftc` from Xcode
 or its Command Line Tools. Checks of Max for Live devices, including the example below, need
 Max for Live. Live's language must be English: the harness finds its menus and dialogs by name.

@@ -42,7 +42,7 @@ To start Live, or relaunch it, on either machine, run
 never an `open`, quit or kill of your own. It discards unsaved changes and recordings. Use
 `--suite` only for a task that needs Suite, and `--plugin <name>` after every build for a
 plug-in's checks: Live keeps playing the plug-in build it loaded until it relaunches. Its last line names the component it loaded and when that
-was built: check it is your build. Where the Beta isn't installed, pass `--app <path>`. Its options and what it answers are in `harness/README.md`. If it stops at
+was built: check it is your build. If it asks which Live to start, ask the user and set `"app"` in `harness/local.json`. Its options and what it answers are in `harness/README.md`. If it stops at
 a dialog it doesn't know, it prints the message: ask the user. If the permission system
 denies it, don't start Live another way: tell the user, who can start Live or allow the command.
 

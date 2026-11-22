@@ -1,4 +1,5 @@
 {
   "remote": "user@second-mac",
-  "clickHost": "second-mac"
+  "clickHost": "second-mac",
+  "app": "/Applications/Ableton Live 12 Suite.app"
 }

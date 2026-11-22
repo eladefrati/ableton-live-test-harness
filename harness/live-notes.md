@@ -58,6 +58,10 @@ unexpected.
 - `relaunch.js` and `quit.js` empty the harness's temp folder, where every set the harness
   saves or starts Live on is, while they hold UDP 11001, the port a check holds while it
   runs. So `quit.js` refuses while another client runs, also when Live isn't running.
+- Lives of several editions and versions can be installed side by side, each with its own
+  preferences folder. `relaunch.js` and `add-place.js` use the Live named by `--app`,
+  `--suite` or `"app"` in `harness/local.json`, else the running Live, else the only one in
+  `/Applications`, and refuse to guess between several.
 - A new Live writes one `Temp Project` folder in `~/Music/Ableton/Live Recordings`, named
   for a time some seconds after it started, and records into it a set never saved or one
   saved outside a Live project (a lone `.als`). Quitting asks about deleting it only for a

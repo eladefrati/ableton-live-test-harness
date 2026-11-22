@@ -3,7 +3,10 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const dgram = require("node:dgram");
-const { answerFor, tempProjectsSince, crashPrefix, parseArgs, warmUp } = require("../relaunch.js");
+const fs = require("node:fs");
+const os = require("node:os");
+const path = require("node:path");
+const { answerFor, tempProjectsSince, crashPrefix, parseArgs, warmUp, SUITE, installedLives, readApp, chooseLive } = require("../relaunch.js");
 const { Live } = require("../live.js");
 const { encode, decode } = require("../osc.js");
 
@@ -83,4 +86,41 @@ test("parseArgs reads --kill, --suite, --app <path> and --plugin <name>, and ref
   assert.throws(() => parseArgs(["--plugin=Plugin"]), /Unknown option --plugin=Plugin/);
   assert.throws(() => parseArgs(["--plugins", "Plugin"]), /Unknown option --plugins/);
   assert.throws(() => parseArgs(["--suite", "--app", "/Applications/Live.app"]), /pass one/);
+});
+
+test("chooseLive takes --app, then --suite, then local.json's app, then the running Live, then the only one installed", () => {
+  const installed = ["/Applications/Ableton Live 12 Standard.app", "/Applications/Ableton Live 12 Suite.app"];
+  const all = { local: "/Apps/Local.app", running: "/Apps/Running.app", installed };
+  assert.equal(chooseLive({ app: "/Apps/Given.app", suite: false }, all), "/Apps/Given.app");
+  assert.equal(chooseLive({ app: null, suite: true }, all), SUITE);
+  assert.equal(chooseLive({}, all), "/Apps/Local.app");
+  assert.equal(chooseLive({}, { ...all, local: null }), "/Apps/Running.app");
+  assert.equal(chooseLive({}, { local: null, running: null, installed: [installed[0]] }), installed[0]);
+});
+
+test("chooseLive refuses to guess between Lives, or with none installed, and says how to name one", () => {
+  const installed = ["/Applications/Ableton Live 12 Standard.app", "/Applications/Ableton Live 12 Suite.app"];
+  assert.throws(() => chooseLive({}, { local: null, running: null, installed }),
+    /2 are installed \(Ableton Live 12 Standard, Ableton Live 12 Suite\): set "app" in harness\/local.json/);
+  assert.throws(() => chooseLive({}, { local: null, running: null, installed: [] }), /none is installed/);
+});
+
+test("readApp reads app from local.json, null with no file or no key, and refuses a broken file", (t) => {
+  const folder = fs.mkdtempSync(path.join(os.tmpdir(), "relaunch-"));
+  t.after(() => fs.rmSync(folder, { recursive: true, force: true }));
+  const file = path.join(folder, "local.json");
+  assert.equal(readApp(file), null);
+  fs.writeFileSync(file, JSON.stringify({ clickHost: "click-mac" }));
+  assert.equal(readApp(file), null);
+  fs.writeFileSync(file, JSON.stringify({ app: "/Applications/Ableton Live 12 Standard.app" }));
+  assert.equal(readApp(file), "/Applications/Ableton Live 12 Standard.app");
+  fs.writeFileSync(file, "{");
+  assert.throws(() => readApp(file), /isn't valid JSON/);
+});
+
+test("installedLives lists only the Ableton Live apps in a folder", (t) => {
+  const folder = fs.mkdtempSync(path.join(os.tmpdir(), "relaunch-"));
+  t.after(() => fs.rmSync(folder, { recursive: true, force: true }));
+  for (const name of ["Ableton Live 12 Suite.app", "Ableton Live 12 Standard.app", "Max.app", "Ableton Live 12 Suite.txt"]) fs.mkdirSync(path.join(folder, name));
+  assert.deepEqual(installedLives(folder), [path.join(folder, "Ableton Live 12 Standard.app"), path.join(folder, "Ableton Live 12 Suite.app")]);
 });

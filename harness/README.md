@@ -268,8 +268,9 @@ Node 18 or later. See [ADR-0001](../docs/adr/0001-fork-abletonosc.md) for the de
 - `doctor.js`: read-only check that Live is ready to be driven; run it first. What it
   checks and what to do about each line: the
   [`verify-ableton` skill](../skills/verify-ableton/SKILL.md).
-- `relaunch.js [--kill] [--suite | --app <path>] [--plugin <name>]`: quits Live if it runs and starts Ableton Live 12 Beta
-  (Suite with `--suite`, another Live with `--app <path>`, which it checks exists before quitting anything), behind other windows, on a fresh copy of `sets/empty.als` (one MIDI track, unarmed, no
+- `relaunch.js [--kill] [--suite | --app <path>] [--plugin <name>]`: quits Live if it runs and starts the Live named by
+  `--app <path>`, else Ableton Live 12 Suite with `--suite`, else `"app"` in `local.json`, else the Live that was running, else the only one in
+  `/Applications`, and refuses to guess between several. It checks the Live exists before quitting anything. Live starts behind other windows, on a fresh copy of `sets/empty.als` (one MIDI track, unarmed, no
   devices, no returns, nothing on Main, Main at -inf dB so runs are silent (recordings take tracks' Post FX, before Main); saved by Live 12.4.25b1, opens in Suite 12.4.3), not
   the user's template. It answers "Save changes?" with Don't Save and "delete the temporary files?" with Delete, and kills Live if it is
   still running 10 s after the quit or the last answer (`--kill` kills at once). After a

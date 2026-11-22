@@ -7,13 +7,13 @@
 // already there. Live shows the new Place when it next starts. Refuses an option it doesn't
 // know.
 //
-//   node harness/add-place.js <folder>               for Ableton Live 12 Beta
+//   node harness/add-place.js <folder>               for the Live relaunch.js would start
 //   node harness/add-place.js <folder> --suite       for Ableton Live 12 Suite
 //   node harness/add-place.js <folder> --app <path>  for the Live at <path>
 
 const fs = require("node:fs");
 const path = require("node:path");
-const { BETA, SUITE } = require("./relaunch.js");
+const { installedLives, readApp, chooseLive } = require("./relaunch.js");
 const { livePids } = require("./macos.js");
 const { preferencesFolder } = require("./settings.js");
 const { escapeXml } = require("./tools.js");
@@ -69,7 +69,8 @@ function addPlaceToFile(file, folder) {
 
 async function main(argv) {
   const { folder: given, suite, app: chosen } = parseArgs(argv);
-  const app = chosen || (suite ? SUITE : BETA);
+  // Live is quit here (checked below), so no running Live is asked for.
+  const app = chooseLive({ app: chosen, suite }, { local: readApp(), running: null, installed: installedLives() });
   if (!fs.existsSync(app)) throw new Error(`${app} isn't installed: name the Live with --app <path>`);
   const folder = path.resolve(given);
   if (!fs.statSync(folder, { throwIfNoEntry: false })?.isDirectory()) throw new Error(`${folder} isn't a folder`);

@@ -13,9 +13,9 @@
 // deleted) a track of each kind once (warmUp) and, with --plugin, Live runs the plug-in with
 // every parameter listed. Refuses an option it doesn't know.
 //
-//   node harness/relaunch.js          quit Live if it runs, then start Ableton Live 12 Beta
+//   node harness/relaunch.js          quit Live if it runs, then start it again (chooseLive)
 //   node harness/relaunch.js --kill   kill Live without asking it to quit (it hangs), then start it
-//   node harness/relaunch.js --suite  start Ableton Live 12 Suite instead, for a task that needs it
+//   node harness/relaunch.js --suite  start Ableton Live 12 Suite instead
 //   node harness/relaunch.js --app <path>  start the Live at <path> instead
 //   node harness/relaunch.js --plugin <name>
 //                                     start on a set holding only the Audio Unit effect named
@@ -50,13 +50,50 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const HANG_MS = 10000; // Live exited about 3 s after the last answer in every run measured
 const START_MS = 90000;
 const WARM_MS = 30000;
-const BETA = "/Applications/Ableton Live 12 Beta.app";
 const SUITE = "/Applications/Ableton Live 12 Suite.app";
 const RECOVERY_DATA = ["CrashRecoveryInfo.cfg", "Undo", "BaseFiles"];
 // Saved by Live 12.4.25b1; Suite 12.4.3 opens it too.
 const EMPTY_SET = path.join(__dirname, "sets", "empty.als");
 // Live's default Temporary Folder; a different one set in Live's settings isn't followed.
 const RECORDINGS = path.join(os.homedir(), "Music", "Ableton", "Live Recordings");
+const LOCAL = path.join(__dirname, "local.json");
+
+// The Lives in /Applications, by path.
+function installedLives(folder = "/Applications") {
+  return fs.readdirSync(folder).filter((name) => /^Ableton Live .*\.app$/.test(name)).sort()
+    .map((name) => path.join(folder, name));
+}
+
+// "app" in harness/local.json, which is not in git (see local.example.json); null with no
+// file or no key.
+function readApp(file = LOCAL) {
+  let text;
+  try {
+    text = fs.readFileSync(file, "utf8");
+  } catch (error) {
+    if (error.code === "ENOENT") return null;
+    throw new Error(`Could not read ${file}: ${error.message}`);
+  }
+  let local;
+  try {
+    local = JSON.parse(text);
+  } catch (error) {
+    throw new Error(`${file} isn't valid JSON: ${error.message}`);
+  }
+  return local && typeof local.app === "string" && local.app ? local.app : null;
+}
+
+// The Live to start: the one named by --app or --suite, else "app" in local.json, else the
+// Live running now (`running`, its path or null), else the only Live installed.
+function chooseLive({ app, suite }, { local, running, installed }) {
+  if (app) return app;
+  if (suite) return SUITE;
+  if (local) return local;
+  if (running) return running;
+  if (installed.length === 1) return installed[0];
+  const found = installed.length ? `${installed.length} are installed (${installed.map((one) => path.basename(one, ".app")).join(", ")})` : "none is installed in /Applications";
+  throw new Error(`Which Live to start? ${found}: set "app" in harness/local.json (see local.example.json) or pass --app <path>`);
+}
 
 function answerFor(message) {
   if (/^Save changes to .* before closing\?$/s.test(message)) return SAVE_CHANGES.DONT_SAVE;
@@ -283,11 +320,12 @@ async function stop(live, pid, forceKill, say) {
 async function main(argv) {
   const say = (text) => console.log(text);
   const { kill: forceKill, suite, plugin: name, app: chosen } = parseArgs(argv);
-  const app = chosen || (suite ? SUITE : BETA);
-  // Before anything else: stopping Live discards its unsaved work.
-  if (!fs.existsSync(app)) throw new Error(`${app} isn't installed: name the Live to start with --app <path>`);
   const pids = await livePids();
   if (pids.length > 1) throw new Error("More than one Live is running: the harness can't tell them apart");
+  const running = pids.length === 1 ? await liveApp().catch(() => null) : null;
+  const app = chooseLive({ app: chosen, suite }, { local: readApp(), running, installed: installedLives() });
+  // Before anything else: stopping Live discards its unsaved work.
+  if (!fs.existsSync(app)) throw new Error(`${app} isn't installed: name the Live to start with --app <path>`);
   // Holding UDP 11001 across the relaunch also keeps other clients out until Live is back.
   const live = await connect({ timeout: 1000 });
   try {
@@ -337,4 +375,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { answerFor, tempProjectsSince, crashPrefix, parseArgs, warmUp, stop, BETA, SUITE };
+module.exports = { answerFor, tempProjectsSince, crashPrefix, parseArgs, warmUp, stop, SUITE, installedLives, readApp, chooseLive };
