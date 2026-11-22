@@ -1,7 +1,7 @@
 # Notes from Live
 
-How Live behaves under the harness, found by running it. Read this when Live does something
-unexpected.
+This file records how Live behaves under the harness, as found by running it. Read this file when
+Live does something unexpected.
 
 ## Dialogs
 
@@ -27,7 +27,7 @@ unexpected.
 - While Live starts, AbletonOSC can answer while the LOM still reports a dialog with no
   message; it is gone a second later.
 - After File > New Live Set (`clickMenu`) with unsaved changes, the LOM can't read or press
-  Live's "Save changes?" dialog: it reports no message and no buttons. `saveSetAs` into a
+  Live's "Save changes?" dialog. It reports no message and no buttons. `saveSetAs` into a
   temp folder first. `openSetAndWait`'s path (opening a file) does get the message.
 
 ## Saving and opening sets
@@ -35,7 +35,7 @@ unexpected.
 - Live's Save panel counts as an open dialog over the LOM (no message, no buttons), and
   some requests fail while it is open (a fresh track's input routing reads ""). `saveSetAs()`
   closes the panel with Escape if it fails, and says so in its error if the panel stays
-  open: Accessibility can't press its Cancel.
+  open. Accessibility can't press its Cancel.
 - A click in another app just after File > Save Live Set As... can bring that app forward
   after Live has come to the front (200 ms after the click, the other app was in front once
   `activate` had seen Live there). Keys typed then go to that app, and
@@ -49,10 +49,10 @@ unexpected.
   highlighted suggestion lags the typed path: Return half a second after typing went to
   the previous temp folder. `saveSetAs` waits for both. Go to Folder lists the folder that
   holds the typed one, and with 15,857 entries there (the system temp folder) it was still
-  "Loading..." when Return was pressed, which was lost: `saveSetAs` presses Return again
+  "Loading..." when Return was pressed, which was lost. `saveSetAs` presses Return again
   until the sheet closes, and saves into a folder under the harness's own small
   `ableton-harness/`. Accessibility shows only that the sheet is open, nothing in it. With
-  Live's windows on another Space, Live comes to the front without them: Accessibility
+  Live's windows on another Space, Live comes to the front without them. Accessibility
   lists no windows and `saveSetAs` can't find or close its panel. Keep Live on the Space the harness runs on.
 - AbletonOSC keeps running across opening another set.
 - `relaunch.js` and `quit.js` empty the harness's temp folder, where every set the harness
@@ -69,15 +69,15 @@ unexpected.
 
 ## Menus and windows
 
-Measured in Live 12.4 (12.4.25 betas) on macOS 26. Times were measured on an Intel Mac,
-unless an entry says otherwise.
+The entries in this section were measured in Live 12.4 (12.4.25 betas) on macOS 26. Times
+were measured on an Intel Mac, unless an entry says otherwise.
 
 - Live updates its menus' check marks about a second after a change; `setToggle()` waits.
 - Edit > Undo names a change made over OSC "Custom Action"; the same change made in the UI
   gets its own name (a track rename: "Track Name"). Checks of undo step names must make
   the change in the UI.
-- `macos.js` addresses Live's process as "Live", which Suite and Beta share: run one Live at
-  a time.
+- `macos.js` addresses Live's process as "Live", which Suite and Beta share, so run one Live
+  at a time.
 
 ### The pointer, the Info View and controls
 
@@ -135,16 +135,16 @@ unless an entry says otherwise.
 - A held drag (ADR-0021) keeps the button down and posts nothing for its hold, then a second
   drag event at the press point plus both moves. Its second move is refused as any drag's
   move is, and so is a hold that isn't whole ms from 1 to 2000, before the pointer moves.
-  Stop or an ending signal during the hold brings the button up at once: the helper looks
+  Stop or an ending signal during the hold brings the button up at once. The helper looks
   for both every 10 ms while it holds. On Auto Filter's Resonance a drag 5 up, held 400 ms,
-  then 5 up more turned 15 steps, where one drag 10 up turned 10: the knob counted the first
+  then 5 up more turned 15 steps, where one drag 10 up turned 10. The knob counted the first
   event's 5 points, moved the pointer back to the press point, then counted the second
   event's 10 points from there. So a held drag over-turns Live's knob, as ADR-0021 says
   (Live 12.4.25b2).
-- `device-ui.swift` holds SIGINT, SIGQUIT, SIGTERM and SIGHUP back while the button is down:
-  it posts the button up where the pointer is, then dies by that signal (after SIGQUIT it
+- `device-ui.swift` holds SIGINT, SIGQUIT, SIGTERM and SIGHUP back while the button is down.
+  It posts the button up where the pointer is, then dies by that signal. After SIGQUIT it
   exits with status 131 instead, as macOS writes a crash report for a process that dies by
-  it). A helper that fails with the button down releases it the same way. A crash or
+  it. A helper that fails with the button down releases it the same way. A crash or
   SIGKILL still leaves the button held.
 
 ### Device titles and panels
@@ -156,7 +156,7 @@ unless an entry says otherwise.
   second title (Live 12.4.25b2).
 - Live draws a hand right after the title of the device a Control Surface controls. The
   text reader's first read of a device's title had no hand; every read after a press read
-  the title as ") <title>\", the hand on the end of the last word. The cause is not known:
+  the title as ") <title>\", the hand on the end of the last word. The cause is not known.
   `DeviceUi.locate()` selects the device over OSC before every read, the first too, so
   selecting it is not what changed. The likely source, unverified: AbletonOSC's `Manager`
   subclasses `ableton.v2.control_surface.ControlSurface`, which sets up a device provider,
@@ -169,7 +169,7 @@ unless an entry says otherwise.
   panel corner came out 2.0 points right of its body's edge as the first device on a track
   and 0.7 points left as the second, and Erosion's title read 2.2 points left of where
   Accessibility puts its text (Live 12.4.25b2, a 2x display). Accessibility's frame of the
-  device's group in Device Detail doesn't move with the title: in Live's window the device's
+  device's group in Device Detail doesn't move with the title. In Live's window the device's
   body starts 1 point right of it and 18 below, for Erosion, Utility, Auto Filter and
   Saturator, for the plug-in AUDelay and for the Max device Max Audio Effect alike, also
   after Device Detail scrolled to another device, and the title's text 4 points below its
@@ -218,8 +218,8 @@ unless an entry says otherwise.
   two windows of one title, which the guard refuses, can't be put on screen by the harness,
   which opens a window only for a device whose name is the only one on its track. AUDelay's
   window is 484 x 274 points, with its editor, 444 x 80, at the bottom. Moved to the
-  screen's top through Accessibility, the window stops below the menu bar, 30 points down:
-  the editor can't come under harness-computer-use's pill.
+  screen's top through Accessibility, the window stops below the menu bar, 30 points down,
+  so the editor can't come under harness-computer-use's pill.
 - While a notification banner shows, from any app, Notification Center holds a transparent
   window the size of the screen at layer 21, gone about 4 s after the banner appeared on an
   Apple-silicon Mac and 5.3 s after on an Intel one; a second notification in that time
@@ -230,7 +230,7 @@ unless an entry says otherwise.
   `checks/pointer-target.swift` reports its window only once no cover is up.
 - harness-computer-use's pill is a window of its own (title "harness-computer-use pill"), a
   non-activating panel that takes a click on its Stop without taking the front. Unlike the
-  glow, the click guard doesn't skip it: a point under the pill is refused, with an error
+  glow, the click guard doesn't skip it. A point under the pill is refused, with an error
   that names the pill.
 
 ### Stop
@@ -250,14 +250,14 @@ unless an entry says otherwise.
   `checks/press-stop.swift` does) is taken as a click on it, as is a real click posted on
   it. The press returns -25204 (cannot complete) when the overlay ends before it answers,
   and during Stop's last resort it returns about 1.6 s after it was started, the overlay
-  still up. It removed the token 71 to 123 ms after the press was started: longer than a
+  still up. It removed the token 71 to 123 ms after the press was started, longer than a
   click's 70 ms hold, so `checks/pointer-guards.js` suspends the helper (SIGSTOP) at one of
   its events to land Stop inside a gesture, and lets it go on (SIGCONT) once the token is
   gone. A sleep runs on while its process is suspended, and isn't cut short when the process
   is let go on.
 - Stop goes by whether the token went, removed by it or gone already, not by whether the run
   can read it. A token still there (its folder unwritable, or the token user-immutable,
-  `chflags uchg`) takes Stop's last resort: it sends the run SIGUSR2 and keeps the border up
+  `chflags uchg`) takes Stop's last resort, which sends the run SIGUSR2 and keeps the border up
   until the run has ended, and kills a run still there 10 s after the signal (ADR-0012 says
   why that signal, and why 10 s); a killed run dies before its clean-up and leaves its
   tracks in Live. On the signal the run counts itself stopped, passes the signal on to the
@@ -274,9 +274,9 @@ unless an entry says otherwise.
   the overlay goes, notifying that the run was stopped and is still running, and kills
   nothing. The glow's windows stayed on screen 0.3 s after they were ordered out until their
   closing animation was turned off.
-- A run killed by a signal sent to it alone (SIGTERM) leaves its click token behind: it
-  removes the token's folder only on a normal exit. So `device-ui.swift` posts only while
-  the process that started it is still its parent: a run that has ended counts as stopped,
+- A run killed by a signal sent to it alone (SIGTERM) leaves its click token behind, since a
+  run removes the token's folder only on a normal exit. So `device-ui.swift` posts only while
+  the process that started it is still its parent. A run that has ended counts as stopped,
   and a helper waiting under a notification's cover is gone about 0.2 s after its run is
   killed. A helper whose run ended before it began has process 1 for a parent from its
   first instruction, and counts its run as ended from that. `checks/run-orphaned.swift`
@@ -294,13 +294,13 @@ unless an entry says otherwise.
   with status 1 two seconds after it began to look, with no notification, and its run warns
   that it clicks with no border. Which windows to wait for can't be taken from
   `NSWindow.isVisible`, which read visible for windows the window server didn't list.
-- `computer-use-overlay` refuses a process id of 0 or below: Stop's last resort signals that
+- `computer-use-overlay` refuses a process id of 0 or below. Stop's last resort signals that
   id, and to `kill` 0 is the caller's own process group and -1 every process the user may
   signal.
 - Stop pressed once the run has ended says that the run has ended, not Stopped. The overlay
   looks for its run every 0.25 s and then says the same by itself.
-- A run that has ended and that its parent hasn't waited for stays in the process table (a
-  zombie: `ps` gives its state as `Z`) and still answers signal 0. `sysctl` gives its state
+- A run that has ended and that its parent hasn't waited for stays in the process table as a
+  zombie (`ps` gives its state as `Z`) and still answers signal 0. `sysctl` gives its state
   (5, `SZOMB`), where `proc_pidinfo` fails with `ESRCH` as for one that is gone, so the
   overlay reads the state too. The process that started a run can therefore read what the
   overlay says of the run's end before it hears of that end itself, by under a millisecond,
@@ -309,7 +309,7 @@ unless an entry says otherwise.
 - `Process.waitUntilExit()` runs the run loop while it waits: an overlay waiting that way
   for its notification had its timer fire meanwhile and notified twice. It now waits
   without running the run loop.
-- A run has one click token: every border it shows is given the same one, and the run names
+- A run has one click token. Every border it shows is given the same one, and the run names
   it to each helper it starts, in that helper's environment (`HARNESS_COMPUTER_USE_TOKEN`),
   and nowhere else, so a token named in the environment a run starts with neither stops the
   run nor reaches its helper.
@@ -321,7 +321,7 @@ unless an entry says otherwise.
   key, which the one script that finds Live in front types. A Stop that lands after the last
   look still finds Live brought forward (ADR-0012). A capture of a plug-in's window gives
   the front back to the app that had it only if it brought Live forward.
-- A press doesn't wait for its reads of Live's window to end once stopped: Stop during the
+- A press doesn't wait for its reads of Live's window to end once stopped. Stop during the
   read that finds the device, or the Info View's after the hover, rejects the press within
   0.1 s, and the read, which posts nothing, ends on its own. `choose`'s read of its open
   menu still ends first.
@@ -334,8 +334,8 @@ unless an entry says otherwise.
   of their own or only as flags of the key, and the app in front got the modifiers but not
   the key, also with a mouse button held down in its window and with secure input on.
   Claimed without the exclusive option by two programs it goes to both, and against
-  Spotlight's Command-Space to the program and Spotlight. The overlay claims it exclusively:
-  a second overlay's claim is refused (`eventHotKeyExistsErr`), its pill shows no key and
+  Spotlight's Command-Space to the program and Spotlight. The overlay claims it exclusively.
+  A second overlay's claim is refused (`eventHotKeyExistsErr`), its pill shows no key and
   its Stop still stops its run; a program holding the key the ordinary way doesn't block the
   overlay and loses the key while the overlay holds it, and one holding it exclusively makes
   the claim fail. An overlay killed with SIGKILL gives the key up, and so does one that has
@@ -406,7 +406,7 @@ unless an entry says otherwise.
   displaysleepnow`) still sleeps, up to about a second late, and the video freezes from then
   on, which `checks/video-record.js` catches by comparing frames.
 - An ssh session that ends, its local ssh killed as Ctrl-C on `remote.sh` kills it, sends
-  the command it ran no signal: the command runs on, and only the other end of its stdout
+  the command it ran no signal. The command runs on, and only the other end of its stdout
   and stderr is gone. A `cli.js video` whose ssh was killed stops then, as its helper
   watches the run's stderr, and leaves a whole video.
 - `screencapture` refuses a file name that starts with a dot ("cannot write file to intended
@@ -414,7 +414,7 @@ unless an entry says otherwise.
   saying the same on stderr, when the file's folder doesn't exist or can't be written, and a
   file already at the path stays as it was. So `captureWindow` has `screencapture` write
   `<name>-capturing-<random>.png` beside the file (`<random>` 8 hex digits new for each
-  capture) and replaces the file only once that is there: each case throws `DeviceUiError`
+  capture) and replaces the file only once that is there. Each case throws `DeviceUiError`
   naming the file, `cli.js` exits 1, and a file already there is left as it was. A
   read-only file in a folder that can be written is replaced. A run killed while it captures
   can leave the file beside a path the caller gave, where nothing deletes it; in the
@@ -448,14 +448,14 @@ unless an entry says otherwise.
   refuses rather than guess: `recordArrangement()` when a track that can be armed reads no
   `arm`, `arrangementClips()` when a clip reads no value for one of its properties, and
   both when a reply isn't whole rows.
-- `createTrack()` makes MIDI and audio tracks only and refuses another kind: a return track
+- `createTrack()` makes MIDI and audio tracks only and refuses another kind. A return track
   isn't among the song's tracks, so the last of those would be renamed and stripped instead.
 - New audio tracks get the devices of Live's default audio track template, as MIDI tracks
   do; `createAudioTrack()` removes them.
 - A Max for Live device's parameters arrive seconds after the device; `loadDevice()` waits.
   A Max device with no parameters lists only Device On, and nothing else the harness reads
   (its name, `is_active`, `class_name`) changes once it has loaded (Live 12.4.25b2), so
-  `loadDevice()` can't tell it has loaded: pass `{ parameters: 0 }`. In that
+  `loadDevice()` can't tell it has loaded. Pass `{ parameters: 0 }`. In that
   version a Max device's parameters were there at the first read, also on the first Max
   device after a relaunch.
   Their names are the short names, which can repeat within a device. Live lists the visible
@@ -465,21 +465,21 @@ unless an entry says otherwise.
   attribute at its default of 0 (not verified); a device that sets it breaks the mapping,
   which `parameterIndices()` then reports.
 - The browser lists `.amxd` devices without the extension.
-- Live crashes loading an `.amxd` whose patcher has a `project` without a `searchpath`: Max
+- Live crashes loading an `.amxd` whose patcher has a `project` without a `searchpath`. Max
   reads it unchecked while it builds the device (seen in Live 12.4.25b1).
 - A track whose MIDI From source is deleted can no longer be armed or disarmed ("The Track
-  in question cannot be armed!"): delete the recording track before its source.
+  in question cannot be armed!"). Delete the recording track before its source.
 - Live's input routing list follows a track rename a tick later, and the routing setter
   only logs an unknown name; use `setInputRouting()`, which waits and checks.
 - A From is picked by track name, and reads back as that name whichever of two tracks so
   named it came from (Live 12.4.25b2), so a set holding tracks of an earlier check's names
   records those. `setInputRouting()` refuses a name two other tracks hold, so
-  `signalTracks` fails in such a set: delete the old tracks first.
+  `signalTracks` fails in such a set. Delete the old tracks first.
 - Loading a device from the browser selects its track.
 - A MIDI source the harness makes (`midi.js`) was a MIDI input within 2 s, Track on by
   default. With Remote turned on for it once, Live keeps that after the port closes and
   reopens and after a relaunch (Live 12.4.25b2).
-- `device-ui.js` presses work in MIDI Map and Key Map Mode: the Info View still names the
+- `device-ui.js` presses work in MIDI Map and Key Map Mode. The Info View still names the
   control. A press then a CC maps the control; a press then a key, typed with Live in front,
   maps it to the key, and the key toggles the parameter between its ends (Auto Filter, same
   version).
@@ -490,9 +490,9 @@ unless an entry says otherwise.
   modes, every time (Live 12.4.25b2). `device-ui.js`
   reads the Info View from that crop after its hover.
 - `-EnableArmOnSelection` is an optional Options.txt entry; without it, none of this
-  applies. With it, the arm follows the selection: while a track is armed, selecting another
+  applies. With it, the arm follows the selection. While a track is armed, selecting another
   moves the arm to it; with no track armed, selecting a track arms nothing (Live 12.4.16).
-  Loading an instrument armed its track: `signalTracks` disarms the source track after loading its
+  Loading an instrument armed its track. `signalTracks` disarms the source track after loading its
   instrument, or `recordArrangement` refuses. Loading a MIDI effect onto a track, with no
   track armed, armed nothing.
 - `/live/view/set/selected_track` once left the selection unchanged, with no error sent or
@@ -502,7 +502,7 @@ unless an entry says otherwise.
   Arrangement view). The same steps on another Live selected the track every time, so the
   cause is not known.
   `/live/view/set/selected_device` on a device of the wanted track selected that track.
-  Read `get/selected_track` back after setting it. `/live/browser/load` does: it refuses,
+  Read `get/selected_track` back after setting it. `/live/browser/load` does, and refuses,
   loading nothing, when the track it selected isn't the selected one.
 - A value listener left on a parameter by an earlier session kept sending after its client
   was gone (`stop_listen` answered "Observer not connected"). Its updates arrive on
@@ -520,35 +520,35 @@ unless an entry says otherwise.
   126. A time range is a start and a length, and a note can sit anywhere in a clip's time:
   one placed at -9000 or 20000 beats is kept there. So with no arguments, the note queries
   read every note with `Clip.get_all_notes_extended()`, and `/live/clip/remove/notes`
-  removes them by their ids, rather than through a fixed range: the old one, pitches 0 and
+  removes them by their ids, rather than through a fixed range. The old one, pitches 0 and
   127 from -8192 for 16384 beats, left out notes at pitch 127, before -8192 or from 8192 on. On 387 notes
   at every pitch, at times from -9000 to 20000, `get_all_notes_extended()` returned all of
   them, in a Session and an Arrangement clip, in `get_notes_extended()`'s order, pitch then
   time, which the callers rely on (Live 12.4.25b2).
-- A relocation ends an Arrangement recording: setting `current_song_time` while Live records
+- A relocation ends an Arrangement recording. Setting `current_song_time` while Live records
   (or `/live/song/jump_by`) turns Record off and Play goes on from the new place, so the take
   ends at the jump. Read 0.15 s after a jump from beat 4 to 20, `record_mode` was off and
   Play on, and the MIDI take ended at beat 4.4; the same with `jump_by` 16, and an audio take
   ended the same way (Live 12.4.25b2).
   `recordArrangement()` throws when Record is off after a `during` action or at the end, rather
   than return a short take. A loop's end doesn't end the take. To record across a jump, record
-  in the Session: fire a clip slot on the armed track and relocate while it records.
+  in the Session. Fire a clip slot on the armed track and relocate while it records.
 - Play starts from the start marker, `Song.start_time`; `recordArrangement()` sets it to
   `start` and leaves cue points alone. Setting `current_song_time` while stopped doesn't
   move the marker, Stop while stopped puts it back at 0, and turning `record_mode` on while
   stopped starts Play at once, so the marker goes first. Don't reach a start through a cue
-  point: in some sets a cue point added while stopped snaps to the bar.
+  point. In some sets a cue point added while stopped snaps to the bar.
 - `start_playing` while Live plays restarts Play from the start marker (beat 1.516 jumped
   back to 0.186). `recordArrangement()` used to send it right after `record_mode`, and when
-  an audio buffer ran between the two, the take recorded that buffer, then the restart:
-  from sample 129 on it sat one buffer (128 samples) late against its file (3 takes of 200,
+  an audio buffer ran between the two, the take recorded that buffer, then the restart.
+  From sample 129 on it sat one buffer (128 samples) late against its file (3 takes of 200,
   on an Intel and an Apple-silicon Mac, Live 12.4.25b2). It now sends `start_playing` only if
   `record_mode` didn't start Play.
 - While any track's Session clip is active (`playing_slot_index` 0 or more, even with the
-  transport stopped), Live starts Play from the bar at or before the start marker: bars of
+  transport stopped), Live starts Play from the bar at or before the start marker, in bars of
   4 x numerator / denominator beats from beat 0 (time signature changes in the Arrangement
   are not seen). `recordArrangement()` then refuses a start off a bar line, naming the bar
-  Live would use: start on a bar line, stop the clips, or record from 0. One set, after a
+  Live would use. Start on a bar line, stop the clips, or record from 0. One set, after a
   crash, started at the marker instead. Stop while the transport is stopped leaves the
   clip active (measured in Live 12.4.15b7), so the Stop
   `recordArrangement()` sends before Play doesn't change this.
@@ -568,7 +568,7 @@ unless an entry says otherwise.
 
 ## Plug-ins
 
-- A plug-in rebuilt while Live runs: Live keeps playing the build it loaded until it
+- When a plug-in is rebuilt while Live runs, Live keeps playing the build it loaded until it
   relaunches: a check after a fix failed exactly as before until a relaunch, and a run played
   the old build while the first load after a relaunch played the new one. That Live keeps the old binary mapped
   is inferred. A plug-in installed while Live runs is listed only after Settings > Plug-Ins >
@@ -581,7 +581,7 @@ unless an entry says otherwise.
   parameters are added in Configure mode. A plug-in with more than 64 showed this (Live 12.4.25b1).
   So `loadDevice()` takes a plug-in's count once it has held for a second, even at 1, where
   a Max for Live device must also list more than Device On.
-- Live keeps a plug-in's configured parameters in the set: the device's `ParameterList`
+- Live keeps a plug-in's configured parameters in the set. The device's `ParameterList`
   holds 128 pairs of slots, a `PluginFloatParameter` (Id 2i) then a `PluginEnumParameter`
   (Id 2i+1), each with a `ParameterId` (the AU parameter ID, -1 when free), a
   `ParameterName`, a `VisualIndex` (the order Live lists them in), a `Manual` value and,
@@ -591,9 +591,9 @@ unless an entry says otherwise.
   over the LOM (`plugin.js`). Filled instead into the first free slot of each kind, so a
   float and an enum shared a pair, every parameter read back in Live but some floats never
   reached the plug-in: with one plug-in, one float did not while another did.
-  `Manual` is the value Live shows, not read from the plug-in nor pushed into it at load
-  (a float with `Manual` below its default showed the `Manual` while the plug-in held its
-  default): normalized 0..1 for a float
+  `Manual` is the value Live shows, not read from the plug-in nor pushed into it at load. A
+  float with `Manual` below its default showed the `Manual` while the plug-in held its
+  default. The value is normalized 0..1 for a float
   (AUDelay's 50 % Dry/Wet is 0.5, its -99.9..99.9 % Feedback at 50 % is 0.75), on a log
   scale for one flagged Display Logarithmic (its 10..22050 Hz Lowpass at 15000 Hz is 0.95), an item index
   for an enum; unfilled it reads 0.1234567687. An enum slot left at `LastItemCount` 1 reads
@@ -639,7 +639,7 @@ unless an entry says otherwise.
   build until a relaunch; whether it had started while the display slept ("The window
   server and captures") isn't known.
 - Live logs every Max console message to `~/Library/Preferences/Ableton/Live <version>/Log.txt`
-  (the version without a Beta's build, e.g. `Live 12.4.25b1`), appended to at each launch
+  (the version without a Beta's build, such as `Live 12.4.25b1`), appended to at each launch
   after an `info: Started: Live <version>` line, as
   `<local time, microseconds>: error: Message from Max:  <text>`. A gen~ codebox
   that fails to compile ("declarations must come before any expressions") leaves a device
