@@ -39,6 +39,11 @@ stand-in for its helper, so only this check sends MIDI into Live.
 A commit that changes how Live behaves
 under the harness, or what the harness refuses, adds it to `harness/live-notes.md` in the same commit: the next reader reads that file, not
 code comments or commit messages.
+A finding (in `live-notes.md`, an ADR or a comment) states the behaviour, the conditions it
+was measured under (Live and macOS versions, Intel or Apple silicon, display scale where it
+matters) and what the harness does about it, with no dates and no run-by-run history: git
+and the ADRs keep that. A default in code suits any user; a value that suits one setup goes
+in `harness/local.json`.
 
 The repo names no project that uses it: tests and docs use plain stand-ins.
 
