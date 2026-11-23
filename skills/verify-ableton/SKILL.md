@@ -34,7 +34,7 @@ Other agent sessions may be driving Live. Only one client can bind UDP 11001.
 ## Start and quit Live
 
 Ask the user whether Live is free. Then start each piece of work in Live with a relaunch, on
-the harness's empty set, unless `doctor.js` says the open set was opened by the harness or the
+the harness's empty set, unless `doctor.js` says the open set was made by the harness or the
 user calls it disposable. A check changes the set it runs in.
 
 To start Live, or relaunch it, on either machine, run

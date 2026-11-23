@@ -130,9 +130,9 @@ async function main() {
     // Every set the harness opens or saves is in its temp folder (tempFolder); any other set
     // may be the user's, which a check would change.
     const file = await live.get("song", "file_path");
-    if (file && inHarnessTemp(file)) console.log(`info open set: ${file} (opened by the harness)`);
+    if (file && inHarnessTemp(file)) console.log(`info open set: ${file} (made by the harness)`);
     else {
-      console.log(`warn open set: ${file || "(never saved)"} was not opened by the harness: a check changes it. `
+      console.log(`warn open set: ${file || "(never saved)"} was not made by the harness: a check changes it. `
         + "Unless the user calls it disposable, ask whether Live is free and run relaunch.js first");
     }
   } finally {
