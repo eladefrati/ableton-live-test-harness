@@ -1,12 +1,12 @@
 ---
 title: "ADR-0013: Drag in one move of whole points"
-status: Accepted
+status: Accepted; extended by ADR-0021
 date: 2026-11-13
 ---
 
 # ADR-0013: Drag in one move of whole points
 
-**Status:** Accepted. Supersedes ADR-0010. Extends ADR-0004, ADR-0007 and ADR-0008 from clicks
+**Status:** Accepted. Extended by ADR-0021. Supersedes ADR-0010. Extends ADR-0004, ADR-0007 and ADR-0008 from clicks
 to drags.
 
 ## Context

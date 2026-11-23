@@ -6,7 +6,7 @@ date: 2026-11-11
 
 # ADR-0006: Clicks on another Mac after asking
 
-**Status:** Accepted. Supersedes ADR-0004 decision 2 and ADR-0005 decision 3; extended by ADR-0012.
+**Status:** Accepted. Supersedes ADR-0004 decision 2 and ADR-0005 decision 3. Extended by ADR-0012.
 
 ## Context
 

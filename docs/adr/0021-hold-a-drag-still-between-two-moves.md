@@ -45,7 +45,7 @@ second move have to come from the same call of the helper, with the button down 
 
 ## Consequences
 
-- `checks/pointer-guards.js` covers the gesture's events and the pause between them, its
+- `harness/checks/pointer-guards.js` covers the gesture's events and the pause between them, its
   refusals, and Stop and an ending signal during the hold.
 - A knob of one of Live's own devices counts every drag event from the press point
   (`harness/live-notes.md`), so a held drag turns it by the first move and then again by both.

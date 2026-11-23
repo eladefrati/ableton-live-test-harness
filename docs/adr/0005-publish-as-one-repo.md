@@ -6,7 +6,7 @@ date: 2026-11-08
 
 # ADR-0005: Publish as one repo, with each machine's values in a local file
 
-**Status:** Accepted; decision 3 superseded by ADR-0006
+**Status:** Accepted. Decision 3 is superseded by ADR-0006. Supersedes ADR-0004 decision 2 and the local-only clause of ADR-0001 decision 1.
 
 ## Context
 
@@ -20,7 +20,7 @@ the projects that used it. A published repo can carry none of that.
 1. **One public repository.** Standalone, not a GitHub fork; AbletonOSC is credited as the
    base in `README.md`, and its copyright notice is kept in `LICENSE.md`. No private copy is kept in step with it.
 2. **Values that differ per machine live in `harness/local.json`,** which git ignores.
-   `harness/local.example.json` shows the keys: `remote`, the host `remote.sh` runs on
+   `harness/local.example.json` shows the keys, among them `remote`, the host `remote.sh` runs on
    (`LIVE_REMOTE` overrides it for one run), and `clickHost`, the one machine `device-ui.js`
    may click on.
 3. **The click host comes from the file only,** never from the environment. With no file or

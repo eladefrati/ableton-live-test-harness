@@ -6,7 +6,7 @@ date: 2026-10-18
 
 # ADR-0002: A test hook in development builds of devices
 
-**Status:** Accepted
+**Status:** Accepted. Supersedes ADR-0001 decision 4.
 
 ## Context
 

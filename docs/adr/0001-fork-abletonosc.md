@@ -6,7 +6,7 @@ date: 2026-10-18
 
 # ADR-0001: Drive Live through our own fork of AbletonOSC
 
-**Status:** Accepted; decision 1's local-only clause superseded by ADR-0005, decision 4 by ADR-0002, decision 5's opening of sets by ADR-0003
+**Status:** Accepted. Decision 1's local-only clause is superseded by ADR-0005, decision 4 by ADR-0002, and decision 5's opening of sets by ADR-0003.
 
 ## Context
 
@@ -23,7 +23,7 @@ gaps and bugs that hit our tests:
 - No notes from Arrangement clips (every timing check records to the Arrangement); only open
   PR ideoforms/AbletonOSC#195 adds them.
 - No device loading from the browser; only open PR ideoforms/AbletonOSC#204 (consolidating five others).
-- `/live/clip_slot/*` writes a traceback to Log.txt on every call (ideoforms/AbletonOSC#212, PR ideoforms/AbletonOSC#213).
+- `/live/clip_slot/*` writes a traceback to `Log.txt` on every call (ideoforms/AbletonOSC#212, PR ideoforms/AbletonOSC#213).
 - `/live/clip/get/notes` fails above macOS's 9216-byte UDP datagram limit
   (`net.inet.udp.maxdgram`, ideoforms/AbletonOSC#88); a long recording is about 16 KB.
 - Floats are sent as 32-bit. That is not a blocker, since at 120 BPM the error stays in
@@ -41,7 +41,7 @@ and visual judgments.
    GitHub remote. Upstream is dormant, so fetching from it has no expected value; the tag is
    enough to diff our changes. Changes go where they are needed, in upstream files or new
    ones.
-2. **Installed as a symlink.** `Remote Scripts/AbletonOSC` links to this repo, so edits reach
+2. **Installed as a symlink.** `~/Music/Ableton/User Library/Remote Scripts/AbletonOSC` links to this repo, so edits reach
    Live without copying.
 3. **Fork patches are not listed here.** `git diff upstream-base` shows them, and
    `docs/osc-api.md` shows the endpoints they add.

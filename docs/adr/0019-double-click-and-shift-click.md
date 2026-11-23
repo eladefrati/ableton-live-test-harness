@@ -36,7 +36,7 @@ lets go of keys a person holds (`harness/live-notes.md`).
 
 ## Consequences
 
-- `checks/pointer-guards.js` covers both gestures, Stop during them, and that no modifier is
+- `harness/checks/pointer-guards.js` covers both gestures, Stop during them, and that no modifier is
   left held.
 - A plug-in's own window (ADR-0008) still takes plain clicks only.
 - While the helper holds Shift, about 0.15 s, a person's stop key (ADR-0017) carries Shift too,

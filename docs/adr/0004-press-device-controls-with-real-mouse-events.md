@@ -1,12 +1,12 @@
 ---
 title: "ADR-0004: Press device controls with real mouse events"
-status: Accepted; decision 2 superseded by ADR-0005, then ADR-0006; decision 4 extended by ADR-0007, and how it finds the panel superseded by ADR-0020; decision 3 extended to plug-in windows by ADR-0008
+status: Accepted; decision 2 superseded by ADR-0005, then ADR-0006; decision 3 extended to plug-in windows by ADR-0008 and to menu items by ADR-0014; decision 4 extended by ADR-0007, and how it finds the panel superseded by ADR-0020; extended to drags by ADR-0013, and to double-clicks and Shift-clicks by ADR-0019
 date: 2026-11-08
 ---
 
 # ADR-0004: Press device controls with real mouse events
 
-**Status:** Accepted; decision 2 superseded by ADR-0005, then ADR-0006; decision 4 extended by ADR-0007, and how it finds the panel superseded by ADR-0020; decision 3 extended to plug-in windows by ADR-0008
+**Status:** Accepted. Decision 2 is superseded by ADR-0005, then by ADR-0006. Decision 3 is extended to plug-in windows by ADR-0008 and to menu items by ADR-0014. Decision 4 is extended by ADR-0007, and ADR-0020 supersedes how it finds the panel. ADR-0013 extends this ADR to drags, and ADR-0019 to double-clicks and Shift-clicks.
 
 ## Context
 

@@ -6,7 +6,7 @@ date: 2026-11-02
 
 # ADR-0003: Build plug-in sets instead of saving them through Live
 
-**Status:** Accepted
+**Status:** Accepted. Supersedes how ADR-0001 decision 5 opens sets.
 
 ## Context
 
@@ -15,7 +15,7 @@ are added in Configure mode, a UI gesture (`harness/live-notes.md`), and is back
 state after every relaunch. A project's checks need Live relaunched after each plug-in build
 anyway, because Live loads an AU's code once per launch.
 
-`exposePluginParameters` (plugin.js) got around this by saving the open set with File >
+`exposePluginParameters` (`harness/plugin.js`) got around this by saving the open set with File >
 Save Live Set As, writing the parameters into a copy of the file, and opening the copy. The
 save types into Live's Save panel with System Events keystrokes, which go to the frontmost
 app, so it takes the user's focus, and after a click elsewhere at the wrong moment the keys go
@@ -91,7 +91,7 @@ Measured in Live 12.4.25b1 and Suite 12.4.3:
 - **Post keys to Live's process (`CGEventPostToPid`):** untested. Accessibility sees
   nothing inside the Save panel's Go to Folder sheet, which suggests it is drawn by another
   process the keys wouldn't reach.
-- **Raise `-_PluginAutoPopulateThreshold` in Options.txt:** it changes the user's own Live,
+- **Raise `-_PluginAutoPopulateThreshold` in `Options.txt`:** it changes the user's own Live,
   and Live's own population can leave parameters out (`harness/live-notes.md`).
 - **A set kept by each project with its plug-in loaded:** a file per project, made with a
   Save As, whose saved state can drift from the build. The fixture needs none of that.

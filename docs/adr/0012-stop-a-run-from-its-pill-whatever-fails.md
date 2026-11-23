@@ -6,8 +6,8 @@ date: 2026-11-13
 
 # ADR-0012: Show when the harness holds the mouse, and stop it from the pill whatever fails
 
-**Status:** Accepted; in decision 5, what Stop takes down and when it says that the mouse is
-free superseded by ADR-0015; extended by ADR-0017. Supersedes ADR-0009. Extends ADR-0006.
+**Status:** Accepted. In decision 5, what Stop takes down and when it says that the mouse is
+free are superseded by ADR-0015. Extended by ADR-0017. Supersedes ADR-0009. Extends ADR-0006.
 
 ## Context
 
@@ -88,7 +88,7 @@ Stop could fail, leaving a run that still clicked.
   doesn't end.
 - **SIGTERM or SIGINT as the last resort's signal.** A run that handled either would no
   longer end by it, for Ctrl-C and for whatever else sends it. SIGUSR2 has no other meaning
-  to the run or to node (SIGUSR1 starts node's debugger), nothing but Stop sends it, and it
+  to the run or to `node` (SIGUSR1 starts `node`'s debugger), nothing but Stop sends it, and it
   ends a run that doesn't handle it.
 - **A shorter or a longer wait before the kill.** It is how long a run that doesn't act on
   the signal can still click, so it is as short as a stopped run's end allows. A press

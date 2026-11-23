@@ -6,7 +6,7 @@ date: 2026-11-13
 
 # ADR-0014: Choose a menu item by its text, and close the menu whatever fails
 
-**Status:** Accepted; extended by ADR-0017. Supersedes ADR-0011. Extends ADR-0004 decision 3 to the items of a menu
+**Status:** Accepted. Extended by ADR-0017. Supersedes ADR-0011. Extends ADR-0004 decision 3 to the items of a menu
 a control opens.
 
 ## Context

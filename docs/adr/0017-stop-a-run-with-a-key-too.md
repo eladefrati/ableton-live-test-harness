@@ -6,7 +6,7 @@ date: 2026-11-15
 
 # ADR-0017: Stop a run with a key too
 
-**Status:** Accepted. Extends ADR-0012 and ADR-0015.
+**Status:** Accepted. Extends ADR-0012, ADR-0014, and ADR-0015.
 
 ## Context
 
@@ -34,7 +34,7 @@ so reaching Stop means competing with the run for the pointer. A key needs no po
    the run.
 3. **The key is a choice, not a constraint.** One constant in `computer-use-overlay.swift`
    holds its key code and modifiers. The words the dialog uses and the hint on the pill are
-   made from that constant, and so is the key that `checks/pointer-guards.js` presses. It is
+   made from that constant, and so is the key that `harness/checks/pointer-guards.js` presses. It is
    Space, which is in one place on every keyboard layout, with three modifiers that nothing
    in Live's shortcut list uses together. The harness never types Control, so it can't
    press the key itself (see Consequences).
@@ -83,10 +83,10 @@ Probed on an Intel Mac (macOS 26), with a stand-in app in front and keys posted 
   registers, and the exclusive option isn't expected to keep it out; that wasn't tried.
 - A claimed plain Escape (key code 53) caught an Escape posted with no modifiers.
 - With Live in front, the key stopped a run as Stop on the pill does, and once the border's
-  program had gone it didn't start Live's transport (live-notes.md).
+  program had gone it didn't start Live's transport (`harness/live-notes.md`).
 - With a program holding the key the ordinary way, the border's program still claimed it,
   and a press went to the border's program alone; with another border's program holding it,
-  the claim failed (live-notes.md).
+  the claim failed (`harness/live-notes.md`).
 
 Not proven:
 
@@ -112,7 +112,7 @@ Also:
   its release will, whenever the key comes while the helper holds the button. Live may take
   it as another gesture, a Control-click opening a context menu. Clearing the modifiers on
   the helper's events was tried. The events carried none, but the system then read the
-  modifiers as let go, for every app (live-notes.md). With keys held on a real keyboard,
+  modifiers as let go, for every app (`harness/live-notes.md`). With keys held on a real keyboard,
   tried once for events made from the HID system state and posted at the HID tap, even the
   HID system table read them let go, for at least 1 s while they were held; a private
   event source and the session tap were tried only with modifiers held by posted key

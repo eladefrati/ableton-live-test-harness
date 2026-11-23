@@ -1,12 +1,12 @@
 ---
 title: "ADR-0007: Press any device or plug-in at measured points"
-status: Accepted
+status: Accepted; extended by ADR-0008 and ADR-0013
 date: 2026-11-11
 ---
 
 # ADR-0007: Press any device or plug-in at measured points
 
-**Status:** Accepted. Extends ADR-0004 decision 4 beyond Max for Live devices.
+**Status:** Accepted. Extended by ADR-0008 and ADR-0013. Extends ADR-0004 decision 4 beyond Max for Live devices.
 
 ## Context
 

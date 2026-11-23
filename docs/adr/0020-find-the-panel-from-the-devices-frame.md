@@ -6,7 +6,7 @@ date: 2026-11-21
 
 # ADR-0020: Find the panel from the device's frame in Device Detail
 
-**Status:** Accepted. Supersedes the second sentence of ADR-0004 decision 4: the panel is no
+**Status:** Accepted. Supersedes the last sentence of ADR-0004 decision 4. The panel is no
 longer found by reading the device's title.
 
 ## Context

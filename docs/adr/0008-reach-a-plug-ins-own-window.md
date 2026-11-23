@@ -1,12 +1,12 @@
 ---
 title: "ADR-0008: Reach a plug-in's own window"
-status: Accepted
+status: Accepted; extended by ADR-0013
 date: 2026-11-13
 ---
 
 # ADR-0008: Reach a plug-in's own window
 
-**Status:** Accepted. Extends ADR-0004 and ADR-0007 to the window a plug-in opens its editor in.
+**Status:** Accepted. Extended by ADR-0013. Extends ADR-0004 and ADR-0007 to the window a plug-in opens its editor in.
 
 ## Context
 
