@@ -492,7 +492,7 @@ Represents an instrument or effect.
 For devices:
 
 - `name` is the human-readable name
-- `type` is 1 = audio_effect, 2 = instrument, 4 = midi_effect
+- `type` is 0 = undefined, 1 = instrument, 2 = audio_effect, 4 = midi_effect
 - `class_name` is the Live instrument/effect name, e.g. Operator, Reverb. For external plugins and racks, can be
   AuPluginDevice, PluginDevice, InstrumentGroupDevice...
 

@@ -172,7 +172,7 @@ class TrackHandler(AbletonOSCHandler):
 
         """
          - name: the device's human-readable name
-         - type: 0 = audio_effect, 1 = instrument, 2 = midi_effect
+         - type: 0 = undefined, 1 = instrument, 2 = audio_effect, 4 = midi_effect
          - class_name: e.g. Operator, Reverb, AuPluginDevice, PluginDevice, InstrumentGroupDevice
         """
         self.osc_server.add_handler("/live/track/get/num_devices", create_track_callback(track_get_num_devices))
