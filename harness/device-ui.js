@@ -56,11 +56,12 @@ class DeviceUiError extends Error {}
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 // From the corner of the device's frame in Device Detail, as Accessibility gives it, to the
-// panel's corner, in points at Live's 100% zoom (ADR-0020): the device's body starts 1 point
-// in and 18 down, below the title bar, for Live's own devices, Max devices and plug-ins alike,
-// and a Max device's presentation 2 points further in than its body (measured in captures of
-// Live's window, Live 12.4.25b2). The title's text starts 4 points below the
-// frame's top.
+// panel's corner, in points at Live's 100% zoom (ADR-0020). The device's body starts 1 point
+// in and 18 down, below the title bar, for Live's own devices, Max devices and plug-ins alike.
+// A Max device's presentation starts 2 points further in than its body, and the panel's corner
+// is that point, 3 in, for every device, so points measured on any device count from there
+// (measured in captures of Live's window, Live 12.4.25b2). The title's text starts 4 points
+// below the frame's top.
 const DEVICE_TO_PANEL = { x: 3, y: 18 };
 const DEVICE_TO_TITLE_Y = 4;
 const isPlugin = (className) => /PluginDevice$/.test(className); // AuPluginDevice, PluginDevice
