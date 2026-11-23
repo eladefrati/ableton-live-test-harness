@@ -239,6 +239,8 @@ text.
   glow, the click guard doesn't skip it. A point under the pill is refused, with an error
   that names the pill.
 
+## Stop, the stop key, and the window server
+
 ### Stop
 
 - Stop on the pill removes the run's click token, a file `device-ui.swift` must be able to
