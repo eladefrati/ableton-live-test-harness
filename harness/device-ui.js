@@ -15,6 +15,9 @@
 //   await ui.drag("Knob", { up: 40 });     // turns a control: whole points with the button down (ADR-0013)
 //   await ui.drag("View", { right: 12 }, { hold: 400, then: { right: 12 } });
 //                                          // held still 400 ms between two moves (ADR-0021)
+//   await ui.drag("View", { right: 12 }, { after: { click: "Other", ms: 150 }, hold: 400, then: { right: 12 } });
+//                                          // 150 ms after a click on Other; resolves with
+//                                          // { gapMs }, the time measured (ADR-0022)
 //   await ui.choose("Menu", "Item");       // an item of the menu a control opens (ADR-0014)
 //   await ui.text([0, 0, 200, 100]);       // the text shown in part of the panel, device units
 //   await ui.capture("/path/to/device.png"); // the device, title bar and frame included
@@ -500,6 +503,9 @@ const machine = {
   click: (windowId, x, y, ...gesture) => helper("click", windowId, x, y, ...gesture),
   // `hold`: "hold", ms, dx, dy for a held drag's pause and second move (ADR-0021), or none.
   drag: (windowId, x, y, dx, dy, ...hold) => helper("drag", windowId, x, y, dx, dy, ...hold),
+  // A click at cx, cy, then, `ms` after its release, the drag (ADR-0022): { gapMs }, the time
+  // from the release to the drag's press.
+  clickDrag: async (windowId, cx, cy, ms, x, y, dx, dy, ...hold) => JSON.parse(await helper("click-drag", windowId, cx, cy, ms, x, y, dx, dy, ...hold)),
   // A plug-in's window (ADR-0008): its button's state, opened or closed; where it and its
   // editor are; a click in the editor.
   pluginWindow: async (action, device) => JSON.parse(await helper("plugin-window", action, device)).open,
@@ -529,7 +535,7 @@ const machine = {
 };
 
 // The system's calls that move the pointer or press its button.
-const POINTER_CALLS = ["hover", "click", "drag", "clickEditor", "dragEditor"];
+const POINTER_CALLS = ["hover", "click", "drag", "clickDrag", "clickEditor", "dragEditor"];
 // Every call of the machine, by name. A test requires each to be classified.
 const MACHINE_CALLS = Object.keys(machine);
 
@@ -693,7 +699,7 @@ function dragHold(options) {
   if (options === undefined) return [];
   const { hold, then, ...other } = options ?? {};
   const unknown = Object.keys(other);
-  if (unknown.length) throw new DeviceUiError(`A drag takes { hold, then }, not ${unknown.join(", ")}. Not dragged`);
+  if (unknown.length) throw new DeviceUiError(`A drag takes { hold, then, after }, not ${unknown.join(", ")}. Not dragged`);
   if (!Number.isInteger(hold) || hold < 1 || hold > MAX_HOLD_MS) {
     throw new DeviceUiError(`A held drag needs hold in whole ms, from 1 to ${MAX_HOLD_MS}, and then, the move after it. Not dragged`);
   }
@@ -701,6 +707,22 @@ function dragHold(options) {
     throw new DeviceUiError(`A held drag needs then, the move after the hold, as { up, right }. Not dragged`);
   }
   return ["hold", hold, ...dragDistance(then)];
+}
+
+// The longest wait between a click and the drag after it, in ms (ADR-0022); device-ui.swift
+// holds the same limit.
+const MAX_GAP_MS = 2000;
+
+// A drag's { click, ms } after a click (ADR-0022), refused before anything moves unless `click`
+// names a control and `ms` is whole ms from 1 to MAX_GAP_MS.
+function clickBefore(after) {
+  const { click, ms, ...other } = after ?? {};
+  const unknown = Object.keys(other);
+  if (after === null || typeof after !== "object" || unknown.length || typeof click !== "string" || !click
+    || !Number.isInteger(ms) || ms < 1 || ms > MAX_GAP_MS) {
+    throw new DeviceUiError(`A drag after a click needs after: { click, ms }, the control to click and whole ms from 1 to ${MAX_GAP_MS}. Not dragged`);
+  }
+  return { click, ms };
 }
 
 // Live's windows on screen, front to back: [{ id, title, layer, x, y, w, h }] in points. A
@@ -778,12 +800,29 @@ class DeviceUi {
   // Drags a control by { up, right } whole points with the button down, after the same checks
   // as a press (ADR-0013): a knob turns with up, a horizontal slider with right. `options`:
   // { hold, then: { up, right } } keeps the button down and the pointer still for `hold` ms
-  // after that move, then moves `then` further before the release (ADR-0021).
+  // after that move, then moves `then` further before the release (ADR-0021). With
+  // { after: { click, ms } }, `hold` and `then` optional, it first clicks the control `click`
+  // and presses `ms` after that click's release, both controls checked before the click, and
+  // resolves with { gapMs }, the time the helper measured from the release to the press
+  // (ADR-0022).
   async drag(name, distance, options) {
     const [dx, dy] = dragDistance(distance);
-    const hold = dragHold(options);
-    const { window, x, y } = await this.aim(name);
-    await this.system.drag(window, x, y, dx, dy, ...hold);
+    if (options?.after === undefined) {
+      const hold = dragHold(options);
+      const { window, x, y } = await this.aim(name);
+      await this.system.drag(window, x, y, dx, dy, ...hold);
+      return;
+    }
+    const { after, ...held } = options;
+    const { click, ms } = clickBefore(after);
+    const hold = Object.keys(held).length ? dragHold(held) : [];
+    if (click === name) throw new DeviceUiError(`A drag after a click clicks another control than ${name}. Not dragged`);
+    const target = await this.aim(name);
+    const clicked = await this.aim(click);
+    if (clicked.window !== target.window || clicked.panel.some((n, i) => n !== target.panel[i])) {
+      throw new DeviceUiError(`${this.title} moved between the checks of ${name} and ${click}. Not clicked`);
+    }
+    return this.system.clickDrag(target.window, clicked.x, clicked.y, ms, target.x, target.y, dx, dy, ...hold);
   }
 
   // Opens the menu `name` and clicks its item `item`, confirmed by its text (ADR-0014). The
@@ -832,7 +871,8 @@ class DeviceUi {
   }
 
   // Puts the pointer on a control once the Info View names it, with Live in front, and
-  // resolves with the window and the point, for the click or the drag that follows. Stop
+  // resolves with the window, the point and the panel's corner, for the click or the drag that
+  // follows. Stop
   // during either read of Live's window rejects at once, not when the read ends.
   async aim(name, item) {
     const control = this.controls.get(name);
@@ -856,7 +896,7 @@ class DeviceUi {
       throw new DeviceUiError(`The Info View reads "${shown}" over ${name}, expected "${control.info}" (is it visible?). Not clicked`);
     }
     await this.system.focus();
-    return { window: at.window.id, x, y };
+    return { window: at.window.id, x, y, panel: [at.x, at.y] };
   }
 
   // The lines of text shown inside a rectangle of the panel, [x, y, w, h] in device units.
@@ -965,9 +1005,10 @@ class PluginWindow {
   }
 
   // Drags a control by { up, right } whole points with the button down (ADR-0013). The helper
-  // checks the start as for a click. A held drag (ADR-0021) is for Live's window only.
+  // checks the start as for a click. A held drag (ADR-0021) and a drag after a click (ADR-0022)
+  // are for Live's window only.
   async drag(name, distance, options) {
-    if (options !== undefined) throw new DeviceUiError(`A plug-in's window takes a drag of one move only, not a held one (ADR-0021). Not dragged`);
+    if (options !== undefined) throw new DeviceUiError(`A plug-in's window takes a drag of one move only, not a held one (ADR-0021) or one after a click (ADR-0022). Not dragged`);
     const [dx, dy] = dragDistance(distance);
     const [x, y] = await this.aim(name);
     await this.system.dragEditor(this.title, x, y, this.size, dx, dy);

@@ -36,14 +36,22 @@
 //                                     down and the pointer still for <ms> after that move, then
 //                                     moves it by <dx2>, <dy2> more before the release
 //                                     (ADR-0021)
+//   device-ui click-drag <window> <cx> <cy> <ms> <x> <y> <dx> <dy> [hold <ms> <dx2> <dy2>]
+//                                     clicks <cx> <cy>, then, <ms> after the click's release,
+//                                     drags from <x> <y> as drag does, with no hover there, and
+//                                     prints {"gapMs"}: the time from the release to the
+//                                     drag's press as posted (ADR-0022)
 //
 // hover, click and drag refuse, posting nothing, unless the screen is unlocked and <window> is
 // the topmost window at the point, which a click and a drag check again after their hover,
 // before the button goes down; the editor's commands also unless the point is inside the
 // editor and the editor is the size given; a drag also unless each of its moves is whole
 // points, at least 1 on its longer axis and at most MAX_DRAG on either, and ends on a screen,
-// and its hold is whole ms from 1 to MAX_HOLD_MS. Exits 1 with the reason on stderr if
-// anything fails.
+// and its hold is whole ms from 1 to MAX_HOLD_MS. click-drag refuses as a click and a drag do,
+// both points checked before the click, and unless its wait is whole ms from 1 to MAX_HOLD_MS;
+// after the click it checks only that <window> is still topmost at the drag's point, and
+// doesn't wait out a notification's banner. Exits 1 with the reason on stderr if anything
+// fails, saying so if click-drag's click had happened.
 //
 // Once the run is stopped (ADR-0012), hover, click and drag post nothing but the release of a
 // button this helper holds, and exit 3 saying so. The run counts as stopped unless the helper
@@ -55,7 +63,8 @@
 // click or a drag with only that release left has happened. The helper posts it and exits 4,
 // saying that too; so does a double-click stopped after its first click, which happened, and a
 // held drag stopped during its hold, which releases the button at once, its first move
-// having happened (ADR-0021). A
+// having happened (ADR-0021), and a click-drag stopped after its click, which posts nothing
+// more (ADR-0022). A
 // helper that fails, or is sent SIGINT, SIGQUIT, SIGTERM or SIGHUP, while it holds the button
 // or Shift releases them before it ends: by that signal, or with status 131 after SIGQUIT.
 
@@ -123,9 +132,14 @@ let SHIFT_KEY: CGKeyCode = 56
 let ENDING_SIGNALS = [SIGINT, SIGQUIT, SIGTERM, SIGHUP]
 var signalled: sig_atomic_t = 0
 
+// Where click-drag's click was, once it had happened (ADR-0022), for the helper to say so
+// however it ends.
+var clickedAt: CGPoint? = nil
+
 func fail(_ message: String) -> Never {
     release()
-    FileHandle.standardError.write(Data((message + "\n").utf8))
+    let clicked = clickedAt.map { " (the click at \($0.x), \($0.y) had happened)" } ?? ""
+    FileHandle.standardError.write(Data((message + clicked + "\n").utf8))
     exit(1)
 }
 
@@ -465,6 +479,8 @@ func obeySignal() {
 // Ends a helper that the run's stop, for the reason `why`, lets post nothing more: by a
 // signal held back, or else as stopped.
 func halt(_ why: String) -> Never {
+    // After click-drag's click, which had happened (ADR-0022).
+    if clickedAt != nil { stoppedAfterClick(why) }
     let released = release()
     obeySignal()
     let did = released.map { "released the button at \($0.x), \($0.y)" } ?? "held no button"
@@ -568,10 +584,15 @@ let HOLD_POLL_US: UInt64 = 10_000
 // ending signal held back ends the hold within HOLD_POLL_US, the button released where the
 // pointer is. A signal cuts a sleep short, so the wait is to a deadline, not a count of sleeps.
 func holdStill(_ ms: Double) {
-    let deadline = DispatchTime.now().uptimeNanoseconds + UInt64(ms * 1_000_000)
+    waitUntil(DispatchTime.now().uptimeNanoseconds + UInt64(ms * 1_000_000), onStop: stoppedInHold)
+}
+
+// Posts nothing until `deadline`, on the system's uptime clock, looking for Stop and an ending
+// signal held back every HOLD_POLL_US, and ends the helper with `onStop` on either.
+func waitUntil(_ deadline: UInt64, onStop: (String) -> Never) {
     while true {
         obeySignal()
-        if let why = stopped() { stoppedInHold(why) }
+        if let why = stopped() { onStop(why) }
         let now = DispatchTime.now().uptimeNanoseconds
         if now >= deadline { return }
         usleep(UInt32(min(HOLD_POLL_US, (deadline - now) / 1000)))
@@ -586,6 +607,63 @@ func stoppedInHold(_ why: String) -> Never {
     obeySignal()
     FileHandle.standardError.write(Data("\(why), and the helper released the button at \(point.x), \(point.y) during the drag's hold: its first move had happened, its second hadn't\n".utf8))
     exit(HAPPENED_STATUS)
+}
+
+// The longest wait between click-drag's click and its drag, in ms (ADR-0022): as a hold, it
+// keeps the person's mouse.
+let MAX_GAP_MS = MAX_HOLD_MS
+
+// Refuses click-drag's wait, before any event is posted, unless it is whole ms from 1 to
+// MAX_GAP_MS.
+func requireGap(_ ms: Double) {
+    guard ms == ms.rounded(), ms >= 1, ms <= MAX_GAP_MS
+    else { fail("A click-drag waits whole ms, from 1 to \(Int(MAX_GAP_MS)), not \(ms)") }
+}
+
+// Ends a click-drag that Stop, or an ending signal, caught after its click, before its drag
+// had happened: the button released where the pointer is if the drag's press was posted, and
+// nothing more. The helper exits as a gesture that had happened, since the click had (ADR-0022).
+func stoppedAfterClick(_ why: String) -> Never {
+    let released = release()
+    obeySignal()
+    let click = clickedAt ?? .zero
+    let did = released.map { ", and the helper released the button at \($0.x), \($0.y)" } ?? ""
+    FileHandle.standardError.write(Data("\(why)\(did), after the click at \(click.x), \(click.y): the click had happened, the drag hadn't\n".utf8))
+    exit(HAPPENED_STATUS)
+}
+
+// Window `id` topmost at `point`, at once: no wait under a notification's banner, which would
+// take click-drag's wait past its time, so the banner's cover refuses it as another window does.
+func requireOnTopNow(_ id: Int, _ point: CGPoint) {
+    guard let top = clickableWindows().first(where: { bounds($0).contains(point) }) else { fail("No window at the point") }
+    if isPill(top) { fail("The point is under harness-computer-use's pill") }
+    if number(top) != id {
+        fail("The window at the point is \(top[kCGWindowOwnerName as String] ?? "?") \(number(top)), not \(id)")
+    }
+}
+
+// A click at `click`, then the drag from `point` as drag does, its press posted `gapMs` after
+// the click's release, or as soon after as the helper can (ADR-0022). Between them: one pointer
+// move to `point`, as a person's pointer travels there, and the check that the window is still
+// topmost there. Prints the time measured from the release to the press.
+func clickDrag(_ id: Int, click: CGPoint, gapMs: Double, _ point: CGPoint, by delta: CGVector, hold: Hold?) {
+    post(.leftMouseDown, click)
+    usleep(70_000)
+    // The release without buttonUp's wait, which would eat into the gap; the drag's events
+    // that follow keep it from being the helper's last.
+    guard let up = held else { fail("The click's button isn't held") }
+    up.location = click
+    up.post(tap: .cghidEventTap)
+    held = nil
+    let released = DispatchTime.now().uptimeNanoseconds
+    clickedAt = click
+    post(.mouseMoved, point, onStop: stoppedAfterClick)
+    requireOnTopNow(id, point)
+    waitUntil(released + UInt64(gapMs * 1_000_000), onStop: stoppedAfterClick)
+    let pressed = DispatchTime.now().uptimeNanoseconds
+    // Stopped at the drag's press or first move, halt ends it as stoppedAfterClick does.
+    drag(point, by: delta, hold: hold)
+    printJSON(["gapMs": Double(pressed - released) / 1_000_000])
 }
 
 // A click; `double`, a double-click: a second press and release at the same point, 0.1 s after
@@ -716,8 +794,28 @@ case "drag":
     requireUnlocked()
     aim(id, point)
     drag(point, by: delta, hold: hold)
+case "click-drag":
+    let numbers = arguments.dropFirst(3).prefix(7).compactMap { Double($0) }
+    let holding = arguments.dropFirst(11).compactMap { Double($0) }
+    guard arguments.count == 10 || (arguments.count == 14 && arguments[10] == "hold" && holding.count == 3),
+          let id = Int(arguments[2]), numbers.count == 7
+    else { fail("usage: device-ui click-drag <window> <cx> <cy> <ms> <x> <y> <dx> <dy> [hold <ms> <dx2> <dy2>]") }
+    let click = CGPoint(x: numbers[0], y: numbers[1])
+    let (point, delta) = (CGPoint(x: numbers[3], y: numbers[4]), CGVector(dx: numbers[5], dy: numbers[6]))
+    requireGap(numbers[2])
+    requireDrag(point, delta)
+    let hold = holding.isEmpty ? nil : Hold(ms: holding[0], then: CGVector(dx: holding[1], dy: holding[2]))
+    if let hold {
+        requireHold(hold.ms)
+        requireDrag(CGPoint(x: point.x + delta.dx, y: point.y + delta.dy), hold.then)
+    }
+    requireUnlocked()
+    requireOnTop(id, point)
+    aim(id, click)
+    clickDrag(id, click: click, gapMs: numbers[2], point, by: delta, hold: hold)
 default:
     fail("usage: device-ui window | windows | device <title> | text <png> | crop <png> <width> <x> <y> <w> <h> <out> | hover <window> <x> <y> | click <window> <x> <y> [double | shift] | "
         + "plugin-window state|open|close <device> | plugin-editor <title> | click-editor <title> <x> <y> <w> <h> | "
-        + "drag <window> <x> <y> <dx> <dy> [hold <ms> <dx2> <dy2>] | drag-editor <title> <x> <y> <w> <h> <dx> <dy>")
+        + "drag <window> <x> <y> <dx> <dy> [hold <ms> <dx2> <dy2>] | "
+        + "click-drag <window> <cx> <cy> <ms> <x> <y> <dx> <dy> [hold <ms> <dx2> <dy2>] | drag-editor <title> <x> <y> <w> <h> <dx> <dy>")
 }

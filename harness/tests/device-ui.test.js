@@ -74,6 +74,7 @@ function fakeMachine({ info = "Button", device = async () => DEVICE, onFocus = (
     hover: async (id, x, y) => { calls.push(["hover", id, x, y]); },
     click: async (id, x, y, ...gesture) => { calls.push(["click", id, x, y, ...gesture]); },
     drag: async (id, x, y, dx, dy, ...hold) => { calls.push(["drag", id, x, y, dx, dy, ...hold]); },
+    clickDrag: async (...args) => { calls.push(["clickDrag", ...args]); return { gapMs: 151.2 }; },
   };
 }
 
@@ -951,7 +952,7 @@ test("a held drag whose hold or second move a drag can't make is refused before 
   for (const then of [{}, { up: 0.5 }, { right: 401 }]) {
     await assert.rejects(ui.drag("Button", { up: 5 }, { hold: 400, then }), /in whole points, at least 1 on the longer axis and at most 400 on either\. Not dragged/);
   }
-  await assert.rejects(ui.drag("Button", { up: 5 }, { hold: 400, then: { up: 5 }, wait: 100 }), /takes \{ hold, then \}, not wait\. Not dragged/);
+  await assert.rejects(ui.drag("Button", { up: 5 }, { hold: 400, then: { up: 5 }, wait: 100 }), /takes \{ hold, then, after \}, not wait\. Not dragged/);
   await assert.rejects(ui.drag("Button", { up: 5 }, null), /hold in whole ms/);
   assert.equal(system.calls.length, 0);
 });
@@ -960,8 +961,65 @@ test("a plug-in's window refuses a held drag before the pointer moves", async ()
   const system = fakePluginMachine();
   const window = await openPluginWindow(pluginLive(), PLUGIN, system);
   const before = system.calls.length;
-  await assert.rejects(window.drag("Button", { up: 5 }, { hold: 400, then: { up: 5 } }), /of one move only, not a held one \(ADR-0021\)\. Not dragged/);
+  await assert.rejects(window.drag("Button", { up: 5 }, { hold: 400, then: { up: 5 } }), /of one move only, not a held one \(ADR-0021\) or one after a click \(ADR-0022\)\. Not dragged/);
+  await assert.rejects(window.drag("Button", { up: 5 }, { after: { click: "Button", ms: 150 } }), /or one after a click \(ADR-0022\)\. Not dragged/);
   assert.equal(system.calls.length, before);
+});
+
+// Two controls at points, each with its Info View title, which the fake reads after a hover
+// over it.
+const TWO = { Click: { x: 20, y: 10, info: "Click" }, Drag: { x: 60, y: 30, info: "Drag" } };
+async function openTwo(system) {
+  const hoveredOver = () => {
+    const hover = system.calls.filter((call) => call[0] === "hover").pop();
+    return hover && hover[2] === PANEL.x + TWO.Click.x ? "Click" : "Drag";
+  };
+  system.read = async () => ({ width: 2880, lines: [line(hoveredOver(), 26, 1400)] });
+  return openDeviceUi(fakeLive(), { track: 1, device: 1, controls: TWO }, system);
+}
+
+test("a drag after a click checks both controls, the drag's first, then goes to the helper as one call and resolves with the time it measured (ADR-0022)", async () => {
+  const system = fakeMachine();
+  const ui = await openTwo(system);
+  const result = await ui.drag("Drag", { right: 12, up: 1 }, { after: { click: "Click", ms: 150 }, hold: 400, then: { right: 3, up: 2 } });
+  const drag = [PANEL.x + 60, PANEL.y + 30];
+  const click = [PANEL.x + 20, PANEL.y + 10];
+  assert.deepEqual(system.calls, ["focus", ["hover", 7, ...drag], "focus", "focus", ["hover", 7, ...click], "focus",
+    ["clickDrag", 7, ...click, 150, ...drag, 12, -1, "hold", 400, 3, -2]]);
+  assert.deepEqual(result, { gapMs: 151.2 });
+  system.calls.length = 0;
+  await ui.drag("Drag", { up: 5 }, { after: { click: "Click", ms: 1 } });
+  assert.deepEqual(system.calls.pop(), ["clickDrag", 7, ...click, 1, ...drag, 0, -5]);
+});
+
+test("a drag after a click is refused before the pointer moves unless after is { click, ms } with whole ms from 1 to 2000 and another control", async () => {
+  const system = fakeMachine();
+  const ui = await openTwo(system);
+  for (const after of [null, 5, {}, { click: "Click" }, { ms: 150 }, { click: "", ms: 150 }, { click: "Click", ms: 0 }, { click: "Click", ms: 2001 },
+    { click: "Click", ms: 150.5 }, { click: "Click", ms: "150" }, { click: "Click", ms: 150, wait: 1 }]) {
+    await assert.rejects(ui.drag("Drag", { up: 5 }, { after }), /after: \{ click, ms \}, the control to click and whole ms from 1 to 2000\. Not dragged/);
+  }
+  await assert.rejects(ui.drag("Drag", { up: 5 }, { after: { click: "Drag", ms: 150 } }), /clicks another control than Drag\. Not dragged/);
+  await assert.rejects(ui.drag("Drag", { up: 5 }, { after: { click: "Click", ms: 150 }, hold: 400 }), /then, the move after the hold/);
+  await assert.rejects(ui.drag("Drag", { up: 5 }, { after: { click: "Click", ms: 150 }, wait: 1 }), /takes \{ hold, then, after \}, not wait/);
+  await assert.rejects(ui.drag("Drag", {}, { after: { click: "Click", ms: 150 } }), /in whole points/);
+  assert.equal(system.calls.length, 0);
+});
+
+test("a drag after a click is refused before the click when the click's control isn't named in the Info View", async () => {
+  const system = fakeMachine();
+  const ui = await openTwo(system);
+  system.read = async () => ({ width: 2880, lines: [line("Drag", 26, 1400)] });
+  await assert.rejects(ui.drag("Drag", { up: 5 }, { after: { click: "Click", ms: 150 } }), /The Info View reads "Drag" over Click, expected "Click".*Not clicked/);
+  assert.equal(system.calls.some((call) => call[0] === "clickDrag"), false);
+});
+
+test("a drag after a click is refused when the device moved between the two checks", async () => {
+  let n = 0;
+  const system = fakeMachine({ device: async () => (n++ === 0 ? DEVICE : { ...DEVICE, y: DEVICE.y + 40 }) });
+  const ui = await openTwo(system);
+  await assert.rejects(ui.drag("Drag", { up: 5 }, { after: { click: "Click", ms: 150 } }), /moved between the checks of Drag and Click\. Not clicked/);
+  assert.equal(system.calls.some((call) => call[0] === "clickDrag"), false);
 });
 
 test("a drag in a plug-in's editor goes to the helper with the point, the size and right, down", async () => {
@@ -1620,6 +1678,19 @@ test("the helper refuses a held drag whose hold isn't whole ms from 1 to 2000 or
     await assert.rejects(tools.run(helper, ["drag", -1, 100, 100, 5, 0, "hold", 400, dx, dy]), /whole points, at least 1 on its longer axis and at most 400 on either/);
   }
   await assert.rejects(tools.run(helper, ["drag", -1, 100, 100, 5, 0, "wait", 400, 5, 0]), /usage: device-ui drag <window> <x> <y> <dx> <dy> \[hold <ms> <dx2> <dy2>\]/);
+});
+
+// As above, for a drag after a click (ADR-0022): its wait, its drag and its hold are refused
+// before any event.
+test("the helper refuses a click-drag whose wait isn't whole ms from 1 to 2000 or whose drag or hold a drag can't make", { skip: !hasDeveloperTools && "no developer tools", timeout: 300000 }, async () => {
+  const helper = await tools.helperBinary(path.join(__dirname, "..", "device-ui.swift"));
+  for (const ms of [0, 2001, 150.5]) {
+    await assert.rejects(tools.run(helper, ["click-drag", -1, 100, 100, ms, 120, 100, 5, 0]), /waits whole ms, from 1 to 2000/);
+  }
+  await assert.rejects(tools.run(helper, ["click-drag", -1, 100, 100, 150, 120, 100, 0.5, 0]), /whole points, at least 1 on its longer axis/);
+  await assert.rejects(tools.run(helper, ["click-drag", -1, 100, 100, 150, 120, 100, 5, 0, "hold", 0, 5, 0]), /holds still for whole ms, from 1 to 2000/);
+  await assert.rejects(tools.run(helper, ["click-drag", -1, 100, 100, 150, 120, 100, 5, 0, "hold", 400, 0, 401]), /whole points, at least 1 on its longer axis/);
+  await assert.rejects(tools.run(helper, ["click-drag", -1, 100, 100, 150, 120, 100, 5]), /usage: device-ui click-drag <window> <cx> <cy> <ms> <x> <y> <dx> <dy> \[hold <ms> <dx2> <dy2>\]/);
 });
 
 // A PNG's chunk, and a grey PNG `width` x `height` pixels that gives its resolution as
