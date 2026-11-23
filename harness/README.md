@@ -16,7 +16,7 @@ checks it runs beside it.
   and `set(...)` for `/live/<object>/get|set/<property>`: `live.set("view",
   "selected_track", 1)` selects track 1. `on(address, fn)` calls `fn(args)` for every message
   on that address, such as the replies a `/live/.../start_listen/...` sends; `off(address)`
-  stops it. `deleteTracks(names, from)` deletes tracks;
+  stops it. `deleteTracks(names, from)` deletes the tracks whose names are in `names`, from track index `from` on, last first;
   `dialog()` resolves with Live's open dialog, or null. `trackData(...properties)` reads
   properties of every track in one reply (null for one that doesn't apply to a track); `placeClip(track, notes, beats)` puts a clip of
   notes on a MIDI track in the Arrangement from beat 0.
@@ -27,7 +27,7 @@ checks it runs beside it.
   where Play started against the audio buffer; at other tempos it rounds to up to half a
   sample. Figures under one sample don't tell runs apart.
 - `device-checks.js`: the runner for a project's checks of a MIDI device. `main(cases,
-  {device, builds, build, longNames, notes, beats, compare, openHooks, onFail})` loads the
+  {device, builds, build, longNames, notes, beats, compare, openHooks, onFail, tempo, reachMs})` loads the
   newest `<device> YYYY.MM.DD.N.amxd` in `builds` (or the file `build` names, for another
   naming: a file name, or a function of the folder returning one) onto a new track, from whichever Places
   folder has it (it refuses, saying what to fix, unless exactly one does), places a clip in
@@ -35,7 +35,7 @@ checks it runs beside it.
   output on a second track and compares it with the case's `expect(ctx)`. Both tracks are
   deleted afterwards (`--keep` leaves them; `--tempo <bpm>` sets the song's tempo first and
   leaves it). Settings use long names when the project passes
-  `longNames` (every visible parameter's long name; needed when short names repeat),
+  `longNames`, a function of the build file that returns every visible parameter's long name (needed when short names repeat),
   otherwise Live's short names. `compare: {edgeBeats}` skips notes near
   the start and the stop, for a device whose first notes are late by design. Durations are
   compared only with `compare: {durationToleranceMs}`. Set it for a device whose note
@@ -46,7 +46,7 @@ checks it runs beside it.
   without waiting, so the window brackets only it (an action that syncs or sleeps widens
   it). With `grid`, a case fails when its change may have crossed a grid line, which
   leaves the step it hit unknown; the grid step must be well over one tick plus `reachMs`
-  (about 250 ms), or every run fails. `buildScript(file)` reads the
+  (about 250 ms), or every run fails. `reachMs` is how long after a `during` window a change may still reach the device (default 50 ms). `buildScript(file)` reads the
   [v8] script out of a build, so expected notes can come from the very build loaded.
   `latestBuild(folder, device)` finds the newest build; `clipNotes()` is the default test
   clip.
@@ -68,7 +68,7 @@ checks it runs beside it.
   `exposePluginParameters(live, name)` returns the plug-in if the open set already holds it
   that way; otherwise it opens such a set in the running Live, behind other windows (the
   song becomes the fixture's, at 120 BPM). It resolves with `{track, device, parameters,
-  file}`, and refuses to replace a set the harness didn't make (outside its temp folder),
+  file}`, and refuses to replace a set the harness didn't make (one outside its temp folder),
   since opening discards unsaved changes; after a relaunch, `relaunch.js --plugin <name>`
   starts Live on the set instead.
   Instruments (`aumu`) and VST3 plug-ins refuse. Instruments are untested, and VST3 parameter
@@ -102,9 +102,9 @@ checks it runs beside it.
   (`setMidiMapMode`, `macos.js`), a press on a control (`device-ui.js`) and a CC map the
   control to that CC; with it off, the CC sets it. A key is mapped the same way in Key Map
   Mode, and pressed with `typeInLive`. Needs Remote on for the port ("What Live needs").
-- `macos.js`: what the LOM can't do, through Live's menus with AppleScript: save, save as,
+- `macos.js`: what the LOM can't do, through Live's menus with AppleScript: save (`saveSet`), save as (`saveSetAs`),
   open a set (`openSetAndWait(live, file)`: behind other windows, stopping the transport first, answering "Save changes?" and "This action
-  will stop audio?", and resolving once the set has loaded), Key Map and MIDI Map Mode, and the name of the step Edit > Undo would
+  will stop audio?", and resolving once the set has loaded), Key Map and MIDI Map Mode (`setKeyMapMode`, `setMidiMapMode`), and the name of the step Edit > Undo would
   undo (`undoName`). `tempFolder(prefix)` makes a folder in `<system temp>/ableton-harness/`, where every
   set the harness saves goes; `relaunch.js` and `quit.js` empty it.
 - `device-ui.js`: presses a device's controls with real mouse events (ADR-0004), and
@@ -166,7 +166,7 @@ checks it runs beside it.
   the button up at once with no second move, its error saying `done`; a knob of one of Live's
   devices counts both events from the press point, so it turns further than both moves),
   `ui.choose(name, item)` opens the menu a control opens (a chooser) and clicks the one row
-  that reads `item`, closing the menu with Escape if none or two do or anything else fails once the menu's control was clicked (ADR-0014; after Stop, once no modifier key is held, waiting 2 s at most and leaving the menu open with a warning if one still is, since the stop key's may be; see ADR-0017), and `ui.text([x, y, w, h])`
+  that reads `item`, closing the menu with Escape if no row or more than one row reads `item` or anything else fails once the menu's control was clicked (ADR-0014; after Stop, once no modifier key is held, waiting 2 s at most and leaving the menu open with a warning if one still is, since the stop key's may be; see ADR-0017), and `ui.text([x, y, w, h])`
   resolves with the lines shown in that part of the panel, in device units. A press looks
   for the panel again, brings Live to the front, and throws `DeviceUiError` without clicking
   unless the screen is unlocked, Live's main window is on top at the point and the Info View
@@ -201,7 +201,7 @@ checks it runs beside it.
   `size`, the point inside it, and the plug-in's window on top at the point. There is no Info
   View to confirm the control. A moved point clicks another control of the plug-in, so take
   the evidence from Live. A press needs `size`; opening and capturing don't.
-  To measure a plug-in's points, `node harness/cli.js plugin-window <track> <device> <png>`
+  To measure a plug-in's points, `node harness/cli.js plugin-window <track> <device> [<png>]`
   prints the editor's size (`editor: {w, h}`, the `size` to give) and saves the editor. Take
   each control's centre from the plug-in's own layout code, whose coordinates are these
   points when the editor isn't scaled, or from that picture. Its pixels are points times the
@@ -226,7 +226,7 @@ checks it runs beside it.
   data rate the Mac's encoder picks. Measured with Live idle or playing, the rate is about
   0.1 MB a second for
   Live's window on a 2x display and 0.2 for that display on an Intel Mac, and 0.46 and 0.75
-  on an Apple-silicon one, so a recording that runs to the 10-minute cap can reach about
+  on an Apple-silicon one, so a recording of the default 10 minutes can reach about
   280 MB for a window and 450 MB for the screen; more movement costs more. It builds the
   helper first, then wakes the display, and keeps it on while it records. A display that
   sleeps leaves the video on its last picture. The recording stops after `seconds` (10
@@ -282,7 +282,7 @@ checks it runs beside it.
   still running 10 s after the quit or the last answer (`--kill` kills at once). After a
   kill, or when it finds that Live crashed, it moves Live's recovery data into the
   preferences folder's `Crash` folder, so Live starts without asking to recover. Once the old Live has exited it deletes that Live's
-  Temp Projects and the previous copy's folder. It stops at any other dialog, leaving it
+  Temp Projects and empties the harness's temp folder. It stops at any other dialog, leaving it
   open. Once Live is up it creates and deletes an audio and a MIDI track (`warmUp`). Live's
   first track after it starts loads the plug-ins of the user's default track, which held
   Live for over 2 s, long enough for a check's next get to time out. Holds UDP 11001 throughout. With `--plugin <name>` Live starts instead on a set
@@ -315,6 +315,10 @@ checks it runs beside it.
   and modification times; an older checkout of the harness doesn't mark the builds it finds,
   so one it has found but not yet run can be deleted under it),
   `escapeXml(text)`; `patcherChunk(bytes)` finds the patcher in an `.amxd`.
+- `user-session.js`: runs a command where it sees the user's own Audio Units. A process
+  started over ssh can't reach the user's component registrar, so outside the GUI session the
+  command runs as a one-shot launchd job in the user's GUI domain (`launchctl bootstrap
+  gui/<uid>`, no root needed), and its output and exit status come back through files.
 - `settings.js`: Live's settings, read from `Preferences.cfg` without touching Live's
   window. `recordBitDepth()` resolves with `{bits, float}` (16, 24, or 32 and float);
   `requireRecordBitDepth(bits)` rejects unless Live records at `bits`, with a message
@@ -326,7 +330,11 @@ checks it runs beside it.
   (`{at, level, text}`) Live logged from `since` (ms timestamp or Date) on. Take the time
   before a run and read them after it, to see why a device that loaded and answers OSC
   does nothing.
-- `cli.js`: `node harness/cli.js ping | reload | query <address> [args] | send <address> [args] | notes <track> <clip> [--arrangement] | song-notes <track> | max-log [since] | windows | capture [<png>] [--window <id>] | plugin-window <track> <device> [<png>] | video [<file.mov>] [--seconds <n>] [--window <id> | --screen] [-- <command...>] | video-frame <file.mov> <seconds> [<png>]`.
+- `run-log.js`: saves each run of a project's check in `tests/live/` in that project's repo,
+  one file per run in `tests/live/logs/` ("Running"). `connect()` starts it. Only a script
+  inside a `tests/live/` folder is logged, and no `node -e` script. A log that can't be
+  written never fails the check.
+- `cli.js`: `node harness/cli.js ping | reload | query <address> [args] | send <address> [args] | notes <track> <clip> [--arrangement] | song-notes <track> | max-log [since] | windows | capture [<png>] [--window <id>] | plugin-window <track> <device> [<png>] | video [<file.mov>] [--seconds <n>] [--window <id> | --screen] [-- <command...>] | video-frame <file.mov> <seconds> [<png>] | midi-port [--seconds <n>]`.
   `max-log` reads Live's log, not OSC, so it runs beside a check; `since` is ms or a local
   time such as `2026-10-31T11:18`, and defaults to Live's start. `windows` lists Live's
   windows on screen with their layer (`liveWindows` in `device-ui.js`). A dialog or a panel
@@ -353,7 +361,8 @@ checks it runs beside it.
   tests/live/<check>.js`. `video-frame` saves the frame a video
   shows at a time, in seconds (`videoFrame`). `capture`, `plugin-window`, `video` and
   `video-frame` given a file make its folder if it is missing, given no file save to the
-  captures folder (`captures.js`), and each prints the file's path.
+  captures folder (`captures.js`), and each prints the file's path. `midi-port` holds the
+  `Harness` port open until Ctrl-C, or for the seconds given.
 - `checks/record-roundtrip.js`: checks the recording path and the note addresses. It adds
   two tracks, records one's clip into the other through MIDI routing, and compares both the
   clip's notes read back (`songNotes()`) and the recording with the notes the clip plays.
@@ -362,13 +371,19 @@ checks it runs beside it.
   127 and two outside the clip, more than 8192 beats before and after its start, which only
   the Session read and the removal see. It prints a PASS/FAIL line per comparison, with the
   missing and extra notes on a failure.
+- `checks/automation-record.js`: checks `recordArrangement`'s `automation` option on Auto
+  Filter, with no track armed. A pass sets Frequency to 0.8 at beat 1 and to 0.3 at beat 3. A
+  second pass, with nothing set, reads Frequency at beat 2: 0.3 without the option, as Live
+  then writes no automation, and 0.8 with it. Each runs with Automation Arm off and then on,
+  on a new track each time, and must leave Automation Arm as it found it. The tracks are
+  deleted at the end. Needs Count-In off.
 - `checks/plugin-record.js [--keep]`: checks the plug-in path on Apple's AUDelay, which
   every Mac has. It exposes the parameters, records Operator through the plug-in and checks
   the output equals the signal at Dry/Wet Mix 0, and at Mix 1 trails it by the Delay Time
   set, at two settings (floats; the control that the output track records the plug-in).
   AUDelay has no enum parameters, so enum slots are not checked in Live. It replaces the
   open set with one holding only the plug-in, as `exposePluginParameters` does, so it refuses a set the harness
-  didn't open.
+  didn't make.
 - `checks/plugin-set.js <name> [--keep]`: checks the set built for the AU effect `<name>`
   against the plug-in as Live lists it itself. It exposes the parameters, loads the
   plug-in again from the Plug-Ins browser onto a new track, and checks that the built
@@ -534,6 +549,13 @@ checks it runs beside it.
   where; it deletes what they saved. The frames are for looking at. With `--out` the videos
   and frames are kept in that folder, otherwise deleted. Leaves the transport stopped; takes
   about 70 s.
+- `checks/midi-map.js`: checks `midi.js` (ADR-0018) and the map modes on Auto Filter. It
+  opens the `Harness` port, maps Frequency to a CC in MIDI Map Mode (a press through
+  `device-ui.js` and a CC), and checks that CCs then move Frequency to its ends and between.
+  Then it maps Resonance to a key in Key Map Mode and checks that pressing the key toggles it.
+  It needs Remote on for the `Harness` input and what `device-ui.js` needs ("What Live
+  needs"), and runs on the click host. It brings Live to the front for the key, and deletes
+  the track and its mappings afterwards.
 
 Project checks live in each project's repo, in `tests/live/`, and use this folder as a
 library by path. Checks of a MIDI device run on `device-checks.js`; checks of audio or a
@@ -547,8 +569,9 @@ is set to and what is off without it. `remote.sh` copies the file to the remote 
 rest of the clone, so both machines read the same values.
 
 - `app`: the path of the Live `relaunch.js` and `add-place.js` use when `--app` and
-  `--suite` aren't given. Unset, they use the running Live, else the only one in
-  `/Applications`, and refuse when several are installed.
+  `--suite` aren't given. Unset, `relaunch.js` uses the running Live, else the only one in
+  `/Applications`. `add-place.js` runs with Live quit, so it uses the only one. Both refuse
+  when several are installed.
 - `remote`: the ssh destination (`user@host`) of the second Mac `remote.sh` runs on
   ("Running on a second Mac"). `LIVE_REMOTE` names another for one run.
 - `clickHost`: the hostname (without `.local`) of the one machine `device-ui.js` clicks on
@@ -564,8 +587,9 @@ node harness/checks/record-roundtrip.js   # the harness's own recording path
 node harness/checks/automation-record.js  # recordArrangement's automation option, on Auto Filter
 node harness/checks/example-device-check.js  # a template for a project's check
 node harness/checks/example-transpose-check.js  # the same on device-checks.js (needs harness/devices in Places)
-node harness/checks/plugin-record.js      # the plug-in path, on AUDelay (replaces a set the harness opened)
-node harness/checks/plugin-set.js <name>  # a plug-in's built set against Live's own (replaces a set the harness opened)
+node harness/checks/plugin-record.js      # the plug-in path, on AUDelay (replaces a set the harness made)
+node harness/checks/plugin-set.js <name>  # a plug-in's built set against Live's own (replaces a set the harness made)
+node harness/checks/save-reopen.js        # the save and reopen path (replaces the open set)
 node harness/checks/pointer-guards.js     # what the click helper posts and refuses (Live not needed; on the click host only)
 node harness/checks/editor-guards.js      # what the click helper refuses in a plug-in's editor, on AUDelay (on the click host only)
 node harness/checks/video-record.js       # video recordings of Live, and their frames
@@ -586,8 +610,8 @@ Each run of a check in a project's `tests/live/` is saved in that repo, one file
 and whether the code had uncommitted changes, then everything the run printed, then
 `exit: <code>` (no exit line means the run was killed). `connect()` starts it, through
 `run-log.js`; the harness's own tools and checks are not logged. The `verify-ableton`
-skill has these logs committed in the project's repo. That is a convention. The harness
-works without it.
+skill tells agents to commit these logs in the project's repo. The harness works without
+that.
 
 ## Running on a second Mac
 
@@ -670,7 +694,9 @@ must stay off there. Waking doesn't reliably dismiss it.
   Security > Accessibility, and under Automation > (that app) > System Events.
 - For `device-ui.js` and `cli.js windows` and `capture`: Screen Recording for the terminal
   app, to capture Live's window; the two `cli.js` commands also need the Automation
-  permission above.
+  permission above. `device-ui.js` also needs Accessibility, and Automation for System
+  Events: every press, `ui.text` and `ui.capture` finds the panel through Accessibility
+  (ADR-0020) and wakes the display through System Events.
 - For `video.js` and `cli.js video`: macOS 15 or later, Screen Recording for the terminal app,
   and Automation for System Events, which wakes the display first, as for `capture`; for
   `video-frame`, macOS 15 or later only. A recording that can't wake the display says why,
@@ -681,12 +707,13 @@ must stay off there. Waking doesn't reliably dismiss it.
   opened, and the error says what it didn't find.
 - Live in front while `saveSetAs()` types into it, since keystrokes go to the frontmost app. It
   brings Live forward itself and types only from a script that finds Live in front; if
-  another app comes forward, it brings Live back, up to three times, then fails having typed
-  nothing. It puts the app that was in front back afterwards. Don't click or type in another
+  another app comes forward, it brings Live back; it tries three times in all, then fails
+  having typed nothing. It puts the app that was in front back afterwards. Don't click or type in another
   app meanwhile, or the save fails. Menu commands
   (`clickMenu`: `saveSet`, Key and MIDI Map Mode) bring Live forward for the click and put
   it back too. A plug-in window's `press` and `capture` bring Live forward, since Live shows
-  the window only then; `capture` puts the app back. Nothing else brings Live forward.
+  the window only then; `capture` puts the app back. Device presses (`ui.press`, `ui.drag`, `ui.choose`) also
+  bring Live forward and leave it there, and so does `typeInLive` outside `saveSetAs`.
 - For `midi.js`: Remote on for the MIDI input `Harness` in Live's Settings > Link, Tempo &
   MIDI, and Track on for notes into a track, set once per Mac while `node harness/cli.js
   midi-port` holds the port open. Live keeps it after the port closes and after a relaunch.
