@@ -1,17 +1,16 @@
-# Ableton Live Test Harness
+# Ableton Live test harness
 
 **This is a test harness for Ableton Live**, built so a coding agent can run
 in-Live acceptance tests for projects that run in Live: Max for Live devices, MIDI Tools,
 Audio Unit effect plug-ins, Live Extensions, and Remote Scripts. [ADR-0001](docs/adr/0001-fork-abletonosc.md) says why and
 how. The Node client and the checks are in
-[harness/](harness/README.md); the `verify-ableton` skill
+[harness/](harness/README.md). The `verify-ableton` skill
 ([skills/verify-ableton](skills/verify-ableton/SKILL.md), linked into your agent's skills folder)
 tells an agent how to use it. It runs on macOS only.
 
 It is built on [AbletonOSC](https://github.com/ideoforms/AbletonOSC). See [Origin](#origin).
 
-**To find your way around,** see [AGENTS.md](AGENTS.md) for the layout and which doc covers
-what.
+For the layout and which doc covers what, see [AGENTS.md](AGENTS.md).
 
 **To change this repo,** see [CONTRIBUTING.md](CONTRIBUTING.md).
 
@@ -19,38 +18,38 @@ what.
 [releases](https://github.com/eladefrati/ableton-live-test-harness/releases) and their notes.
 `main` is the development line.
 
-AbletonOSC is a MIDI remote script that provides an [Open Sound Control (OSC)](https://ccrma.stanford.edu/groups/osc/) interface to
-control [Ableton Live](https://www.ableton.com/en/live/). AbletonOSC's aim is to expose the
-entire [Live Object Model](https://docs.cycling74.com/max8/vignettes/live_object_model) API
-([full API docs](https://structure-void.com/PythonLiveAPI_documentation/Live11.0.xml)), providing comprehensive control
-over Live's control interfaces using the same naming structure and object hierarchy as LOM.
+AbletonOSC is a MIDI Remote Script that gives [Ableton Live](https://www.ableton.com/en/live/) an
+[Open Sound Control (OSC)](https://ccrma.stanford.edu/groups/osc/) interface. It aims to expose
+the whole [Live Object Model](https://docs.cycling74.com/max8/vignettes/live_object_model) (LOM)
+API ([full API docs](https://structure-void.com/PythonLiveAPI_documentation/Live11.0.xml)), with
+the LOM's names and object hierarchy.
 
-# Installation
+## Installation
 
-This repo needs macOS, Ableton Live 12 (it is used with Live 12.4), Node 18 or
+This repo needs macOS and Ableton Live 12 (it is used with Live 12.4). It also needs Node 18 or
 later (no packages to install) and, for the plug-in, device-ui, video, and MIDI helpers, `swiftc` from Xcode
 or its Command Line Tools. Checks of Max for Live devices, including the example below, need
 Max for Live. Live's language must be English. The harness finds its menus and dialogs by
 name.
 
-- Clone it anywhere; the commands here assume `~/dev/ableton-live-test-harness`.
-  `harness/remote.sh` (runs on a second Mac) needs the clone in a folder under your home
+- Clone it anywhere. The commands here assume `~/dev/ableton-live-test-harness`.
+  `harness/remote.sh`, which runs commands on a second Mac, needs the clone in a folder under your home
   folder, beside the repos it runs, and the same layout on the second Mac. A project's checks
   load the harness by path. By convention they read `LIVE_HARNESS` (the path of the
-  `harness/` folder) and fall back to this path.
+  `harness/` folder) and fall back to `~/dev/ableton-live-test-harness/harness`.
 - Link the clone into Live's Remote Scripts as `AbletonOSC`, so Live runs the working tree.
   It takes the place of an installed AbletonOSC, so first move any existing `AbletonOSC`
   folder out of Remote Scripts. It isn't a drop-in replacement. It listens on 127.0.0.1 only,
-  so clients on other machines stop working, and `/live/clip/get/notes` replies in chunks.
+  so clients on other machines stop working. `/live/clip/get/notes` replies in chunks.
   `ln -s ~/dev/ableton-live-test-harness ~/Music/Ableton/User\ Library/Remote\ Scripts/AbletonOSC`
-- Restart Live. In Settings > Link, Tempo & MIDI, set a Control Surface slot to AbletonOSC
-  (Input and Output None). Live should display a message saying "AbletonOSC: Listening for
+- Restart Live. In **Settings > Link, Tempo & MIDI**, set a **Control Surface** slot to AbletonOSC
+  (**Input** and **Output** **None**). Live should display a message saying "AbletonOSC: Listening for
   OSC on port 11000".
-- Keep Count-In at None, Live's default (the metronome's drop-down menu in the Control Bar).
+- Keep **Count-In** at **None**, Live's default (the metronome's drop-down menu in the Control Bar).
   The LOM can't change it, and a recording with Count-In on starts late.
 - Add each project's `builds/` folder to Live's Places, and `harness/devices/` for the example
   Max for Live check below. An agent does this with Live quit, using
-  `node harness/add-place.js <folder>`. By hand, use Add Folder under Places in Live's browser.
+  `node harness/add-place.js <folder>`. By hand, use **Add Folder** under **Places** in Live's browser.
 - For an agent, link `skills/verify-ableton` into its skills folder. For Claude Code:
   `ln -s ~/dev/ableton-live-test-harness/skills/verify-ableton ~/.claude/skills/verify-ableton`
 - To choose which Live the harness starts, run checks on a second Mac, or let `device-ui.js`
@@ -64,45 +63,47 @@ name.
   Recording to press device controls and to capture or record Live. See "What Live needs" in
   [harness/README.md](harness/README.md).
 
-Activity logs will be output to a `logs` subdirectory. Logging granularity can be controlled with `/live/api/set/log_level` (see [Application API](docs/osc-api.md#application-api)). 
+AbletonOSC writes its log to `logs/`. Set how much it logs with `/live/api/set/log_level` (see
+[Application API](docs/osc-api.md#application-api)).
 
-# Quick start
+## Quick start
 
 With Live open on a new empty set and AbletonOSC selected, from the repo root:
 
-1. `node harness/doctor.js` says whether Live is ready to be driven.
-2. `node harness/checks/record-roundtrip.js` is a first real run. It adds two tracks to the
-   open set, records one into the other, compares the notes and deletes the tracks. It leaves the loop off,
-   Record Quantization at None and the start marker moved.
+1. Run `node harness/doctor.js` to check that Live is ready.
+2. Run `node harness/checks/record-roundtrip.js` for a first real run. It adds two tracks to the
+   open set, records one into the other, compares the notes, and deletes the tracks. It leaves the loop off,
+   **Record Quantization** at **None**, and the start marker moved.
 3. In your project, ask your agent to prove a change in Live. Following the `verify-ableton`
-   skill, it asks whether Live is free, runs the project's checks in `tests/live/` and
+   skill, it asks whether Live is free, runs the project's checks in `tests/live/`, and
    reports PASS or FAIL per case. If the project has no checks yet, it proposes them first.
 
 `harness/relaunch.js` starts Live on a test set with Main at -inf dB, on purpose. Runs are
 silent, and recordings are taken before Main.
 
-Two checks are ready to copy, and both run as they stand:
+Two checks are ready to copy, and both run unchanged:
 [harness/checks/example-transpose-check.js](harness/checks/example-transpose-check.js) for a
 Max for Live device, on an example device in this repo, and
 [harness/checks/example-device-check.js](harness/checks/example-device-check.js) for anything
 else, on Live's stock Pitch device.
 
-# Usage
+## Usage
 
 AbletonOSC listens for OSC messages on port **11000**, on 127.0.0.1 only, and sends replies on port **11001** of the
-same machine. When querying properties, OSC wildcard patterns can be used; for example, `/live/clip/get/* 0 0` will query all the properties of track 0, clip 0.
+same machine. A query can use OSC wildcards. For example, `/live/clip/get/* 0 0` queries every
+property of track 0, clip 0.
 
 The addresses are listed in [docs/osc-api.md](docs/osc-api.md).
 
-# Origin
+## Origin
 
 This repo is built on [ideoforms/AbletonOSC](https://github.com/ideoforms/AbletonOSC)
-(MIT, see [LICENSE.md](LICENSE.md)). It adopted AbletonOSC as its base at commit
-[`0ca68214bd62c9b5cb641ca34006cfd70ba94430`](https://github.com/ideoforms/AbletonOSC/commit/0ca68214bd62c9b5cb641ca34006cfd70ba94430)
-(2025-11-19, AbletonOSC's `master` then), tagged `upstream-base` here, and has since
-changed and built on it. `git diff upstream-base` shows that work. The adopted code is
-changed wherever the harness needs; nothing is tracked or sent back. AbletonOSC's original
-text is kept in this README, with its install steps replaced by this repo's, and in
-[docs/osc-api.md](docs/osc-api.md), which holds its API reference. `pythonosc/` is
+(MIT, see [LICENSE.md](LICENSE.md)). Its base is AbletonOSC's commit
+[`0ca68214bd62c9b5cb641ca34006cfd70ba94430`](https://github.com/ideoforms/AbletonOSC/commit/0ca68214bd62c9b5cb641ca34006cfd70ba94430) of
+2025-11-19, then the head of AbletonOSC's `master`, tagged `upstream-base` here. This repo has
+since changed and built on it, and `git diff upstream-base` shows that work. The adopted code
+is changed wherever the harness needs. This repo doesn't follow upstream changes or send
+changes back. AbletonOSC's text is adapted in this README, with its install steps replaced by
+this repo's, and kept in [docs/osc-api.md](docs/osc-api.md), which holds its API reference. `pythonosc/` is
 [python-osc](https://github.com/attwad/python-osc) (Unlicense). This repo is not affiliated
 with Ableton or Cycling '74.
