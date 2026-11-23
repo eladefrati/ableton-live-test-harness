@@ -3,6 +3,9 @@
 `harness/checks/example-device-check.js` is a template to copy for anything that isn't a Max
 for Live device, on a stock Live device.
 
+`harness/checks/example-transpose-check.js` is a check on the runner to copy, on an example
+device in the repo.
+
 `harness/checks/save-reopen.js` replaces the open set with a copy in a temp folder, so later
 runs work in that copy.
 
@@ -15,9 +18,6 @@ and says what it expects. The comment above `run()` in that file describes the c
 options and what a case gets. Settings use long names only when the project passes
 `longNames`, and Live's short names otherwise. Note durations aren't compared unless the check
 passes `compare: {durationToleranceMs}`; set it when lengths matter.
-
-`harness/checks/example-transpose-check.js` is a check on the runner to copy, on an example
-device in the repo.
 
 By default the runner loads the highest `<device> YYYY.MM.DD.N.amxd`. For another naming,
 pass `build`, either a file name in `builds` or a function of the folder that returns one.
