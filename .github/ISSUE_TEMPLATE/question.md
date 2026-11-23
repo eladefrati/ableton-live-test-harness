@@ -1,24 +1,24 @@
 ---
 name: Question
-about: Question about implementation or some technical aspect
+about: A question about using or changing the harness
 title: ''
 assignees: ''
 
 ---
 
 ## Question
-**Describe your question in ONE SENTENCE.**
+Your question, in one sentence.
 
-## Further Information
-Describe your question in greater length here.
+## Further information
+What you tried, and what you expected.
 
 ## Screenshots
 If applicable, add screenshots to help explain your question.
 
-## System Information
- - OS: [e.g. macOS]
- - OS Version: [e.g. Sequoia]
- - Live Version: [e.g. Live 12.2.2 Suite]
+## System information
+- macOS version:
+- Intel or Apple silicon:
+- Live version: (for example, Live 12.4 Suite)
 
-## Additional Context
-Add any other context about the problem here.
+## Additional context
+Add anything else that bears on the question.

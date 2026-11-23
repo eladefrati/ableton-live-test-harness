@@ -1,30 +1,28 @@
 ---
 name: Bug
-about: Some functionality not working as intended
+about: Something in the harness or AbletonOSC doesn't work as documented
 title: ''
 assignees: ''
 
 ---
 
 ## Description
-A clear and concise description of the bug.
+What went wrong, and what the harness printed.
 
-## How to Reproduce
-1. Go to '...'
-2. Click on '...'
-3. Scroll down to '...'
-4. See error
+## How to reproduce
+1. The command you ran, from the repo root.
+2. What it printed.
 
-## Expected Behaviour
-A clear and concise description of what you expected to happen.
+## Expected behaviour
+What you expected the command to do.
 
 ## Screenshots
-If applicable, add screenshots to help explain your problem.
+A capture of Live, if what went wrong shows on screen.
 
-## System Information
- - OS: [e.g. macOS]
- - OS Version: [e.g. Sequoia]
- - Live Version: [e.g. Live 12.2.2 Suite]
+## System information
+- macOS version:
+- Intel or Apple silicon:
+- Live version: (for example, Live 12.4 Suite)
 
-## Additional Context
-Add any other context about the problem here.
+## Additional context
+Add anything else that bears on the problem.
