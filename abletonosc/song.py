@@ -156,7 +156,7 @@ class SongHandler(AbletonOSCHandler):
             Queries tracks 0..11, and returns a list of values comprising:
 
             [track_0_name, clip_0_0_name,   clip_0_1_name,   ... clip_0_7_name,
-                           clip_1_0_length, clip_0_1_length, ... clip_0_7_length,
+                           clip_0_0_length, clip_0_1_length, ... clip_0_7_length,
              track_1_name, clip_1_0_name,   clip_1_1_name,   ... clip_1_7_name, ...]
             """
             track_index_min, track_index_max, *properties = params
