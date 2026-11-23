@@ -148,6 +148,15 @@ were measured on an Intel Mac, unless an entry says otherwise.
   event's 5 points, moved the pointer back to the press point, then counted the second
   event's 10 points from there. So a held drag over-turns Live's knob, as ADR-0021 says
   (Live 12.4.25b2).
+- A drag after a click (ADR-0022) presses with no hover before it, after one pointer move,
+  and the press lands on the control there. On Auto Filter, a click on Frequency, then a
+  drag of Resonance 5 up pressed 150 ms and 40 ms after the click's release, turned
+  Resonance 5 steps each time and left Frequency as it was; held 400 ms, then 5 up more, it
+  turned 15, as a held drag does. The helper measured 150.8 and 40.5 ms from the release to
+  the press (Live 12.4.25b2, macOS 26, Intel). Its wait is refused, before the pointer moves,
+  unless it is whole ms from 1 to 2000. After the click, a window over the drag's point,
+  a notification's cover included, refuses the drag at once, saying that the click had
+  happened.
 - `device-ui.swift` holds `SIGINT`, `SIGQUIT`, `SIGTERM`, and `SIGHUP` back while the button
   is down. It posts the button up where the pointer is, then dies by that signal. After
   `SIGQUIT` it exits with status 131 instead, as macOS writes a crash report for a process

@@ -120,7 +120,8 @@ and check results. A project has it only once its own ADR adopts it. To use it:
 (`docs/adr/0004-press-device-controls-with-real-mouse-events.md`)
 presses a device's controls with real mouse events, a double-click and a Shift-click too
 (ADR-0019), and picks an item from a chooser's menu (ADR-0014). It drags a device's controls
-to turn them by whole points, also held still between two moves (ADR-0013, ADR-0021).
+to turn them by whole points, also held still between two moves, and soon after a click on another control (ADR-0013,
+ADR-0021, ADR-0022).
 Dragging is mainly for a plug-in's editor. Live's own devices are set over OSC, and Auto
 Filter's knobs turn one of their 126 steps per point up. `device-ui.js` also reads the text a device's
 panel shows and captures the panel. It does all of this on the unmodified build. A Max device's

@@ -167,6 +167,16 @@ projects whose checks it runs beside it.
     both moves. Stop during the hold brings the button up at once with no second move, its
     error saying `done`. A knob of one of Live's devices counts both events from the press
     point, so it turns further than both moves.
+  - `ui.drag(name, {up, right}, {after: {click, ms}})` clicks the control `click` first, then
+    presses `name` `ms` after that click's release (a whole number, 1 to 2000) and drags it,
+    held too when `hold` and `then` are given (ADR-0022). It is for a view that reads a press
+    soon after a click, near it or not, as part of a double-click. Both controls need an Info
+    View title, and both are checked before the click. The press carries click count 1, and
+    no hover comes before it, only one pointer move. It resolves with `{gapMs}`, the time the
+    helper measured from the release to the press; a check that rests on that time asserts
+    on it. Stop after the click ends the gesture there, its error saying `done`. A window
+    over the drag's point after the click refuses the drag; that error has no `done`, and
+    says that the click had happened. A drag after a click on its own control is refused.
   - `ui.choose(name, item)` opens the menu a control opens (a chooser) and clicks the one row
     that reads `item` (ADR-0014). If no row or more than one row reads `item`, or anything
     else fails once the menu's control was clicked, it closes the menu with Escape. After
