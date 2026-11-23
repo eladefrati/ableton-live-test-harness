@@ -1,8 +1,8 @@
 # Ableton Live Test Harness
 
 **This is a test harness for Ableton Live**, built so a coding agent can run
-in-Live acceptance tests for projects that run in Live: Max for Live devices, Audio Unit effects,
-Live Extensions, Remote Scripts. [ADR-0001](docs/adr/0001-fork-abletonosc.md) says why and
+in-Live acceptance tests for projects that run in Live: Max for Live devices, MIDI Tools,
+Audio Unit effect plug-ins, Live Extensions, and Remote Scripts. [ADR-0001](docs/adr/0001-fork-abletonosc.md) says why and
 how. The Node client and the checks are in
 [harness/](harness/README.md); the `verify-ableton` skill
 ([skills/verify-ableton](skills/verify-ableton/SKILL.md), linked into your agent's skills folder)
@@ -28,7 +28,7 @@ over Live's control interfaces using the same naming structure and object hierar
 # Installation
 
 This repo needs macOS, Ableton Live 12 (it is used with Live 12.4), Node 18 or
-later (no packages to install) and, for the plug-in and device-ui helpers, `swiftc` from Xcode
+later (no packages to install) and, for the plug-in, device-ui, video, and MIDI helpers, `swiftc` from Xcode
 or its Command Line Tools. Checks of Max for Live devices, including the example below, need
 Max for Live. Live's language must be English. The harness finds its menus and dialogs by
 name.
@@ -53,15 +53,15 @@ name.
   `node harness/add-place.js <folder>`. By hand, use Add Folder under Places in Live's browser.
 - For an agent, link `skills/verify-ableton` into its skills folder. For Claude Code:
   `ln -s ~/dev/ableton-live-test-harness/skills/verify-ableton ~/.claude/skills/verify-ableton`
-- To choose which Live the harness starts, run checks on a second Mac, or press a device's
-  controls with the mouse, copy `harness/local.example.json` to `harness/local.json` and set
+- To choose which Live the harness starts, run checks on a second Mac, or let `device-ui.js`
+  click on one Mac without asking first, copy `harness/local.example.json` to `harness/local.json` and set
   its values, as "Settings" in [harness/README.md](harness/README.md) describes.
 - `harness/relaunch.js` and `harness/quit.js` quit the running Live and discard its unsaved
   changes and recordings. Don't run them on a set you care about.
   [harness/README.md](harness/README.md) says which Live `relaunch.js` starts and gives its
   options.
 - The harness needs Accessibility and Automation permission for the terminal app, and Screen
-  Recording to press device controls. See "What Live needs" in
+  Recording to press device controls and to capture or record Live. See "What Live needs" in
   [harness/README.md](harness/README.md).
 
 Activity logs will be output to a `logs` subdirectory. Logging granularity can be controlled with `/live/api/set/log_level` (see [Application API](docs/osc-api.md#application-api)). 
