@@ -6,7 +6,7 @@ date: 2026-11-13
 
 # ADR-0010: Turn controls by dragging
 
-**Status:** Superseded by ADR-0013. Extends ADR-0004, ADR-0007 and ADR-0008 from clicks to drags.
+**Status:** Superseded by ADR-0013. Extends ADR-0004, ADR-0007, and ADR-0008 from clicks to drags.
 
 ## Context
 
@@ -15,8 +15,8 @@ and released, and a click with no movement leaves its value alone (a knob of one
 devices, `harness/live-notes.md`). Setting a parameter over OSC proves the value reaches the
 device, not that the mouse turns the control.
 
-It is mainly for plug-ins. The harness already changes the values of Live's own devices over
-OSC, and their controls are Live's; a plug-in's editor is the plug-in's own code, which only
+Dragging is mainly for plug-ins. The harness already changes the values of Live's own devices
+over OSC, and their controls are Live's. A plug-in's editor is the plug-in's own code, which only
 the mouse exercises.
 
 ## Decision
@@ -37,7 +37,7 @@ the mouse exercises.
 
 - Only the start is checked. Once the button is down the control has the mouse, wherever the
   pointer goes.
-- A drag can't set an exact value; a check that needs one sets it over OSC and drags only to
+- A drag can't set an exact value. A check that needs one sets it over OSC and drags only to
   prove the mouse turns the control.
 - Each drag event carries its movement as well as its position, for controls that read how
   far the mouse moved rather than where it is.

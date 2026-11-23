@@ -37,13 +37,13 @@ and takes the pointer from whoever is using the Mac.
 
 ## Consequences
 
-- A check takes Live's front and the pointer while it runs.
+- A check brings Live to the front and takes the pointer while it runs.
 - The Info View must be visible, Live's zoom at 100%, the device in view with its title
   unique on screen, and each pressed control must have an `annotation_name`. Anything else
   is refused, not guessed.
 - All the items of a `live.tab` share one Info View title, so only the evidence shows which
   item was hit.
 - ADR-0002 kept screenshots for visual judgments because they are layout-dependent and
-  can't tell instances apart; here the device is selected first, a repeated title is
+  can't tell instances apart. Here the device is selected first, a repeated title is
   refused, and the Info View confirms each target. The hook remains the way to read a
   development build's state.

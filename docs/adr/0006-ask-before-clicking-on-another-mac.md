@@ -21,15 +21,15 @@ works at can't press hidden controls, so that person presses them by hand.
    moves the pointer until the check ends." The buttons are Don't Allow, the default, and
    Allow. It gives up after 2 minutes.
 2. **Allow covers the rest of that run.** Don't Allow or no answer refuses, as before.
-3. **The click host doesn't ask.** No flag or variable skips the dialog; the click host
+3. **The click host doesn't ask.** No flag or variable skips the dialog. The click host
    still comes from `harness/local.json` only.
 
 ## Consequences
 
 - Someone has to be at the Mac. An unattended run there waits 2 minutes, then fails.
-- The dialog takes the front; the harness brings Live back before each click, as it already
-  did.
+- The dialog comes to the front. The harness brings Live back to the front before each
+  click, as it already did.
 - A script could press Allow through System Events, so the dialog stops accidents, not a
-  program set on clicking.
+  program written to click.
 - Opening a device's UI and reading its panel's text (`ui.text`) no longer needs the click
   host, because neither moves the pointer.

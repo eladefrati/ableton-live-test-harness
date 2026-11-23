@@ -27,5 +27,5 @@ click on an item has no Info View to confirm it.
 ## Consequences
 
 - Items with the same text in one menu can't be chosen.
-- Text recognition misreads some characters (0 and O, 1 and I or l); the harness compares
+- Text recognition misreads some characters (0 and O, 1 and I or l). The harness compares
   them as it does device titles.

@@ -11,14 +11,15 @@ date: 2026-11-08
 ## Context
 
 The harness was local only (ADR-0001, decision 1) and written for one setup. The host that
-`remote.sh` runs checks on was a default in the script, the one machine whose pointer may
-be used was named in `device-ui.js` (ADR-0004, decision 2), and the docs and tests named
-the projects that used it. A published repo can carry none of that.
+`remote.sh` runs checks on was a default in the script. The one machine whose pointer may
+be used was named in `device-ui.js` (ADR-0004, decision 2). The docs and tests named the
+projects that used it. A published repo can carry none of that.
 
 ## Decision
 
-1. **One public repository.** Standalone, not a GitHub fork; AbletonOSC is credited as the
-   base in `README.md`, and its copyright notice is kept in `LICENSE.md`. No private copy is kept in step with it.
+1. **One public repository.** It is standalone, not a GitHub fork. AbletonOSC is credited as
+   the base in `README.md`, and its copyright notice is kept in `LICENSE.md`. No private copy
+   is kept and updated alongside it.
 2. **Values that differ per machine live in `harness/local.json`,** which git ignores.
    `harness/local.example.json` shows the keys, among them `remote`, the host `remote.sh` runs on
    (`LIVE_REMOTE` overrides it for one run), and `clickHost`, the one machine `device-ui.js`
@@ -38,13 +39,13 @@ the projects that used it. A published repo can carry none of that.
   read the same values.
 - `remote.sh` takes the repos as the folders beside the clone, at the same path under the
   home folder on both Macs. Checks that load the harness by path can read `LIVE_HARNESS`.
-- `git diff upstream-base` shows everything this repo changed and added; there is no
+- `git diff upstream-base` shows everything this repo changed and added. There is no
   commit-by-commit record of it before publication.
 
 ## Alternatives considered
 
-- **A private repo and a scrubbed public copy:** every change is made twice or
+- **A private repo and a scrubbed public copy.** Every change is made twice or
   cherry-picked, and the copies drift. What differs between machines here is two host
   names, not code that must stay private.
-- **Environment variables only:** ssh does not carry them to the remote, and a variable
+- **Environment variables only.** `ssh` does not carry them to the remote, and a variable
   would lift the click guard for a single command.

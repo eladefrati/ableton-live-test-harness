@@ -20,9 +20,9 @@ it.
 
 1. **A Swift helper makes a virtual MIDI source named Harness** (`harness/midi.swift`, built
    like the harness's other helpers) while a check holds it open, with a fixed unique ID, and
-   sends the messages a check gives it. `midi.js` opens it and sends CCs and notes; `cli.js
+   sends the messages a check gives it. `midi.js` opens it and sends CCs and notes. `cli.js
    midi-port` holds it open with no check running.
-2. **The user turns Remote on for it once per Mac,** in Live's Settings > Link, Tempo & MIDI,
+2. **The user turns Remote on for it once per Mac,** in Live's **Settings > Link, Tempo & MIDI**,
    with the port held open, and Track on if checks send notes into tracks. Live keeps the
    setting after the port closes and after a relaunch (measured, Live 12.4.25b2).
 3. **No IAC.** There is nothing to turn on in macOS, and no other app's messages are on
@@ -31,4 +31,5 @@ it.
 ## Consequences
 
 The harness can't turn Remote on, or read whether it is. A check whose CCs do nothing points
-to the setting. One port named Harness at a time: two are two inputs of one name in Live.
+to the setting. Only one port named Harness can be open at a time. Two would show in Live as
+two inputs with the same name.
