@@ -10,19 +10,20 @@ module needs an import in `abletonosc/__init__.py`, an entry in `HANDLERS` and a
 Before a commit that changes anything other than Markdown files, run
 `node --test harness/tests/*.test.js` (Live not needed, but a logged-in session is) and, with Live open,
 `node harness/checks/record-roundtrip.js`. Before a commit that changes
-`harness/device-ui.swift`, `harness/computer-use-overlay.swift`, `harness/checks/pointer-guards.js` or
-the programs only it runs (`checks/press-key.swift`, `checks/key-target.swift`,
-`checks/press-stop.swift`, `checks/overlay-state.swift`, `checks/run-orphaned.swift`),
+`harness/device-ui.swift`, `harness/computer-use-overlay.swift`, `harness/checks/pointer-guards.js`,
+`harness/checks/pointer-target.swift` or
+the programs only it runs (`harness/checks/press-key.swift`, `harness/checks/key-target.swift`,
+`harness/checks/press-stop.swift`, `harness/checks/overlay-state.swift`, `harness/checks/run-orphaned.swift`),
 also run `node harness/checks/pointer-guards.js` on the click host (Live not needed). The unit tests
-run the helper's callers on fakes, and the helper only where it refuses a drag for its
-distance and where it crops a picture, so only this check sees what the helper posts, what
+run the callers of `harness/device-ui.swift` on fakes, and the helper only where it refuses a drag's
+distance or hold and where it crops a picture, so only this check sees what the helper posts, what
 else it refuses, and what Stop on the overlay's pill and its stop key do. Before a commit that changes
-`harness/device-ui.swift`, `harness/checks/editor-guards.js`,
+`harness/device-ui.swift`, `harness/computer-use-overlay.swift`, `harness/checks/editor-guards.js`,
 `harness/checks/event-tap.swift` or `harness/checks/pointer-target.swift`, also run `node harness/checks/editor-guards.js` on the
 click host, with Live open. `pointer-guards.js` can't run the helper's `click-editor` and
 `drag-editor`, which take only a plug-in window of Live's, so only this check sees what
 those two refuse. Before a commit that changes `harness/video.swift`, `harness/video.js`,
-`harness/captures.js` or `harness/checks/video-record.js`, or `harness/device-ui.js` or
+`harness/captures.js`, `harness/checks/video-record.js` or `harness/checks/pointer-target.swift`, or `harness/device-ui.js` or
 `harness/macos.js`, which find the window a recording takes and wake the display for it, also
 run `node harness/checks/video-record.js` with Live open. The unit tests run `video.js` on a
 stand-in for its helper, and the helper only where it refuses its arguments or a video it
@@ -71,7 +72,7 @@ pytest
 
 Logging can be performed from any of the AbletonOSCHandler classes via the `self.logger` property.
 
-AbletonOSC logs internal events to `logs/abletonosc.log` relative to the AbletonOSC directory. At 10 MB the
+AbletonOSC logs internal events to `logs/abletonosc.log` in the clone. At 10 MB the
 file becomes `abletonosc.log.1` and a new one starts; one old file is kept.
 
 ## Debugging compile-time issues
