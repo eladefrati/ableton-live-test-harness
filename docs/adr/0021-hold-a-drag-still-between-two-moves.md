@@ -1,12 +1,12 @@
 ---
 title: "ADR-0021: Hold a drag still between two moves"
-status: Accepted
+status: Accepted; extended by ADR-0022
 date: 2026-11-22
 ---
 
 # ADR-0021: Hold a drag still between two moves
 
-**Status:** Accepted. Extends ADR-0013 from one move to two with a pause between them, in
+**Status:** Accepted. Extended by ADR-0022. Extends ADR-0013 from one move to two with a pause between them, in
 Live's window only.
 
 ## Context
