@@ -13,7 +13,7 @@ dropped.
   `harness/settings.js` for the preferences folder, so `sampleRate` in `harness/settings.js` requires
   `harness/log.js` inside the function. Move one side so both can require at the top.
 - **A lock for `harness/remote.sh`.** Two runs at once can replace files under a running check. The
-  slot rule in `harness/README.md` is the only guard.
+  rule in `harness/README.md` on who holds the remote's Live is the only guard.
 - **`harness/checks/plugin-record.js` leaves the plug-in's track armed.** With `-EnableArmOnSelection` in
   Options.txt, `harness/doctor.js` reports no armed tracks before the check and track 0 armed after
   it. Which step arms it isn't known. The `restore()` that `signalTracks()` in `harness/audio.js` returns

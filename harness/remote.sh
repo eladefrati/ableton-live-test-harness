@@ -21,8 +21,8 @@
 # and so are the stills and
 # videos taken there without a path (harness/captures.js), from the remote's captures folder
 # to this Mac's. There is no lock. Two runs
-# at once can replace files under a running check, so the slot rule in harness/README.md is
-# the guard.
+# at once can replace files under a running check, so the rule in harness/README.md on who
+# holds the remote's Live is the guard.
 #
 #   harness/remote.sh ableton-live-test-harness node harness/doctor.js
 #   harness/remote.sh <repo> node tests/live/<check>.js --tempo 97
