@@ -700,7 +700,7 @@ must stay off there. Waking doesn't reliably dismiss it.
 
 ## Record bit depth
 
-Live records audio at the bit depth set in Settings > Record/Warp/Launch > Bit Depth. Two
+Live records audio at the bit depth set in Settings > Record, Warp & Launch > Bit Depth. Two
 settings matter here:
 
 - 24-bit: integer samples. A sample above 1.0 (0 dBFS) is clipped to full scale, and every

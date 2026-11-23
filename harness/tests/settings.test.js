@@ -104,7 +104,7 @@ test("requireRecordBitDepth refuses another bit depth, saying what to ask for", 
     const file = path.join(dir, "Preferences.cfg");
     fs.writeFileSync(file, preferences(1));
     await assert.rejects(requireRecordBitDepth(32, { file }),
-      /needs Live to record at 32-bit float; it records at 24-bit\. Ask the user to set Settings > Record\/Warp\/Launch > Bit Depth to 32/);
+      /needs Live to record at 32-bit float; it records at 24-bit\. Ask the user to set Settings > Record, Warp & Launch > Bit Depth to 32/);
     fs.writeFileSync(file, preferences(2));
     assert.equal((await requireRecordBitDepth(32, { file })).float, true);
   } finally {

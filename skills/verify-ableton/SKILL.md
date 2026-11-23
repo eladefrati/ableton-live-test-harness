@@ -97,7 +97,7 @@ propose the case first; once agreed, write it following
 [writing-checks.md](writing-checks.md).
 
 A check that needs a record bit depth or a sample rate refuses when Live is set otherwise.
-Ask the user to set it (Settings > Record/Warp/Launch > Bit Depth, Settings > Audio > In/Out
+Ask the user to set it (Settings > Record, Warp & Launch > Bit Depth, Settings > Audio > In/Out
 Sample Rate) and leave the change to them. Each machine has its own setting.
 
 OSC can't reach the following, so they need the user, a device test hook or real clicks:

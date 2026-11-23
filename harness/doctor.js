@@ -90,7 +90,7 @@ async function main() {
   // Checks that need a bit depth refuse to record at another; this only reports it.
   try {
     const depth = await recordBitDepth();
-    console.log(`info records at ${describeDepth(depth)} (Settings > Record/Warp/Launch > Bit Depth)`);
+    console.log(`info records at ${describeDepth(depth)} (Settings > Record, Warp & Launch > Bit Depth)`);
   } catch (error) {
     console.log(`warn can't read the record bit depth: ${error.message}`);
   }

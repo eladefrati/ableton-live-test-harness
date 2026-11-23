@@ -127,7 +127,7 @@ function readSetting(buffer, object, field) {
   throw new Error(`Preferences.cfg: ${object} has no ${field}`);
 }
 
-// Settings > Record/Warp/Launch > Bit Depth, by the value Live stores. 1 and 2 were
+// Settings > Record, Warp & Launch > Bit Depth, by the value Live stores. 1 and 2 were
 // matched with the files Live recorded; 0 for 16-bit is inferred from the
 // menu's order, not seen.
 const BIT_DEPTHS = { 0: { bits: 16, float: false }, 1: { bits: 24, float: false }, 2: { bits: 32, float: true } };
@@ -155,7 +155,7 @@ async function requireRecordBitDepth(bits, options) {
   const depth = await recordBitDepth(options);
   if (depth.bits !== bits) {
     throw new Error(`This check needs Live to record at ${describeDepth({ bits, float: bits === 32 })}; `
-      + `it records at ${describeDepth(depth)}. Ask the user to set Settings > Record/Warp/Launch > `
+      + `it records at ${describeDepth(depth)}. Ask the user to set Settings > Record, Warp & Launch > `
       + `Bit Depth to ${bits}; don't change it yourself.`);
   }
   return depth;
