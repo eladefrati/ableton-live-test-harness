@@ -5,7 +5,7 @@ Live, for projects that run in Live. It is built on AbletonOSC and runs on macOS
 
 ## Layout
 
-- `manager.py`, `abletonosc/`: the Remote Script. It is written in Python, runs inside Live
+- `manager.py`, `abletonosc/`: the Remote Script. It is written in Python, runs inside Live,
   and answers OSC.
 - `__init__.py`: Live's entry point to the Remote Script (`create_instance`).
 - `pythonosc/`: the copy of python-osc that the Remote Script imports.
