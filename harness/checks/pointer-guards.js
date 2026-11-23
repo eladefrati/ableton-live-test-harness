@@ -2,18 +2,129 @@
 "use strict";
 
 // Checks what device-ui.swift posts and what it refuses, and what Stop on the pill of
-// computer-use-overlay.swift does, with real mouse events and no Live. Each case shows a
-// window of its own (pointer-target.swift), runs the helper against it, and compares how the
-// helper ended with the mouse events the window received. First it starts the overlay with
-// the process ids it must refuse for a run, and last over a run that has ended and that
-// nothing has waited for. Stop is also pressed by its key (ADR-0017), posted as a keyboard's
-// events, and last the key is pressed with another app in front, which must not get it while
-// the overlay is up and must once it has gone. The helper's click and drag at a window are run. Its click-editor
-// and drag-editor aren't, because they take only a window of Live's, whose editor they read
-// from Live through Accessibility. Nor is any command run with the screen locked. It takes the
-// pointer, so it
-// refuses, posting nothing, anywhere but on the click host ("clickHost" in
-// harness/local.json). Exits 1 on failure.
+// computer-use-overlay.swift and its stop key (ADR-0017) do, with real mouse events and no
+// Live. Each case shows a window of its own (checks/pointer-target.swift, which prints the
+// mouse events it receives, pointer moves included, and when). The case runs the helper
+// against that window, from a run of the check's own and with a click token as a run's
+// helpers have. It then compares the helper's exit status and error with the events the
+// window received. The helper's click and drag at a window are run. Its click-editor and
+// drag-editor aren't, because they take only a window of Live's, whose editor they read from
+// Live through Accessibility. Nor is any command run with the screen locked.
+//
+// The cases:
+//   - The overlay is started with the process id 0, and with -1, for its run. It must refuse,
+//     saying nothing and exiting 1 with its usage.
+//   - A click reaches the window, under the overlay's glow too.
+//   - A window that comes over the point during a click's hover gets no click. One that comes
+//     over it during a drag's hover gets no button event.
+//   - A point under the overlay's pill is refused, for a click and for a drag.
+//   - A drag by a fraction of a point, or one that would end off the screen, is refused before
+//     the pointer moves.
+//   - A drag is one button-down at the point, one drag event at its end with the whole
+//     distance in its delta fields, and one button-up, where the pointer then is.
+//   - A held drag (ADR-0021) is a drag with a second drag event, at the press point plus both
+//     moves, with the second move in its delta fields. That event reaches the window the hold
+//     after the first, give or take 50 ms, also when the window moves the pointer back at each
+//     drag event. A held drag whose second move would end off the screen is refused before the
+//     pointer moves.
+//   - Stop, the signal of Stop's last resort, or SIGTERM at a held drag's first drag event
+//     brings the button up within a quarter of the hold, with no second drag event. The helper
+//     exits 4, saying that the first move had happened, or dies by SIGTERM.
+//   - A helper started after Stop, which removes the token, posts nothing, for a click or for
+//     a drag. So does a helper whose token's folder is gone (for a drag too) or can't be
+//     written to, or whose token can't be read. Each says which.
+//   - A helper whose run had ended before it began, so that process 1 is its parent from its
+//     first instruction, posts nothing either, for a click or for a drag. It says that its run
+//     has ended. checks/run-orphaned.swift starts it so, and reads its exit status from the
+//     kernel's event queue, since only a parent can wait for a process.
+//   - Stop while a click holds the button, or once a drag's move is posted, leaves the click
+//     or the drag to complete. The helper exits 4, saying that it had happened.
+//   - A double-click reaches the window as two clicks at the point, the second carrying click
+//     count 2. Stop during its first click lets that click complete, with no second. The
+//     helper ends as stopped, saying that the first click had happened.
+//   - A Shift-click reaches the window with Shift on its button events, and held as each
+//     arrives. Stop while it holds the button lets the click complete with Shift, and the
+//     helper ends as stopped, saying that the click had happened. A Shift-click stopped
+//     before the helper starts posts nothing, Shift included.
+//   - Stop while a drag holds the button, before its move, brings the button up and posts
+//     nothing more. So does the run killed then, by a signal sent to it alone.
+//   - SIGTERM or SIGQUIT while a drag holds the button brings the button up. Then the helper
+//     dies by SIGTERM, or exits with status 131 after SIGQUIT.
+//   - The signal of Stop's last resort (SIGUSR2), sent to the helper, does as Stop does. While
+//     a click holds the button, the click completes and the helper exits 4. While a drag holds
+//     it, before its move, the button comes up and nothing more is posted.
+//   - Stop while the helper waits under a notification's banner ends the wait. So do that
+//     signal, the loss of the token's folder (removed or made unwritable), and the run killed
+//     by a signal sent to it alone, after which the overlay says that the run has ended. For
+//     these cases the check posts a notification, whose banner must show.
+//   - Stop pressed on the pill itself, through Accessibility (checks/press-stop.swift): the
+//     overlay removes the token, takes the glow down and keeps the pill up, its button reading
+//     Stopping, while the run goes on. checks/overlay-state.swift reads the overlay's windows,
+//     that button, and the pill's texts. The overlay says Stopped only once the run has ended,
+//     which the check's run does when the check ends it.
+//   - Over a run that goes on, the pill goes 10 s after Stop, not sooner. The overlay says that
+//     the run was stopped and is still running, and the run is left running.
+//   - When the token can't be removed, the overlay signals the check's run, which passes the
+//     signal on to its helper as a run does. The helper stops as after Stop, the run ends by
+//     itself, and only then does the overlay say Stopped. It does the same when the token's
+//     folder can't be written to, where the run reads as stopped already.
+//   - A run that ignores that signal keeps the glow up with the pill. It is killed 10 s after
+//     Stop, not sooner, and only then does the overlay say that the run was ended.
+//   - Stop pressed again 5 s into that wait, on the button that then reads Stopping, changes
+//     nothing. The run is still killed 10 s after the first press.
+//   - Stop pressed as the run ends says that the run has ended.
+//   - Stop pressed on the pill during a gesture. The pill reads Stopping, and the overlay says
+//     Stopped once the run has ended. The gestures:
+//       - At the first move of a click's hover, or of a drag's, the helper posts nothing more
+//         and exits 3.
+//       - With a click's button down, the click completes and the helper exits 4.
+//       - With a drag's button down, before its move, the button comes up and nothing more is
+//         posted.
+//     The press takes about 0.1 s to remove the token, longer than the helper holds a button.
+//     So for these four the window suspends the helper at that event (SIGSTOP), and the check
+//     lets it go on (SIGCONT) once the token is gone.
+//   - The stop key, posted as the key's events carrying its modifiers (checks/press-key.swift,
+//     given the key that the overlay's --stop-key names), is pressed in place of Stop in every
+//     case above that presses Stop on the pill. Each must end as it does with Stop on the
+//     pill, the overlay saying that it is stopping after the key. Once the pill reads
+//     Stopping, it must no longer show the key.
+//   - The overlay is started over a run that has ended and that nothing has waited for, which
+//     still answers signal 0. The overlay must say that the run has ended. After Stop in its
+//     last resort, where such a run ends at the signal, it must say Stopped, without waiting
+//     to kill the run.
+//   - The key is pressed as soon as the overlay has claimed it, before its windows show, with
+//     an app in front that prints the keys it gets (checks/key-target.swift). It must be taken
+//     as an early Stop, and none of the presses may reach that app once the overlay has said
+//     it is stopping.
+//   - The key is pressed with that app in front. The pill must show the key, and the key must
+//     stop the run. The app must not get the key while the overlay is up. It must get the key
+//     once the overlay has said its last words, while the overlay still waits for its
+//     notification, and once the overlay was killed (SIGKILL).
+//   - A click and a drag that the helper posts while the key's modifiers are held, before the
+//     key (press-key --hold, with F13 in place of Space), and a click while Shift alone is
+//     held, carry the modifiers on their button events. The keyboard's state still reads them
+//     held as each event arrives. checks/pointer-target.swift reports both. These cases
+//     measure the cost ADR-0017 accepts. After each, the modifiers are let go whatever
+//     happened (press-key --release). A click with nothing held carries none.
+//   - With two overlays up, each over a run of its own, the second's claim on the key must be
+//     refused. The second overlay's pill shows no key, and its Stop still stops its run. One
+//     press of the key stops only the first run.
+//   - After every case that presses the key, and once more at the end, no modifier key may be
+//     left held.
+//
+// In every case the window may receive nothing but a button-up once the run is stopped. Where
+// Stop on the pill removed the token, that is from the moment the token went, which is its
+// folder's modification time. Where a stopped click or drag must complete, the button-up must
+// reach the window at least half the helper's hold after the token was removed (35 ms in a
+// click, 25 ms after a drag's move). Where the helper was suspended with the button down, the
+// button-up must not reach the window before the token went. Under that, the case fails, as
+// it hasn't shown that Stop came before the release. A case that leaves the button held
+// releases it and fails. The cases that end under a notification's banner, the check's own or
+// the one the overlay posts as it ends, run after the other click and drag cases, each waiting
+// for the banner of the case before to go.
+//
+// The check takes about 290 s. It takes the pointer, so it refuses, posting nothing, anywhere
+// but on the click host ("clickHost" in harness/local.json). Exits 1 on failure.
 
 const fs = require("node:fs");
 const os = require("node:os");

@@ -29,3 +29,13 @@ sample rate, use `requireSampleRate(rate)` from `settings.js`.
 Expected notes should come from the project's own code (an engine render or a sandbox
 running the built script), not be written out by hand, except for cases as plain as "plays
 the clip as written".
+
+## Measure a plug-in's points
+
+1. Run `node harness/cli.js plugin-window <track> <device> [<png>]`. It prints the editor's
+   size (`editor: {w, h}`, the `size` to give) and saves a picture of the editor.
+2. Take each control's centre from the plug-in's own layout code, whose coordinates are these
+   points when the editor isn't scaled, or from the picture. The picture's pixels are points
+   times the display's scale, which is the picture's width in pixels divided by `editor.w`.
+3. Press each control once, and check that the parameter Live reads is the one meant, as a
+   check does.

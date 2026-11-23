@@ -20,6 +20,11 @@ checks it runs beside it.
   `dialog()` resolves with Live's open dialog, or null. `trackData(...properties)` reads
   properties of every track in one reply (null for one that doesn't apply to a track); `placeClip(track, notes, beats)` puts a clip of
   notes on a MIDI track in the Arrangement from beat 0.
+  For plug-ins: `findDevice(name)` (`{track, device}`, refusing unless exactly
+  one top-level device has the name), `setParameters(track, device, {name: value})` (a
+  string picks a menu item by name), `moveDevice(track, device, target, position)`
+  (keeps the instance and its state), `createAudioTrack(name)` and
+  `arrangementAudioFiles(track)`.
 - `compare.js`: `compareNotes` compares expected notes with recorded ones, with timing errors in ms. Live
   records at audio-sample resolution, so the errors have a floor of one sample: 0.021 ms at
   48 kHz, 0.023 ms at 44.1 kHz (Live runs at the audio device's rate). Where a beat is a
@@ -90,11 +95,6 @@ checks it runs beside it.
   `recordSignal` refuses a take that isn't (see "Record bit depth" below).
 - `wav.js`: `readWav(file)` reads a WAV file (PCM 8/16/24/32-bit, float 32/64-bit) into
   `{sampleRate, bits, float, channels}`, samples scaled to -1..1.
-- `live.js` for plug-ins: `findDevice(name)` (`{track, device}`, refusing unless exactly
-  one top-level device has the name), `setParameters(track, device, {name: value})` (a
-  string picks a menu item by name), `moveDevice(track, device, target, position)`
-  (keeps the instance and its state), `createAudioTrack(name)` and
-  `arrangementAudioFiles(track)`.
 - `midi.js`: MIDI into Live as from a controller (ADR-0018). `openMidiPort()` opens the
   harness's own MIDI input port, `Harness`, and resolves with `cc(channel, controller,
   value)`, `noteOn(channel, pitch, velocity)`, `noteOff(channel, pitch)` (channels 1-16,
@@ -109,44 +109,36 @@ checks it runs beside it.
   set the harness saves goes; `relaunch.js` and `quit.js` empty it.
 - `device-ui.js`: presses a device's controls with real mouse events (ADR-0004), and
   captures its panel; does the same in a plug-in's own window (ADR-0008). Its clicks, with
-  the asking and the border below, are **harness-computer-use**.
-  On the machine `local.json` names as `clickHost` it clicks at once; on any other, a run's
-  first press builds the click helper and the border, if they aren't built, then shows a
-  dialog, and the run clicks only after Allow; Don't Allow or no answer
-  in 2 minutes throws `DeviceUiError` (ADR-0006). From Allow until the run's process ends, a
-  breathing purple glow in from the screen's edges, with a pill naming the run, shows that the
-  run may take the pointer; a notification says when it has ended (`computer-use-overlay.swift`,
-  ADR-0012). Stop on the pill takes the mouse back. The press under way stops, with a button
-  it holds released, and throws `DeviceUiError`, as do the run's later presses, so a
-  check fails at the press that throws and still cleans up. The glow goes at once, and the
-  pill stays, its button reading Stopping, until the run's process has ended. The
-  notification that the mouse is free comes then. A run still going 10 s after Stop is left
-  running. The pill goes, and the notification says that the run was stopped and is still
-  running (ADR-0015). If only the press's release was
-  left, the click or the drag has happened. `error.done` is `true` on that press's error, and
-  set on no other, so a check that must undo what a click did reads it in its cleanup. Stop
-  removes the run's click token, a file the run and its click helper must be able to read
-  before they click. A run that loses the token any other way (its folder removed, or made
-  unwritable, so that Stop couldn't remove the token) can't tell that it wasn't stopped,
-  stops the same way, and says which it was. The click helper also posts only while the run
-  that started it lives. A helper whose run a signal killed, which leaves the token behind, posts
-  nothing but the release of a button it holds. A stopped run doesn't bring Live to the front
-  either, so a capture of a plug-in's window throws too. If Stop can't remove the token, it
-  signals the run instead (SIGUSR2). The run stops the same way, whatever its token says,
-  and the border stays until the run has ended. A run still there 10 s after the signal is
-  killed, and cleans nothing up. A check has that long to clean up and end. The stop key,
-  Control-Option-Command-Space (⌃⌥⌘Space, which the pill shows before its Stop and the
-  dialog names), presses Stop on the pill through the button's action and needs no
-  pointer. While the border's program runs, no app gets that key, Live included
-  (ADR-0017). The key is claimed exclusively. A border that couldn't claim it, as when
-  another run's border, or another program that claimed it exclusively, holds it, shows no
-  key, and the run says so on
-  stderr in a line starting `warn harness-computer-use` and clicks on. A run
-  whose border can't show, or goes, however it ends, while the run goes
-  on and wasn't stopped, says so on stderr in a line starting `warn harness-computer-use`, and clicks without
-  it. When the border couldn't be built, the dialog says, in place of the glow, that nothing
-  on screen will show that the run may take the pointer, and that there will be no Stop and
-  no stop key.
+  the asking and the overlay below, are **harness-computer-use**.
+  On the machine `local.json` names as `clickHost` it clicks at once. On any other, a run's
+  first press builds the click helper and the overlay, if they aren't built, then shows a
+  dialog, and the run clicks only after Allow. Don't Allow or no answer in 2 minutes throws
+  `DeviceUiError` (ADR-0006). From Allow until the run's process ends, the overlay
+  (`computer-use-overlay.swift`) shows that the run may take the pointer: a breathing purple
+  glow in from the screen's edges, and a pill naming the run. A notification says when the
+  run has ended.
+  Stop on the pill, or the stop key, takes the mouse back. How Stop works is in
+  [ADR-0012](../docs/adr/0012-stop-a-run-from-its-pill-whatever-fails.md),
+  [ADR-0015](../docs/adr/0015-keep-the-pill-up-while-a-stopped-run-ends.md), which replaces
+  part of ADR-0012, and [ADR-0017](../docs/adr/0017-stop-a-run-with-a-key-too.md). Stop
+  removes the run's click token, without which the run and its click helper don't click. The
+  glow goes at once, and the pill stays, its button reading Stopping, until the run's process
+  has ended. A run still going 10 s after Stop is left running, and the notification says
+  so. If Stop can't remove the token, it signals the run instead. The glow then stays until
+  the run has ended, and a run still there 10 s after the signal is killed. A killed run
+  cleans nothing up.
+  For a check, Stop means this. The press under way stops, with a button it holds released,
+  and throws `DeviceUiError`, as do the run's later presses. So a check fails at the press
+  that throws and still cleans up. After the signal, it has 10 s to clean up and end. If only the press's release was left, the
+  click or the drag has happened. `error.done` is `true` on that press's error, and set on no
+  other, so a check that must undo what a click did reads it in its cleanup. A stopped run
+  doesn't bring Live to the front, so a capture of a plug-in's window throws too.
+  The stop key is Control-Option-Command-Space (⌃⌥⌘Space), which the pill shows before its
+  Stop and the dialog names. While the overlay runs, no app gets that key, Live included. A
+  run whose overlay couldn't claim the key, or can't show, or goes while the run goes on and
+  wasn't stopped, says so on stderr in a line starting `warn harness-computer-use`, and
+  clicks on. When the overlay couldn't be built, the dialog says that nothing on screen will
+  show that the run may take the pointer, and that there will be no Stop and no stop key.
   The dialog, the pill and the
   notification name a check in `tests/live/` as
   `tests/live/<check>.js`, another script by its file, and code run with `node -e` or given
@@ -201,13 +193,8 @@ checks it runs beside it.
   `size`, the point inside it, and the plug-in's window on top at the point. There is no Info
   View to confirm the control. A moved point clicks another control of the plug-in, so take
   the evidence from Live. A press needs `size`; opening and capturing don't.
-  To measure a plug-in's points, `node harness/cli.js plugin-window <track> <device> [<png>]`
-  prints the editor's size (`editor: {w, h}`, the `size` to give) and saves the editor. Take
-  each control's centre from the plug-in's own layout code, whose coordinates are these
-  points when the editor isn't scaled, or from that picture. Its pixels are points times the
-  display's scale, which is its width in pixels divided by `editor.w`. Then press each control
-  once and
-  check that the parameter Live reads is the one meant, as a check does.
+  How to measure a plug-in's points is in
+  [writing-checks.md](../skills/verify-ableton/writing-checks.md#measure-a-plug-ins-points).
 - `video.js`: a video of Live, for proof of something that changes over time (ADR-0016),
   for any project's checks as for the harness's own; a fixed state needs a still
   (`captureWindow`, `ui.capture`). `recordVideo(file, {window, screen, seconds})` records
@@ -398,110 +385,9 @@ checks it runs beside it.
 - `checks/save-reopen.js`: checks the save and reopen path. It replaces the open set with
   a new one saved in a temp folder; the file the set was opened from is untouched.
 - `checks/pointer-guards.js`: checks what `device-ui.swift` posts and what it refuses, and
-  what Stop on the pill of `computer-use-overlay.swift` does, with real mouse events and no
-  Live. Each case shows a window of its own
-  (`checks/pointer-target.swift`, which prints the mouse events it receives, pointer moves
-  included, and when), runs the helper
-  against it, from a run of the check's own and with a click token as a run's helpers have,
-  and compares the helper's exit status and error and the events the window
-  received: a click reaches the window, under harness-computer-use's border too; a window
-  that comes over the point during a click's
-  hover gets no click, and during a drag's no button event; a point under
-  harness-computer-use's pill is refused, for a click and for a drag; a drag by a fraction
-  of a point, or one that would end off the screen, is refused before the pointer moves; a
-  drag is one
-  button-down at the point, one drag event at its end with the whole distance in its delta
-  fields, and one button-up, where the pointer then is; a held drag (ADR-0021) is that with
-  a second drag event, at the press point plus both moves with the second in its delta
-  fields, reaching the window the hold apart from the first, give or take 50 ms, also when
-  the window moves the pointer back at each drag event, and one whose second move would end
-  off the screen is refused before the pointer moves; Stop, the signal of Stop's last resort
-  or SIGTERM at its first drag event brings the button up within a quarter of the hold, with
-  no second drag event, the helper exiting 4, saying that the first move had happened, or
-  dying by SIGTERM; a helper started after Stop, which
-  removes the token, posts nothing, for a click or for a drag, and so does one whose token's
-  folder is gone, for a drag too, or can't be
-  written to, or whose token can't be read, each saying which; one whose run had ended
-  before it began, so that process 1 is its parent from its first instruction, posts
-  nothing either, for a click or for a drag, and says that its run has ended (`checks/run-orphaned.swift` starts it
-  so, and reads its exit status from the kernel's event queue, since only a parent can
-  wait for a process); Stop while a click holds
-  the button, or once a drag's move is posted, leaves the
-  click or the drag to complete, and the helper exits 4, saying that it had happened; Stop
-  while a drag holds the button, before its move, brings the button up and posts nothing
-  more, and so does the run killed then, by a signal sent to it alone; SIGTERM or SIGQUIT while a
-  drag holds the button brings it up before the helper dies by SIGTERM, or exits with status
-  131 after SIGQUIT; the signal of Stop's last resort (SIGUSR2), sent to the helper, does as
-  Stop does: while a click holds the button the click completes and the helper exits 4, and
-  while a drag holds it, before its move, the button comes up and nothing more is posted;
-  Stop while the helper waits under a notification's banner ends the wait, and so does that
-  signal, and the
-  loss of the token's folder, removed or made unwritable, and so does the run killed, by a
-  signal sent to it alone (the overlay then says that the run has ended), for which the
-  check posts a notification, whose banner must show. Stop is also pressed on the pill
-  itself, through Accessibility (`checks/press-stop.swift`): the overlay removes the token,
-  takes the border down and keeps the pill up, its button reading Stopping, while the run
-  goes on (`checks/overlay-state.swift` reads the overlay's windows, that button and the
-  pill's texts), and
-  says Stopped only once the run has ended, which the check's run does when the check ends
-  it; over a run that goes on, the pill goes 10 s after Stop, not sooner, the overlay says
-  that the run was stopped and is still running, and the run is left running; when the
-  token can't be removed, it signals the check's run, which passes the signal on to its
-  helper as a run does: the helper stops as after Stop, the run ends by itself, and only
-  then does the overlay say Stopped, as it does when the token's folder can't be written
-  to, where the run reads as stopped already; a run that ignores the signal keeps the
-  border up with the pill, is killed 10 s
-  after Stop, not sooner, and only then does the overlay say that the run was ended;
-  pressed again 5 s into that wait, on the button that then reads Stopping, it changes
-  nothing, and the run is still killed 10 s after the first press;
-  pressed as the run ends, it says
-  that the run has ended. Stop is pressed on the pill during a gesture too, where the pill
-  reads Stopping and the overlay
-  says Stopped once the run has ended: at the first move of a click's hover, or of a
-  drag's, after which the helper posts
-  nothing more and exits 3; with a click's button down, where the click completes and the
-  helper exits 4; and with a drag's button down, before its move, where the button comes up
-  and nothing more is posted. The press takes about 0.1 s to remove the token, longer than
-  the helper holds a button, so for these four the window suspends the helper at that
-  event (SIGSTOP), and the check lets it go on (SIGCONT) once the token is gone. The stop
-  key, posted as the key's events carrying its modifiers (`checks/press-key.swift`, given the
-  key the overlay's `--stop-key` names), is pressed in place of Stop in every case above
-  that presses Stop on the pill, and each must end as it does with Stop on the pill, the
-  overlay saying that it is stopping after the key; once the pill reads Stopping it must no
-  longer show the key. Pressed as soon as the
-  overlay has claimed it, before its windows show, with an app in front that prints the
-  keys it gets (`checks/key-target.swift`), it must be taken as an early Stop, and none of
-  the presses may reach that app once the overlay has said it is stopping; and pressed with
-  that app in front, the pill must show it, it must stop the run, and the app
-  must not get it while the overlay is up, and must once the overlay has said its last
-  words, while it still waits for its notification, and once it was killed (SIGKILL). With two overlays up, each over a run of its own, the
-  second's claim on the key must be refused. The second overlay's pill shows no key and its
-  Stop still
-  stops its run, and one press of the key stops only the first run. A click and a drag the
-  helper posts while the key's modifiers are held, before the key (`press-key --hold`, with
-  F13 in place of Space), and a click while Shift alone is, carry them on their button
-  events, while the keyboard's state still reads them held as each event arrives, as
-  `checks/pointer-target.swift` reports both. This is a measurement of the cost ADR-0017 accepts,
-  after which the modifiers are let go of whatever happened (`press-key --release`). A click
-  with nothing held carries none. After every case that presses the key,
-  and once more at the end, no modifier key may be left held. First of
-  all the overlay is started with the process id 0, and with -1, for its run. The overlay must
-  refuse, saying nothing and exiting 1 with its usage. After every case it is started over a run
-  that has ended and that nothing has waited for, which still answers signal 0. The overlay must say
-  that the run has ended, and, after Stop in its last resort, where such a run ends at the
-  signal, Stopped, without waiting to kill it. In every case
-  the window may receive
-  nothing but a button-up once the run is stopped: where Stop on the pill removed the token,
-  from the moment the token went, which is its folder's modification time. Where a stopped
-  click or drag must
-  complete, the button-up must reach the window at least half the helper's hold after the
-  token was removed (35 ms in a click, 25 ms after a drag's move), or, where the helper was
-  suspended with the button down, not before the token went. Under that the case fails,
-  as it hasn't shown that Stop came before the release. The cases that end under a
-  notification's banner come after the others, each waiting for the banner of the case before to go,
-  and the check takes about 290 s. It takes the
-  pointer, so it runs only on the click host and refuses on any other machine, posting
-  nothing. A case that leaves the button held releases it and fails.
+  what Stop on the pill of `computer-use-overlay.swift` and its stop key do, with real mouse
+  events. It runs only on the click host, with no Live, and takes about 290 s. Its cases are
+  listed at the top of the file.
 - `checks/editor-guards.js`: checks what the helper's `click-editor` and `drag-editor`
   refuse, which `pointer-guards.js` can't run, since they take only a plug-in window of
   Live's (ADR-0008). In Live, it adds an audio track with Apple's AUDelay, opens its window
