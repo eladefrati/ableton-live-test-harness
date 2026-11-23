@@ -11,7 +11,7 @@ It checks that Live sees the newest build in the project's builds
 folder in exactly one Places folder, and says what to fix if not. It loads the build onto a
 new track with Live's default-template devices removed, writes a known clip, records the
 device's Post FX output on a second track, and compares. Each case sets device parameters
-and says what it expects. The top of `run()` in that file describes the case shape, the
+and says what it expects. The comment above `run()` in that file describes the case shape, the
 options and what a case gets. Settings use long names only when the project passes
 `longNames`, and Live's short names otherwise. Note durations aren't compared unless the check
 passes `compare: {durationToleranceMs}`; set it when lengths matter.

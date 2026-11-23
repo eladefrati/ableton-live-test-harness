@@ -1,6 +1,6 @@
 ---
 name: verify-ableton
-description: Drive Ableton Live through the AbletonOSC test harness (~/dev/ableton-live-test-harness), for any project that runs in Live (Max for Live device, plug-in, MIDI Tool, Remote Script). Load it before anything in Live - starting or relaunching it, loading a build, adding a builds folder to Places, running a project's checks, pressing a device's controls or clicking in Live (harness-computer-use), capturing Live or a device's panel (screenshots for a manual too) or recording a video of Live, working on the remote Mac - and to prove a change in Live instead of asking the user to test by hand, before calling a Live change fixed.
+description: Drive Ableton Live through the AbletonOSC test harness (~/dev/ableton-live-test-harness), for any project that runs in Live (Max for Live devices, MIDI Tools, plug-ins, Live Extensions, and Remote Scripts). Load it before anything in Live - starting or relaunching it, loading a build, adding a builds folder to Places, running a project's checks, pressing a device's controls or clicking in Live (harness-computer-use), capturing Live or a device's panel (screenshots for a manual too) or recording a video of Live, working on the remote Mac - and to prove a change in Live instead of asking the user to test by hand, before calling a Live change fixed.
 ---
 
 # Verify an Ableton project in Live
@@ -66,7 +66,7 @@ for the value and set it ("Settings" in `harness/README.md`). It checks that Liv
 (only one at a time), AbletonOSC answers, no Live dialog is open, and no track is armed. It
 reports the bit depth Live records at (`info records at 24-bit` or `32-bit float`) and the
 sample rate it runs at. It warns when the Remote Script's files changed since Live started,
-and when Automation Arm is on. For changed files, run `harness/cli.js reload`; a changed
+and when Automation Arm is on. For changed files, run `node ~/dev/ableton-live-test-harness/harness/cli.js reload`; a changed
 `manager.py` needs a relaunch. It also names the running Live
 app and its version, the tracks and the open set's file, with a warning when the harness
 didn't open that set. On "UDP 11001 is in use", another client is
@@ -182,8 +182,8 @@ captures folder is deleted once a capture is saved there more than 7 days later.
 
 ## Evidence
 
-A check's output is the evidence. It has one PASS/FAIL line per case with matched, missing
-and extra notes and the worst timing error in ms, and the missing and extra notes on a
+A check's output is the evidence. It has one PASS/FAIL line per case with matched, missing,
+and extra notes, velocity mismatches, and the largest start and duration errors in ms, and the missing and extra notes on a
 failure. Report the result in one line and show failures in full. The rest is in the run's
 log (see "Run logs"). Where the evidence is on screen, it is a still or a video ("Captures").
 A check that never failed proves little. When you add a case, show it failing once on a wrong
