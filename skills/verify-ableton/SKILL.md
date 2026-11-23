@@ -1,6 +1,6 @@
 ---
 name: verify-ableton
-description: Drive Ableton Live through the AbletonOSC test harness (~/dev/ableton-live-test-harness), for any project that runs in Live (Max for Live devices, MIDI Tools, plug-ins, Live Extensions, and Remote Scripts). Load it before anything in Live - starting or relaunching it, loading a build, adding a builds folder to Places, running a project's checks, pressing a device's controls or clicking in Live (harness-computer-use), capturing Live or a device's panel (screenshots for a manual too) or recording a video of Live, working on the remote Mac - and to prove a change in Live instead of asking the user to test by hand, before calling a Live change fixed.
+description: "Drive Ableton Live through the AbletonOSC test harness (~/dev/ableton-live-test-harness), for any project that runs in Live (Max for Live devices, MIDI Tools, plug-ins, Live Extensions, and Remote Scripts). Load it before anything in Live: starting or relaunching it, loading a build, adding a builds folder to Places, running a project's checks, pressing a device's controls or clicking in Live (harness-computer-use), capturing Live or a device's panel (screenshots for a manual too), recording a video of Live, or working on the remote Mac. Also load it to prove a change in Live instead of asking the user to test by hand, before calling a Live change fixed."
 ---
 
 # Verify an Ableton project in Live
@@ -11,12 +11,12 @@ tracks, plays and records, and compares what Live played with what was expected.
 `~/dev/ableton-live-test-harness/harness/README.md` for the API and `harness/live-notes.md` there for Live's quirks.
 
 The paths here are for a clone at `~/dev/ableton-live-test-harness`. With the harness in
-another folder, use that folder in the commands below; `remote.sh` takes the repos from the
+another folder, use that folder in the commands below. `remote.sh` takes the repos from the
 folder holding the clone. A
-project's checks load the harness by path; by convention they read `LIVE_HARNESS` (the path
-of the `harness/` folder) and fall back to that clone.
+project's checks load the harness by path. By convention they read `LIVE_HARNESS` (the path
+of the `harness/` folder) and fall back to that clone's `harness/` folder.
 
-## Live is shared: coordinate first
+## Coordinate first, because Live is shared
 
 Other agent sessions may be driving Live. Only one client can bind UDP 11001.
 
@@ -24,27 +24,27 @@ Other agent sessions may be driving Live. Only one client can bind UDP 11001.
   anything.
 - Save and reopen the set when a check needs it, but Save As into a temp folder first, as
   `harness/checks/save-reopen.js` does. Never overwrite the file the set was opened from.
-- Agree a slot with another session only when the user says one is working in Live too. Wait
-  if it has Live, and say when it's free.
+- Agree a slot with another session only when the user says one is working in Live too. If the
+  other session has Live, wait. Tell that session when Live is free.
 - Before any run in Live, on either machine, ask the user whether Live is free.
 - Treat the open set as a test set only if the harness started it or the user says it's
-  disposable. In a test set you may change anything, including tempo, transport and tracks
+  disposable. In a test set you may change anything, including tempo, transport, and tracks
   other checks didn't create. Otherwise ask first.
 
 ## Start and quit Live
 
-Start each piece of work in Live with a relaunch, on the harness's empty set, unless
-`doctor.js` says the open set was opened by the harness or the user calls it disposable. A
-check changes the set it runs in. Ask whether Live is free first.
+Ask the user whether Live is free. Then start each piece of work in Live with a relaunch, on
+the harness's empty set, unless `doctor.js` says the open set was opened by the harness or the
+user calls it disposable. A check changes the set it runs in.
 
 To start Live, or relaunch it, on either machine, run
 `node ~/dev/ableton-live-test-harness/harness/relaunch.js` (on the remote through `remote.sh`),
-never an `open`, quit or kill of your own. It discards unsaved changes and recordings. Use
+never an `open`, quit, or kill of your own. It discards unsaved changes and recordings. Use
 `--suite` only for a task that needs Suite, and `--plugin <name>` after every build for a
 plug-in's checks. Live keeps playing the plug-in build it loaded until it relaunches. The last
 line `relaunch.js` prints names the component it loaded and when that was built. Check that it
 is your build. If `relaunch.js` asks which Live to start, ask the user and set `"app"` in
-`harness/local.json`. Its options and what it answers are in `harness/README.md`. If it stops at a dialog it doesn't know, it prints
+`harness/local.json`. Its options and the dialogs it answers are in `harness/README.md`. If it stops at a dialog it doesn't know, it prints
 the message. Ask the user. If the permission system denies it, don't start Live another way.
 Tell the user, who can start Live or allow the command.
 
@@ -55,7 +55,7 @@ Find out who before going on.
 
 ## Doctor
 
-Run this first, and again whenever anything looks off. It's read-only:
+Run this first, and again whenever anything looks wrong. It's read-only:
 
 ```sh
 node ~/dev/ableton-live-test-harness/harness/doctor.js
@@ -66,9 +66,9 @@ for the value and set it ("Settings" in `harness/README.md`). It checks that Liv
 (only one at a time), AbletonOSC answers, no Live dialog is open, and no track is armed. It
 reports the bit depth Live records at (`info records at 24-bit` or `32-bit float`) and the
 sample rate it runs at. It warns when the Remote Script's files changed since Live started,
-and when Automation Arm is on. For changed files, run `node ~/dev/ableton-live-test-harness/harness/cli.js reload`; a changed
+and when Automation Arm is on. For changed files, run `node ~/dev/ableton-live-test-harness/harness/cli.js reload`. A changed
 `manager.py` needs a relaunch. It also names the running Live
-app and its version, the tracks and the open set's file, with a warning when the harness
+app and its version, the tracks, and the open set's file, with a warning when the harness
 didn't open that set. On "UDP 11001 is in use", another client is
 running. Find out who before going on. On "AbletonOSC does not answer", ask the user to
 select it as a Control Surface. On "System Events can't name its app", the terminal app
@@ -83,30 +83,38 @@ what they cover and what the user still has to check by eye. Run a check from an
 ```sh
 node ~/dev/<project>/tests/live/<check>.js          # PASS/FAIL per case, exit 1 on failure
 node ~/dev/<project>/tests/live/<check>.js --keep   # leave its tracks, to inspect in Live
-node ~/dev/<project>/tests/live/<check>.js --tempo 97   # set the song's tempo first (left so)
+node ~/dev/<project>/tests/live/<check>.js --tempo 97   # set the song's tempo first (the tempo stays set after the run)
 ```
 
 Checks on `harness/device-checks.js` take both flags without any code of their own.
 
 For anything else in Live, look for what exists before writing code of your own.
 `harness/README.md` has the client (opening a saved set, listening for changes, raw OSC), and
-`docs/osc-api.md` has every address AbletonOSC answers (selecting a track, say).
+`docs/osc-api.md` has every address AbletonOSC answers (such as selecting a track).
 
 If the project has no `tests/live/` yet, or the change needs a case it doesn't have,
-propose the case first; once agreed, write it following
+propose the case first. Once it is agreed, write it following
 [writing-checks.md](writing-checks.md).
 
 A check that needs a record bit depth or a sample rate refuses when Live is set otherwise.
-Ask the user to set it (Settings > Record, Warp & Launch > Bit Depth, Settings > Audio > In/Out
-Sample Rate) and leave the change to them. Each machine has its own setting.
+Ask the user to set it (**Settings > Record, Warp & Launch > Bit Depth**, **Settings > Audio > In/Out
+Sample Rate**) and leave the change to them. Each machine has its own setting.
 
-OSC can't reach the following, so they need the user, a device test hook or real clicks:
-Stored Only and Visible-not-stored parameters, a device's UI text (status lines), anything
-shown only visually, Push, export dialogs, and undo step names of changes made in the UI (a
-change made over OSC is named "Custom Action"). The test hook (`docs/adr/0002-test-hook.md`)
-lets a development build report its status line and check results. Call `live.openHooks()`,
-then take `const since = Date.now()` before the action and `await live.waitForHook(topic,
-{ track, device, since })`. A project has it only once its own ADR adopts it.
+OSC can't reach the following, so they need the user, a device test hook, or real clicks:
+
+- Stored Only and Visible-not-stored parameters.
+- A device's UI text (status lines).
+- Anything shown only visually.
+- Push.
+- Export dialogs.
+- Undo step names of changes made in the UI. A change made over OSC is named "Custom Action".
+
+The test hook (`docs/adr/0002-test-hook.md`) lets a development build report its status line
+and check results. A project has it only once its own ADR adopts it. To use it:
+
+1. Call `live.openHooks()`.
+2. Before the action, take `const since = Date.now()`.
+3. After the action, `await live.waitForHook(topic, { track, device, since })`.
 
 `harness/device-ui.js`
 (`docs/adr/0004-press-device-controls-with-real-mouse-events.md`)
@@ -116,8 +124,8 @@ to turn them by whole points, also held still between two moves (ADR-0013, ADR-0
 Dragging is mainly for a plug-in's editor. Live's own devices are set over OSC, and Auto
 Filter's knobs turn one of their 126 steps per point up. `device-ui.js` also reads the text a device's
 panel shows and captures the panel. It does all of this on the unmodified build. A Max device's
-controls come from its build; any other device's or plug-in's are points measured in Live
-(ADR-0007; Auto Filter's knobs are built in). Use it for a control that isn't a parameter,
+controls come from its build. Any other device's or plug-in's are points measured in Live
+(ADR-0007). Auto Filter's knobs are built in. Use it for a control that isn't a parameter,
 when the click itself needs proving, or for a picture of a device's panel (`ui.capture`, for
 a manual too). Everything else stays on OSC. Don't write a capture or click script of your
 own. `device-ui.js` exports what one needs. Take the evidence from Live, not from the press
@@ -142,7 +150,7 @@ ends, a purple border around their screen shows the run may take the pointer. St
 pill, or the key the pill shows, takes the mouse back and fails the run at the press under
 way, or at its next one (ADR-0012, ADR-0017). That key is Control-Option-Command-Space. The
 pill shows none when another run, or a program that claimed it exclusively, holds the key.
-These clicks, the asking and the border are harness-computer-use, and a request by that name
+These clicks, the asking, and the border are harness-computer-use, and a request by that name
 means this section. Bring Live to the front only when a step needs it. Keystrokes through
 System Events go to the frontmost app. Before acting on a Live window, list Live's windows
 (System Events) so a panel on top isn't missed. For a dialog the Live API can't answer,
@@ -155,8 +163,8 @@ video for a change over time, not a burst of stills. Captures work in the backgr
 Live behind other windows, and are for any project, not part of harness-computer-use.
 
 Give a capture no path when it is proof, and it goes to the harness's captures folder, whose
-path the command prints. Give it a path of the user's when it is to be kept, a manual's
-screenshot say.
+path the command prints. Give it a path of the user's when it is to be kept, such as a manual's
+screenshot.
 
 - A still: `node ~/dev/ableton-live-test-harness/harness/cli.js capture` takes Live's main
   window. A dialog or panel is a window of its own. `cli.js windows` lists Live's windows
@@ -164,12 +172,12 @@ screenshot say.
   editor) shows only while Live is in front. Open and capture it with `cli.js plugin-window
   <track> <device>`, and press its controls with `openPluginWindow` (`harness/README.md`),
   never by clicking the device's title bar. Never run a `screencapture` of your own.
-- A video: record around what changes Live, `cli.js video -- <command>`, such as `-- node
-  tests/live/<check>.js`, or with `recordVideo` in a check's code; `cli.js video --seconds
-  <n>` records for a length of time, from when it says `recording` on stderr. It records
-  Live's main window; `--window <id>` records another of Live's windows, and `--screen` the
-  whole display, for what the window leaves out: menus, dialogs and other windows over it,
-  and harness-computer-use's pill (`harness/README.md`).
+- A video: record around what changes Live with `cli.js video -- <command>`, such as `-- node
+  tests/live/<check>.js`. In a check's code, use `recordVideo`. `cli.js video --seconds <n>`
+  records for a length of time, from when it says `recording` on stderr. It records Live's
+  main window. `--window <id>` records another of Live's windows. `--screen` records the whole
+  display, for what the window leaves out: menus, dialogs, other windows over it, and
+  harness-computer-use's pill (`harness/README.md`).
 - You can't watch a video. Before calling one proof, save its frames from before and after
   the change with `cli.js video-frame <mov> <seconds>`, look at them, and report the video
   with the times you checked and what each frame shows.
@@ -177,8 +185,8 @@ screenshot say.
 A capture is proof to show once, not part of the project. Give the user its path with "in
 Finder, press Cmd+Shift+G and paste this path", or open it for them, and delete it once they
 have watched it, unless they say to keep it. In that case, move it to a path of theirs.
-Delete the frames you saved only to look at once you have looked. Anything left in the
-captures folder is deleted once a capture is saved there more than 7 days later.
+Delete the frames you saved only to look at once you have looked. Each capture saved to the
+captures folder deletes the captures there older than 7 days.
 
 ## Evidence
 
@@ -188,11 +196,11 @@ failure. Report the result in one line and show failures in full. The rest is in
 log (see "Run logs"). Where the evidence is on screen, it is a still or a video ("Captures").
 A check that never failed proves little. When you add a case, show it failing once on a wrong
 expectation. A Live fix is proven when the check that reproduced the bug passes twice, the
-second time with a different input, tempo or transport state. Make no more runs unless one
+second time with a different input, tempo, or transport state. Make no more runs unless one
 fails. Where timing matters (steps, swing, note lengths), a pass at one tempo proves little.
 Make the second run a different tempo with `--tempo`.
 Timing errors under one sample are the recording's resolution (`compare.js` in
-`harness/README.md`), not a difference between runs or builds. Report a failure as a finding; don't
+`harness/README.md`), not a difference between runs or builds. Report a failure as a finding. Don't
 loosen a tolerance or an expectation to make it pass without saying so.
 
 ## Run logs
@@ -231,10 +239,10 @@ git worktree of one (`project/.worktrees/branch`), whose repo's git comes with i
 remote has them at the same path under its home. `remote.sh` first copies the working copies of the
 harness and `<repo>` to the remote, replacing what's there. Then it runs the command
 in `<repo>` there, with `LIVE_HARNESS` set, and its exit status is the command's. Stills,
-videos and frames taken there with no path come back to this Mac's captures folder, and
+videos, and frames taken there with no path come back to this Mac's captures folder, and
 `remote.sh` names each at its path here. Show the user that path, not the remote's. Ctrl-C
 on `remote.sh` doesn't reach the remote. The run there goes on to its end, and its logs and
-captures come back after the next run. A build made on the
-remote (a plug-in's, say) goes outside `<repo>`, which the next run replaces. Delete
+captures come back after the next run. Put a build you make on the
+remote, such as a plug-in's, outside `<repo>`, because the next run replaces `<repo>`. Delete
 it when the work is done. The project's builds folder
 must be in the remote's Places, a worktree's too (see "Running on a second Mac" in `harness/README.md`).
